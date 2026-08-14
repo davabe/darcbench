@@ -1,0 +1,218 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "storage.mixed",
+  "version": "1.0.0",
+  "title": "Mixed storage workloads",
+  "purpose": "Measure sequential and 4K random read and write throughput at realistic queue depths, tail latency, and fsync durability cost, against a regular file opened with direct I/O so the result describes the device rather than the page cache.",
+  "category": "storage",
+  "safety_class": "writes_temporary_files",
+  "supported_architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "storage_mixed::StorageMixed",
+    "note": "Native rather than an fio adapter. fio's methodology is followed (direct=1, warm-up before recording, realistic queue depths) but not its binary: the product requires a single static binary that runs anywhere it is copied, and a storage module that only worked where fio happened to be installed would leave the Storage category empty on most hosts. An fio adapter remains worthwhile later as a cross-check and as a route to io_uring queue depths."
+  },
+  "dependencies": [],
+  "max_bytes_written": 2147483648,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "safety": {
+    "fixture_name": "storage-mixed.fixture",
+    "regular_files_only": true,
+    "open_flags": [
+      "O_NOFOLLOW",
+      "O_DIRECT (when the filesystem supports it)",
+      "O_EXCL|O_CREAT on creation"
+    ],
+    "note": "The path is composed by the agent's StatePath and the module appends one compile-time constant name. O_NOFOLLOW means a symlink planted at that path cannot redirect the open at a block device, O_EXCL means a link that reappears after the stale-fixture removal aborts creation instead of being written through, and the open file is asserted to be a regular file before any byte is written. Never a raw block device, ever, by any flag."
+  },
+  "sizing": {
+    "preferred_fixture_bytes": 2147483648,
+    "min_fixture_bytes": 67108864,
+    "free_space_share": 0.125,
+    "note": "The fixture is the smaller of the preferred size and a fraction of free space, rounded down to whole large blocks. Unknown free space yields the minimum and the run is refused, never treated as unlimited."
+  },
+  "preparation": "Remove any fixture left by a crashed run, create the file exclusively, fill it with non-zero data so it is fully allocated rather than sparse, and fsync it before measuring. A sparse file would let reads be answered from a hole without the device being touched.",
+  "calibration": "Per workload, grow a probe from one operation by a bounded proportional step until a repetition exceeds a quarter of target_rep_ms, then extrapolate linearly. Capped at 2^24 operations.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics.",
+  "workloads": [
+    {
+      "key": "sequential_read.qd1",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "1 MiB blocks read in order, one outstanding operation.",
+      "represents": "Streaming a large file: backups, media, log shipping"
+    },
+    {
+      "key": "sequential_write.qd1",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "1 MiB blocks written in order, one outstanding operation.",
+      "represents": "Bulk ingest, restores, image writes"
+    },
+    {
+      "key": "random_read_4k.qd1",
+      "unit": "IOPS",
+      "direction": "higher_is_better",
+      "description": "4 KiB reads at random block-aligned offsets, one outstanding operation.",
+      "represents": "An index probe with nothing to overlap it"
+    },
+    {
+      "key": "random_read_4k.qd16",
+      "unit": "IOPS",
+      "direction": "higher_is_better",
+      "description": "The same, with sixteen operations outstanding.",
+      "represents": "A busy server with many requests in flight"
+    },
+    {
+      "key": "random_write_4k.qd1",
+      "unit": "IOPS",
+      "direction": "higher_is_better",
+      "description": "4 KiB writes at random block-aligned offsets, one outstanding operation.",
+      "represents": "Synchronous small writes"
+    },
+    {
+      "key": "random_write_4k.qd16",
+      "unit": "IOPS",
+      "direction": "higher_is_better",
+      "description": "The same, with sixteen operations outstanding.",
+      "represents": "Concurrent small writes"
+    },
+    {
+      "key": "random_mixed_4k.qd16",
+      "unit": "IOPS",
+      "direction": "higher_is_better",
+      "description": "70% reads, 30% writes, 4 KiB, sixteen outstanding. Different from running the two separately because a device's read and write paths contend.",
+      "represents": "A database under load"
+    },
+    {
+      "key": "latency_read_4k.p99",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "99th percentile of per-operation read latency, by nearest rank, captured from the QD1 random read repetitions.",
+      "represents": "The slow 1% of reads, which is what a user notices"
+    },
+    {
+      "key": "latency_write_4k.p99",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "99th percentile of per-operation write latency, captured from the QD1 random write repetitions.",
+      "represents": "The slow 1% of writes"
+    },
+    {
+      "key": "latency_fsync.mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "One 4 KiB write followed by fsync of the data, per operation.",
+      "represents": "What every database commit pays for durability"
+    }
+  ],
+  "shapes": [
+    {
+      "key": "qd1",
+      "queue_depth": 1,
+      "measures": "device response time with nothing to overlap it"
+    },
+    {
+      "key": "qd16",
+      "queue_depth": 16,
+      "measures": "throughput with concurrency",
+      "note": "Reached with one thread per outstanding operation, fio's numjobs model rather than its iodepth model: without io_uring or libaio, which are not reachable from safe Rust, concurrent threads are how a device is given more than one request. Depth 16 rather than a vanity 256, because a web server does not run 256 outstanding I/Os."
+    }
+  ],
+  "metrics": [
+    "sequential_read.qd1",
+    "sequential_write.qd1",
+    "random_read_4k.qd1",
+    "random_read_4k.qd16",
+    "random_write_4k.qd1",
+    "random_write_4k.qd16",
+    "random_mixed_4k.qd16",
+    "latency_read_4k.p99",
+    "latency_write_4k.p99",
+    "latency_fsync.mean"
+  ],
+  "derived_metrics": [
+    {
+      "key": "steady_state_ratio",
+      "formula": "median(last third of measured reps) / median(first third)",
+      "note": "Reported per write workload. Below 0.70 the run visibly slowed as it went, which is the shape of an SLC cache filling up, a burst allowance running out or a thermal limit. Published rather than averaged away, because the opening figure is then not the device's sustained speed."
+    }
+  ],
+  "repetitions": {
+    "quick": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "standard": {
+      "warmup": 2,
+      "measured": 7,
+      "target_rep_ms": 300
+    },
+    "deep": {
+      "warmup": 3,
+      "measured": 11,
+      "target_rep_ms": 500
+    },
+    "endurance": {
+      "warmup": 2,
+      "measured": 31,
+      "target_rep_ms": 500
+    }
+  },
+  "validation": [
+    "Every workload must produce at least 5 measured repetitions.",
+    "Repetitions shorter than 20 ms are rejected as timer-noise dominated.",
+    "A filesystem that refuses direct I/O downgrades the result: the figures then describe the page cache as well as the device.",
+    "Throughput falling below 70% of its opening level across the repetitions is reported as a steady-state failure, not averaged away.",
+    "A percentile is withheld when any repetition completed fewer than 100 operations, because a p99 from a handful of observations is a number wearing a statistical name.",
+    "Coefficient of variation above 0.20 raises a high-variance warning and downgrades the result to Degraded."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no scratch directory was provided",
+    "the fixture does not fit in the free space reported",
+    "an I/O error during measurement",
+    "measurement produced no usable samples"
+  ],
+  "cleanup": "The single fixture file is removed when the module returns, on every exit path including errors and cancellation, and a fixture left behind by a crashed run is removed before a new one is created.",
+  "stability_cv_bound": 0.2,
+  "comparability": [
+    "module.version",
+    "agent.build_target",
+    "storage.filesystem",
+    "plan.fixture_bytes",
+    "plan.direct_io"
+  ],
+  "limitations": [
+    "Measures the filesystem and the storage stack as configured, not the bare device: RAID, LVM, ZFS, virtio and the mount options all sit in the path and are recorded in the environment snapshot for that reason.",
+    "Queue depth is reached with one thread per outstanding operation rather than an asynchronous submission queue, so a small amount of scheduling overhead is charged to the result at depth 16.",
+    "No SSD preconditioning is performed. A drive that has been idle will report its burst behaviour in the first repetitions; the steady-state ratio is published so that is visible rather than hidden, but a full preconditioning pass would take hours and write far more than a benchmark should.",
+    "The fixture is a fraction of free space, so a nearly-full disk is measured over a smaller offset range than an empty one. The size used is recorded.",
+    "fsync latency depends on whether the device or its controller honours cache flushes. A drive that lies about flushing will report an excellent number here, and no benchmark run from userspace can detect that."
+  ],
+  "scoring": {
+    "category": "storage",
+    "facets": {},
+    "metric_weight": {
+      "sequential_read.qd1": 0.75,
+      "sequential_write.qd1": 0.75,
+      "random_read_4k.qd1": 1.5,
+      "random_read_4k.qd16": 1.0,
+      "random_write_4k.qd1": 1.5,
+      "random_write_4k.qd16": 1.0,
+      "random_mixed_4k.qd16": 1.25,
+      "latency_read_4k.p99": 1.25,
+      "latency_write_4k.p99": 1.25,
+      "latency_fsync.mean": 1.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Random I/O and durability outweigh streaming, because a web server almost never streams a whole file but pays fsync on every write its database commits. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

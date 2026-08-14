@@ -1,0 +1,17 @@
+# Build-script policy for dependencies.
+#
+# pnpm does not run dependency install scripts unless they are explicitly
+# decided here. Leaving the decision undeclared is not neutral: pnpm 11 exits
+# non-zero with ERR_PNPM_IGNORED_BUILDS, which breaks `install && build`.
+#
+# `allowBuilds` is the pnpm 11 spelling and is also honoured by pnpm 10. The
+# older `pnpm.ignoredBuiltDependencies` field in package.json is read by pnpm 10
+# only and is silently ignored by pnpm 11, so it is deliberately not used.
+#
+# esbuild: false — its postinstall is deliberately NOT run. esbuild 0.28 ships
+# its native binary through platform-specific optional dependencies, so the
+# build does not need the script (verified from a clean node_modules on both
+# pnpm 10.33 and 11.20), and not executing third-party install scripts is the
+# more conservative supply-chain position.
+allowBuilds:
+  esbuild: false

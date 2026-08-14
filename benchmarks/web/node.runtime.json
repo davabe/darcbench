@@ -1,0 +1,198 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "node.runtime",
+  "version": "1.0.0",
+  "title": "Node.js runtime",
+  "purpose": "Measure how fast this machine runs Node.js: JSON, server-side rendering, hashing, event-loop file I/O, module loading and process start-up, against the runtime the operator installed, with its Node and V8 versions disclosed.",
+  "category": "web",
+  "safety_class": "provisions_services",
+  "supported_architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "implementation": {
+    "kind": "subprocess",
+    "crate": "darcbench-modules",
+    "entry": "node_runtime::NodeRuntime",
+    "note": "Shares the hardened execution layer with php.runtime: a compile-time path allow-list, a safe-path check on the binary and every ancestor directory, fixed argv, no shell, a cleared environment, a hard timeout with every wait bounded, and a script created O_EXCL|O_NOFOLLOW with its mode set at creation. See docs/adr/0013-executing-a-discovered-runtime.md and docs/THREAT-MODEL.md (T-EXEC)."
+  },
+  "dependencies": [
+    "a Node.js binary at an allow-listed, root-owned path"
+  ],
+  "max_bytes_written": 1048576,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "safety": {
+    "interpreter_source": "compile-time allow-list of absolute paths",
+    "never": [
+      "$PATH, which is environment and therefore attacker-influenceable",
+      "a caller-supplied path, binary or argument",
+      "a shell",
+      "an inherited environment"
+    ],
+    "safe_path_check": "The resolved binary and every ancestor directory must be owned by uid 0 and must not be group- or world-writable. Checking only the file is the classic mistake: whoever can write the directory can replace what is in it. A path that fails is skipped and the reason is reported to the operator, because a binary a non-root user can replace is a privilege-escalation path independently of this benchmark.",
+    "environment": "Cleared, not filtered. PHP reads PHP_INI_SCAN_DIR and Node reads NODE_OPTIONS; both turn an environment variable into code execution, and a filter is a list of the ones somebody thought of. The working directory is set to / so nothing can reach a relative path.",
+    "script": "Created O_EXCL|O_NOFOLLOW with its mode set at creation, in a scratch directory that is refused if anyone but its owner can write it. A root interpreter pointed at somebody else's script is root code execution just as surely as somebody else's interpreter is.",
+    "not_implemented": "Resource limits on the child. Setting rlimits needs Command::pre_exec, which is unsafe, and unsafe_code = \"forbid\" is workspace-wide - so the child is bounded by wall clock only. Recorded in docs/BACKLOG.md rather than left implied.",
+    "note": "The adversary is a2, a local unprivileged user - not the operator, who controls the machine anyway. Shared and reseller hosting is the common case in this market and the agent is frequently run as root.",
+    "version_managers": "nvm, fnm, volta and asdf installs are not searched. They live under $HOME, which is not a fixed path and is owned by an ordinary user, so a benchmark running as root must not execute them - they would fail the safe-path check anyway, and listing them would turn a clean 'no Node found' into a confusing rejection.",
+    "timeout_s": 120
+  },
+  "runtime_disclosure": {
+    "recorded": [
+      "interpreter path",
+      "Node version",
+      "V8 version",
+      "libuv version",
+      "architecture",
+      "jitless / lite-mode build flag",
+      "pointer compression",
+      "heap size limit",
+      "libuv thread pool size"
+    ],
+    "note": "Two Node results from different major versions are not comparable, because V8 changes what the same JavaScript costs between releases. A jitless build is disclosed and degrades the result: it runs an order of magnitude slower and would otherwise read as a slow machine."
+  },
+  "dependency_installation": {
+    "performed": false,
+    "note": "docs/BENCHMARK-METHODOLOGY.md requires that dependency installation be separated from compilation, because package download time is a network measurement rather than build performance. This module satisfies that in the strongest available way: it installs nothing at all. `module.load` generates its own 64-module tree and measures resolution, compilation and first execution with the require cache cleared between iterations, so the download half of a cold start is structurally absent rather than subtracted. An npm install benchmark would measure a registry, a CDN and a lockfile resolver."
+  },
+  "preparation": "The runtime is discovered and safety-checked, the workload script is written, and `describe` is run before any measurement. A Node that cannot be interrogated fails here with a readable reason rather than producing a run full of zeroes.",
+  "calibration": "Per workload, against the script's own internal elapsed time rather than the wall clock of the invocation. Process start-up must not enter the search: a machine with a slow fork would otherwise be calibrated to do less work per repetition and then reported as slow at JavaScript, which is a different claim.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics. Each repetition is its own process, so V8 starts cold every time - which is itself what `startup.cold` and `module.load` measure.",
+  "workloads": [
+    {
+      "key": "json.stringify",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Serialising a nested product record",
+      "represents": "Building a response body: where every API request ends"
+    },
+    {
+      "key": "json.parse",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Parsing a pre-built document",
+      "represents": "Reading a request body or a cached blob"
+    },
+    {
+      "key": "ssr.render",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Walking a tree and concatenating escaped strings",
+      "represents": "Server-side rendering, reduced to what every framework compiles down to"
+    },
+    {
+      "key": "crypto.hash",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "SHA-256 over a 10 KiB buffer via node:crypto",
+      "represents": "Sessions, ETags, cache keys, integrity checks"
+    },
+    {
+      "key": "async.fileio",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Batched 4 KiB write-then-read cycles through fs/promises",
+      "represents": "The event loop and the libuv thread pool, which is what a service is made of between the CPU work"
+    },
+    {
+      "key": "module.load",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Resolving, compiling and executing a generated 64-module tree with the require cache cleared",
+      "represents": "What a dependency tree costs on a cold start - paid by every serverless invocation and every deploy, and removed by no cache"
+    },
+    {
+      "key": "startup.cold",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Process creation, V8 start-up and script compilation, timed from outside",
+      "represents": "What an invocation pays without a warm worker"
+    }
+  ],
+  "shapes": [
+    {
+      "key": "single",
+      "measures": "one Node process at a time; the per-request path is single-threaded, and clustering is a deployment property rather than a machine one"
+    }
+  ],
+  "metrics": [
+    "json.stringify",
+    "json.parse",
+    "ssr.render",
+    "crypto.hash",
+    "async.fileio",
+    "module.load",
+    "startup.cold"
+  ],
+  "derived_metrics": [],
+  "repetitions": {
+    "quick": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "standard": {
+      "warmup": 2,
+      "measured": 7,
+      "target_rep_ms": 300
+    },
+    "deep": {
+      "warmup": 3,
+      "measured": 11,
+      "target_rep_ms": 500
+    },
+    "endurance": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "note": "The module is not in the standard profile, for the same reason php.runtime is not: it executes a runtime the operator installed, and most machines have no Node. It runs in `web` and `deep`."
+  },
+  "validation": [
+    "The runtime must be at an allow-listed path that is root-owned and writable only by root, along with every directory above it. A Node that fails that check is refused and the reason is reported.",
+    "Every workload returns a checksum, and a repetition whose checksum differs from the first is rejected: V8 is an optimising compiler, and a loop whose result is never observed is a loop it is entitled to delete.",
+    "Every metric needs at least three successful repetitions; below that it is withheld rather than reported from noise.",
+    "A jitless or lite-mode build of Node is disclosed and degrades the result: it runs an order of magnitude slower and would otherwise read as a slow machine."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no allow-listed Node binary exists",
+    "every Node binary that exists fails the safe-path check",
+    "the runtime cannot run the description pass",
+    "an invocation exceeds the 120-second timeout"
+  ],
+  "cleanup": "The workload script and the module tree and temporary files it generated are removed when the module returns, on every path including cancellation and an error. They are not removed on a panic: the release profile sets panic = \"abort\" and destructors do not run on abort, so the next run removes them before writing its own. No configuration is read or altered and no Node process outlives the run.",
+  "stability_cv_bound": 0.2,
+  "comparability": [
+    "module.version",
+    "agent.build_target",
+    "node.version",
+    "node.v8",
+    "node.jitless"
+  ],
+  "limitations": [
+    "This measures the Node the operator installed, so results are comparable only between machines running the same major version - V8 changes what the same JavaScript costs between releases. The version is recorded in every bundle for exactly that reason.",
+    "Dependency installation is not measured at all, rather than measured and subtracted. module.load generates its own tree, so the download half of a cold start is structurally absent - which is what the methodology asks for, since package download time is a network measurement.",
+    "Version-manager installs (nvm, fnm, volta, asdf) are not measured. They live under $HOME, owned by an ordinary user, so a benchmark running as root must not execute them. The refusal is reported rather than silent.",
+    "async.fileio deliberately uses small files and shallow batches, so it measures the event loop and the libuv thread pool rather than the device. storage.mixed measures the device; doing it again here would put the same disk in two categories.",
+    "Worker threads and clustering are not measured. Node's concurrency story for a web server is one process per core behind a load balancer, which is a deployment property rather than a machine one.",
+    "startup.cold includes process creation as well as V8 start-up, because that is what an invocation without a warm worker actually pays."
+  ],
+  "scoring": {
+    "category": "web",
+    "facets": {},
+    "metric_weight": {
+      "async.fileio": 1.25,
+      "module.load": 1.25,
+      "json.stringify": 1.0,
+      "json.parse": 1.0,
+      "ssr.render": 1.0,
+      "startup.cold": 1.0,
+      "crypto.hash": 0.75
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Event-loop I/O and module loading carry the most weight: the first is what a Node service is actually made of between the CPU work, and the second is the cold-start cost that every serverless invocation and every deploy pays and that no cache removes. Scored into Web rather than Compute because what is being measured is what a JIT does on this silicon - V8's inline caches and garbage collector behave differently from hand-written Rust on the same machine, and it is the JIT's behaviour that decides how a Node service feels. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

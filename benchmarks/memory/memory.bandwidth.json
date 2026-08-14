@@ -1,0 +1,187 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "memory.bandwidth",
+  "version": "1.0.0",
+  "title": "Memory bandwidth and latency",
+  "purpose": "Measure sequential, streaming and random memory throughput plus random-access latency, at working sets sized from the host's own cache topology so the result describes DRAM rather than cache.",
+  "category": "memory",
+  "safety_class": "compute_intensive",
+  "supported_architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "memory_bandwidth::MemoryBandwidth"
+  },
+  "dependencies": [],
+  "max_bytes_written": 0,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "sizing": {
+    "llc_multiple": 4,
+    "fallback_llc_bytes": 33554432,
+    "min_working_set_bytes": 33554432,
+    "max_working_set_bytes": 536870912,
+    "memory_budget_fraction": 0.25,
+    "min_credible_multiple": 2,
+    "note": "The documented multiple applies to what a shape actually streams. For the single-threaded shape that is one thread's buffer; for the multi-threaded shape it is the aggregate across threads, because the threads share the last-level cache and evict each other. Each thread's slice must also exceed l2_multiple times its private L2. Sizes are clamped to max_working_set_bytes and then to memory_budget_fraction of MemAvailable divided across threads. A shape whose working set falls below min_credible_multiple times cache is reported as cache-contaminated and downgrades the result to Degraded.",
+    "l2_multiple": 4
+  },
+  "preparation": "Allocate one working set per thread and write every element before any timing, so page faults, zero-page sharing and NUMA first-touch placement are paid for outside the measured region. Buffers are reused across repetitions.",
+  "calibration": "Per access pattern and shape, grow a probe from one pass by a bounded proportional step until a repetition exceeds a quarter of target_rep_ms, then extrapolate linearly. Capped at 2^24 passes.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics.",
+  "workloads": [
+    {
+      "key": "sequential_read",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "Sum a DRAM-sized u64 buffer in order.",
+      "represents": "Scans: log processing, full-table reads, template rendering"
+    },
+    {
+      "key": "sequential_write",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "Store a per-pass value across a DRAM-sized u64 buffer.",
+      "represents": "Buffer fills, response assembly, page-cache population"
+    },
+    {
+      "key": "sequential_copy",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "Copy between two DRAM-sized buffers via the platform memcpy. Traffic counted in both directions, STREAM Copy style.",
+      "represents": "memcpy between buffers"
+    },
+    {
+      "key": "triad",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "a = b + k*c across three DRAM-sized buffers. Traffic counted as two reads plus one write, STREAM Triad style.",
+      "represents": "Multi-stream traffic that saturates a memory controller"
+    },
+    {
+      "key": "random_read",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "Independent gathers through a full-length random permutation.",
+      "represents": "Hash lookups, index probes, interpreter object graphs"
+    },
+    {
+      "key": "cache_read",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "The sequential read kernel over a working set sized to half of L2.",
+      "represents": "The same scan when the working set fits in cache"
+    },
+    {
+      "key": "latency_random",
+      "unit": "ns",
+      "direction": "lower_is_better",
+      "description": "Dependent pointer chase through a Sattolo-shuffled single cycle, so no access can be prefetched or overlapped. Chunked into 65536-load passes with a cursor that persists across repetitions: a full traversal of a bandwidth-sized working set takes tens of seconds at DRAM latency, and restarting each pass from the beginning would re-walk lines already in cache.",
+      "represents": "Linked structures, B-tree descent, PHP array traversal"
+    }
+  ],
+  "shapes": [
+    {
+      "key": "single",
+      "threads": 1,
+      "measures": "per-core memory performance"
+    },
+    {
+      "key": "multi",
+      "threads": "logical_cpus",
+      "measures": "aggregate memory system throughput",
+      "note": "latency_random has no multi shape: a threaded latency figure measures contention between cores, which is a different quantity."
+    }
+  ],
+  "metrics": [
+    "sequential_read.single",
+    "sequential_read.multi",
+    "sequential_write.single",
+    "sequential_write.multi",
+    "sequential_copy.single",
+    "sequential_copy.multi",
+    "triad.single",
+    "triad.multi",
+    "random_read.single",
+    "random_read.multi",
+    "cache_read.single",
+    "cache_read.multi",
+    "latency_random.single"
+  ],
+  "derived_metrics": [
+    {
+      "key": "cache_cliff",
+      "formula": "cache_read.single / sequential_read.single",
+      "note": "How much faster the same scan is when the working set fits in cache. Reported as context, never scored: it is a property of the cache hierarchy and a machine with a small L3 should not be penalised for it twice."
+    }
+  ],
+  "repetitions": {
+    "quick": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "standard": {
+      "warmup": 2,
+      "measured": 7,
+      "target_rep_ms": 300
+    },
+    "deep": {
+      "warmup": 3,
+      "measured": 11,
+      "target_rep_ms": 500
+    },
+    "endurance": {
+      "warmup": 2,
+      "measured": 31,
+      "target_rep_ms": 500
+    }
+  },
+  "validation": [
+    "Every access pattern must produce at least 5 measured repetitions.",
+    "Repetitions shorter than 20 ms are rejected as timer-noise dominated.",
+    "A shape whose working set falls below twice the last-level cache is reported as cache-contaminated and downgrades the result to Degraded.",
+    "Coefficient of variation above 0.15 raises a high-variance warning and downgrades the result to Degraded."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "measurement produced no usable samples"
+  ],
+  "cleanup": "None required: the module allocates only heap memory, which is released when it returns, including on cancellation.",
+  "stability_cv_bound": 0.15,
+  "comparability": [
+    "module.version",
+    "cpu.architecture",
+    "agent.build_target",
+    "params.threads",
+    "plan.single_bytes",
+    "plan.multi_bytes_per_thread",
+    "plan.llc_bytes"
+  ],
+  "limitations": [
+    "Working sets are sized from the cache topology the host reports. Inside a container or a hypervisor that exports none, a documented default is used instead and the result records that it was assumed.",
+    "Thread placement is left to the operating system, so on a multi-socket machine the multi-threaded figures reflect default first-touch NUMA placement rather than an isolated per-node measurement. Binding threads to nodes needs privileges this module deliberately does not take.",
+    "The kernels are plain loops: no hand-written SIMD and no explicit non-temporal stores, so they measure what a normal optimised program achieves, including whatever the compiler auto-vectorises. sequential_copy is the exception - it delegates to the platform memcpy, which is what real software does and which may use non-temporal stores or other tricks the other kernels do not. That is why it can report more total traffic than a plain read of the same buffer.",
+    "Copy and Triad count traffic in both directions, as STREAM does, so their figures are roughly double and triple a one-way read of the same buffer.",
+    "Random-access latency includes TLB misses, which is what a real workload experiences but makes the figure sensitive to huge-page configuration."
+  ],
+  "scoring": {
+    "category": "memory",
+    "facets": {},
+    "metric_weight": {
+      "sequential_read": 1.0,
+      "sequential_write": 1.0,
+      "sequential_copy": 1.0,
+      "triad": 1.0,
+      "random_read": 1.5,
+      "cache_read": 0.5,
+      "latency_random": 1.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Memory metrics carry no single_core/multi_core facet: those facets are published as core-performance numbers, and folding DRAM latency into them would change what an already-shipped score means. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

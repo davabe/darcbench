@@ -1,0 +1,29 @@
+[package]
+name = "darcbench-modules"
+description = "Benchmark module contract and the first-party DARCBench workload modules."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+darcbench-protocol.workspace = true
+chrono.workspace = true
+# For `O_DIRECT` and `statvfs` through safe wrappers; the workspace forbids
+# `unsafe_code`, so raw libc calls are not an option.
+rustix = { version = "1", features = ["fs"] }
+rcgen.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
+rustls-pki-types.workspace = true
+flate2.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

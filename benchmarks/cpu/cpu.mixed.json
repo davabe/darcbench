@@ -1,0 +1,148 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "cpu.mixed",
+  "version": "1.0.1",
+  "title": "Mixed CPU workloads",
+  "purpose": "Measure per-core and aggregate CPU performance across hashing, compression, serialisation, integer and floating-point work representative of web server duty.",
+  "category": "compute",
+  "safety_class": "compute_intensive",
+  "supported_architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "cpu_mixed::CpuMixed"
+  },
+  "dependencies": [],
+  "max_bytes_written": 0,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "preparation": "Generate five deterministic corpora from CORPUS_SEED via SplitMix64.",
+  "calibration": "Per workload and shape, grow a probe from one iteration by a bounded proportional step until a repetition exceeds a quarter of target_rep_ms, then extrapolate linearly. Capped at 2^24 iterations.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics.",
+  "workloads": [
+    {
+      "key": "crypto_sha256",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "SHA-256 over a 1 MiB deterministic buffer.",
+      "represents": "TLS, content hashing, integrity checks"
+    },
+    {
+      "key": "compress_deflate",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "DEFLATE level 6 over a 512 KiB English-like corpus.",
+      "represents": "Content-Encoding: gzip on every response"
+    },
+    {
+      "key": "json_roundtrip",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Serialise and parse a 64-record product document.",
+      "represents": "API serialisation and parsing"
+    },
+    {
+      "key": "integer_sort",
+      "unit": "Melem/s",
+      "direction": "higher_is_better",
+      "description": "Refill and sort 262144 u64 values.",
+      "represents": "ORDER BY, index maintenance, log processing"
+    },
+    {
+      "key": "float_matmul",
+      "unit": "MFLOP/s",
+      "direction": "higher_is_better",
+      "description": "128x128 dense f64 matrix multiply, i-k-j ordered.",
+      "represents": "Floating-point throughput"
+    }
+  ],
+  "shapes": [
+    {
+      "key": "single",
+      "threads": 1,
+      "measures": "per-core performance"
+    },
+    {
+      "key": "multi",
+      "threads": "logical_cpus",
+      "measures": "aggregate throughput, SPECrate style"
+    }
+  ],
+  "metrics": [
+    "crypto_sha256.single",
+    "crypto_sha256.multi",
+    "compress_deflate.single",
+    "compress_deflate.multi",
+    "json_roundtrip.single",
+    "json_roundtrip.multi",
+    "integer_sort.single",
+    "integer_sort.multi",
+    "float_matmul.single",
+    "float_matmul.multi"
+  ],
+  "derived_metrics": [
+    {
+      "key": "scaling_efficiency",
+      "formula": "mean(multi / (single * threads))",
+      "note": "Below 0.5 on a dedicated-vCPU plan suggests SMT saturation, thermal limits or oversubscription."
+    }
+  ],
+  "repetitions": {
+    "quick": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "standard": {
+      "warmup": 2,
+      "measured": 7,
+      "target_rep_ms": 300
+    },
+    "deep": {
+      "warmup": 3,
+      "measured": 11,
+      "target_rep_ms": 500
+    },
+    "endurance": {
+      "warmup": 2,
+      "measured": 31,
+      "target_rep_ms": 500
+    }
+  },
+  "validation": [
+    "Every workload must produce at least 5 measured repetitions.",
+    "Repetitions shorter than 20 ms are rejected as timer-noise dominated.",
+    "Coefficient of variation above 0.15 raises a high-variance warning and downgrades the result to Degraded."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "measurement produced no usable samples"
+  ],
+  "cleanup": "None required: the module allocates only heap memory, released when it returns.",
+  "stability_cv_bound": 0.15,
+  "comparability": [
+    "module.version",
+    "cpu.architecture",
+    "agent.build_target",
+    "params.threads"
+  ],
+  "limitations": [
+    "Measures the CPU as the operating system presents it. Inside a container or a cgroup-limited VM the result describes that sandbox, not the host.",
+    "Does not use hand-written SIMD; it measures what a normal optimised program achieves, including whatever the compiler auto-vectorises.",
+    "Multi-threaded shapes measure throughput, not parallel speed-up of a single problem, so they do not capture inter-core latency or lock contention."
+  ],
+  "scoring": {
+    "category": "compute",
+    "facets": {
+      "single": "single_core",
+      "multi": "multi_core"
+    },
+    "metric_weight": 1.0,
+    "reference_profile": "DARC-REF-1",
+    "note": "Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

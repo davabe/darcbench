@@ -1,0 +1,27 @@
+# Pinned Rust toolchain.
+#
+# This exists because toolchain drift has already broken this project twice:
+# a clippy lint present in 1.97 but not 1.94 failed CI after passing locally,
+# and the equivalent problem on the JavaScript side (pnpm 10 warning where
+# pnpm 11 errors) broke `install && build` on a contributor's machine while CI
+# stayed green. Both were version skew between CI and a developer, and both are
+# preventable by pinning.
+#
+# `rustup` reads this file automatically, so `cargo build` uses this toolchain
+# with no per-machine setup. CI installs it with `rustup show`.
+#
+# NOT the same thing as `rust-version` in the workspace Cargo.toml: that is the
+# minimum supported Rust version (MSRV, currently 1.82) that consumers must be
+# able to build with. This is the single version we build, lint and test with,
+# so that everyone sees identical diagnostics.
+#
+# Bumping: change `channel`, run
+#   cargo fmt --all && cargo clippy --all-targets --all-features -- -D warnings
+#   cargo test --workspace --release
+# and fix whatever new lints appear in the same commit. The `lint-latest` job in
+# CI runs against current stable without blocking, so new lints are visible
+# before a bump rather than after it.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

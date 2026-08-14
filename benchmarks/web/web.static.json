@@ -1,0 +1,159 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "web.static",
+  "version": "1.0.0",
+  "title": "Static object serving",
+  "purpose": "Measure how many HTTP requests this machine serves per second, at three object sizes, with and without connection reuse, over plaintext and TLS - against an origin the agent starts on loopback and destroys when the run ends.",
+  "category": "web",
+  "safety_class": "provisions_services",
+  "supported_architectures": ["x86_64", "aarch64"],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "web_static::WebStatic",
+    "note": "Both halves are written out rather than taken from a crate. The origin is a small HTTP/1.1 server the agent starts on 127.0.0.1 with an OS-assigned port; the client drives its own connections so that when a connection is reused, when it is closed and how many are open are decisions the measurement makes rather than a library. See docs/adr/0012-load-generation.md."
+  },
+  "dependencies": [],
+  "max_bytes_written": 0,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "safety": {
+    "target": "an origin this module starts on 127.0.0.1, on a port the OS assigns",
+    "never": [
+      "an operator-supplied URL or hostname",
+      "the operator's own web server",
+      "any interface other than loopback",
+      "any port that already has a listener"
+    ],
+    "note": "docs/THREAT-MODEL.md (T-AMPLIFY) is binding and permanent: a benchmark suite that lets you point a load generator at an arbitrary URL is a DDoS tool with a scoring model. Binding port 0 also means the module never races an occupied port, which docs/INSTALLER-AND-DISCOVERY.md requires. No configuration is read or altered (T-CONFIG)."
+  },
+  "origin": {
+    "protocol": "HTTP/1.1 with keep-alive",
+    "bind": "127.0.0.1:0",
+    "bodies": "generated once at start, deterministic, held in memory; never read from disk",
+    "tls": "rustls with the ring provider, terminating a certificate generated per run by rcgen with an IP SAN for 127.0.0.1. The certificate is trusted by exactly one client - this agent's own - and never touches the host trust store.",
+    "lifetime": "started when the module starts, dropped when it returns, on every path including cancellation"
+  },
+  "generator": {
+    "capacity": "closed-loop: connections loop flat out and the module reports what the origin served. The right tool for a capacity question, and it produces no latency distribution for coordinated omission to distort.",
+    "latency": "open-model at 70% of measured capacity. Request i is due at start + i/rate whatever happened before it, and every request is measured from when it was due rather than from when it was sent.",
+    "saturation": "schedule slip, rate shortfall or connection starvation each emit GeneratorSaturated, which degrades the result. Generator CPU is recorded as context rather than used as the criterion; see docs/adr/0012-load-generation.md.",
+    "connections": "logical CPUs, clamped to [2, 64]"
+  },
+  "preparation": "The origin is started and its object bodies generated before anything is measured. A failure to bind loopback is a Precondition error naming the cause, not a run full of zeroes.",
+  "calibration": "Capacity is measured, not calibrated to a duration target: the question this module asks is how much the machine serves, and the answer is the calibration. The measured capacity then sets the rate of the latency phase, which is the same relationship harness::calibrate_with has with the repetition it sizes.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics. The latency phase additionally discards one request per connection before recording, so connection setup and TLS handshakes are not folded into a steady-state serving distribution.",
+  "workloads": [
+    {
+      "key": "requests.small_keepalive",
+      "unit": "req/s",
+      "direction": "higher_is_better",
+      "description": "1 KiB objects over a reused connection",
+      "represents": "An API endpoint or a cached page: the shape most requests to a busy server take"
+    },
+    {
+      "key": "connections.plaintext",
+      "unit": "conn/s",
+      "direction": "higher_is_better",
+      "description": "1 KiB objects with a new TCP connection per request",
+      "represents": "What a client that will not keep alive costs, and the fixed price of a connection"
+    },
+    {
+      "key": "connections.tls",
+      "unit": "conn/s",
+      "direction": "higher_is_better",
+      "description": "The same with a full TLS handshake per request",
+      "represents": "What every fresh HTTPS visitor costs; dominated by one asymmetric operation, which is the most CPU-expensive thing a web server does per visitor"
+    },
+    {
+      "key": "throughput.medium",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "64 KiB objects over a reused connection",
+      "represents": "A typical page's assets"
+    },
+    {
+      "key": "throughput.large",
+      "unit": "MiB/s",
+      "direction": "higher_is_better",
+      "description": "1 MiB objects over a reused connection",
+      "represents": "Images, downloads and media"
+    },
+    {
+      "key": "latency.small_mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Mean response time at 70% of measured capacity, measured from when each request was due",
+      "represents": "Response time at a load the machine comfortably sustains"
+    },
+    {
+      "key": "latency.small_p99",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "99th percentile of the same distribution",
+      "represents": "The slow 1% - what a visitor notices, and what a mean conceals"
+    }
+  ],
+  "shapes": [
+    { "key": "keepalive", "measures": "one connection serving many requests, as a browser does" },
+    { "key": "per_request", "measures": "a new connection per request, so the number is connection setup rather than serving" }
+  ],
+  "metrics": [
+    "requests.small_keepalive",
+    "connections.plaintext",
+    "connections.tls",
+    "throughput.medium",
+    "throughput.large",
+    "latency.small_mean",
+    "latency.small_p99"
+  ],
+  "derived_metrics": [],
+  "repetitions": {
+    "quick": { "warmup": 1, "measured": 5, "target_rep_ms": 200 },
+    "standard": { "warmup": 2, "measured": 7, "target_rep_ms": 300 },
+    "deep": { "warmup": 3, "measured": 11, "target_rep_ms": 500 },
+    "endurance": { "warmup": 1, "measured": 5, "target_rep_ms": 200 },
+    "note": "target_rep_ms is the duration of one load phase, not the size of a unit of work: an HTTP measurement is a rate over a window rather than a fixed quantity of work timed."
+  },
+  "validation": [
+    "A phase whose load generator could not hold its schedule is reported GeneratorSaturated and degrades the result: a latency distribution recorded while the injector was behind describes the injector.",
+    "Every metric needs at least three successful repetitions; below that it is withheld rather than reported from noise.",
+    "A response shorter than the origin's declared Content-Length is an error, never a fast request."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "the origin cannot bind a loopback port",
+    "the origin's certificate cannot be generated or is rejected by the client"
+  ],
+  "cleanup": "The origin listener and its connections are closed when the module returns, on every path including cancellation. Nothing is written to disk and no configuration is read or altered.",
+  "stability_cv_bound": 0.2,
+  "comparability": [
+    "module.version",
+    "agent.build_target",
+    "web.connections",
+    "web.object_sizes"
+  ],
+  "limitations": [
+    "The load generator shares the machine with the origin it measures, so every figure here is a floor: the CPU the generator used is CPU the origin did not get. An external-generator mode is on the roadmap for machines fast enough to outrun a local injector.",
+    "HTTP/1.1 only. HTTP/2 and HTTP/3 need protocol stacks this build does not carry, and approximating them over HTTP/1.1 would be a guess wearing a precise name.",
+    "Compression is not measured. Serving gzip would measure this machine's deflate throughput, which `cpu.mixed` already measures and scores under Compute; counting it again here would charge the same CPU to two categories.",
+    "The origin is DARCBench's own, not the operator's web server. That is a permanent constraint (docs/THREAT-MODEL.md, T-AMPLIFY) and it is also what makes two machines comparable - a run against somebody's nginx measures their configuration.",
+    "Loopback has no packet loss, no reordering and an MTU unlike any real network. This measures the machine's HTTP stack, never its connectivity; `network.transfer` measures the second."
+  ],
+  "scoring": {
+    "category": "web",
+    "facets": {},
+    "metric_weight": {
+      "requests.small_keepalive": 1.5,
+      "latency.small_p99": 1.25,
+      "connections.tls": 1.0,
+      "throughput.medium": 1.0,
+      "latency.small_mean": 1.0,
+      "connections.plaintext": 0.75,
+      "throughput.large": 0.75
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Small-object serving carries the most weight because it is the shape most requests take. The 99th percentile outweighs the mean because the tail is what a visitor notices and the mean is what a dashboard reports. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

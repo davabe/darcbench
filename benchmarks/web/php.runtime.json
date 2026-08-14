@@ -1,0 +1,167 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "php.runtime",
+  "version": "1.0.0",
+  "title": "PHP runtime",
+  "purpose": "Measure how fast this machine runs PHP: JSON, arrays, templating, hashing and interpreter start-up, against the interpreter the operator installed, with its version, SAPI and OPcache state disclosed.",
+  "category": "web",
+  "safety_class": "provisions_services",
+  "supported_architectures": ["x86_64", "aarch64"],
+  "implementation": {
+    "kind": "subprocess",
+    "crate": "darcbench-modules",
+    "entry": "php_runtime::PhpRuntime",
+    "note": "The first module to execute a program it did not build. The workload script is compiled into the agent binary, written to the agent's own scratch directory at mode 0600 and passed by absolute path; the interpreter is invoked with a fixed argument vector, no shell and a cleared environment. See docs/adr/0013-executing-a-discovered-runtime.md and docs/THREAT-MODEL.md (T-EXEC)."
+  },
+  "dependencies": ["a PHP CLI binary at an allow-listed, root-owned path"],
+  "max_bytes_written": 65536,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "safety": {
+    "interpreter_source": "compile-time allow-list of absolute paths",
+    "never": [
+      "$PATH, which is environment and therefore attacker-influenceable",
+      "a caller-supplied path, binary or argument",
+      "a shell",
+      "an inherited environment"
+    ],
+    "safe_path_check": "The resolved binary and every ancestor directory must be owned by uid 0 and must not be group- or world-writable. Checking only the file is the classic mistake: whoever can write the directory can replace what is in it. A path that fails is skipped and the reason is reported to the operator, because a binary a non-root user can replace is a privilege-escalation path independently of this benchmark.",
+    "environment": "Cleared, not filtered. PHP reads PHP_INI_SCAN_DIR and Node reads NODE_OPTIONS; both turn an environment variable into code execution, and a filter is a list of the ones somebody thought of. The working directory is set to / so nothing can reach a relative path.",
+    "script": "Created O_EXCL|O_NOFOLLOW with its mode set at creation, in a scratch directory that is refused if anyone but its owner can write it. A root interpreter pointed at somebody else's script is root code execution just as surely as somebody else's interpreter is.",
+    "not_implemented": "Resource limits on the child. Setting rlimits needs Command::pre_exec, which is unsafe, and unsafe_code = \"forbid\" is workspace-wide - so the child is bounded by wall clock only. Recorded in docs/BACKLOG.md rather than left implied.",
+    "timeout_s": 120,
+    "note": "The adversary is a2, a local unprivileged user - not the operator, who controls the machine anyway. Shared and reseller hosting is the common case in this market and the agent is frequently run as root."
+  },
+  "runtime_disclosure": {
+    "recorded": [
+      "interpreter path",
+      "PHP version",
+      "SAPI",
+      "OPcache loaded / enabled / JIT state",
+      "memory_limit",
+      "ZTS and debug build flags",
+      "loaded extensions"
+    ],
+    "note": "docs/BENCHMARK-METHODOLOGY.md requires it, and comparability depends on it: two PHP results from differently configured interpreters are not comparable, and the comparison layer must be able to refuse on evidence rather than on trust."
+  },
+  "preparation": "The interpreter is discovered and safety-checked, the workload script is written, and `describe` is run before any measurement. A PHP that cannot be interrogated fails here with a readable reason rather than producing a run full of zeroes.",
+  "calibration": "Per workload, against the script's own internal elapsed time rather than the wall clock of the invocation. Process start-up must not enter the search: a machine with a slow fork would otherwise be calibrated to do less work per repetition and then reported as slow at PHP, which is a different claim.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics. Each repetition is its own process, so there is no interpreter state to warm between them - which is itself what `startup.cold` measures.",
+  "workloads": [
+    {
+      "key": "json.encode",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Encoding a nested product record",
+      "represents": "Building a response body: where every API request ends"
+    },
+    {
+      "key": "json.decode",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Decoding a pre-built document into an associative array",
+      "represents": "Reading a request body or a cached blob"
+    },
+    {
+      "key": "array.ops",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Building, sorting and filtering a 32-element array",
+      "represents": "The shape of every listing page ever written"
+    },
+    {
+      "key": "template.render",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "Assembling an escaped HTML fragment by concatenation",
+      "represents": "What every template engine compiles down to"
+    },
+    {
+      "key": "hash.sha256",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "SHA-256 over a 10 KiB payload",
+      "represents": "Sessions, ETags, cache keys, integrity checks"
+    },
+    {
+      "key": "hash.password",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "password_hash with bcrypt at a pinned cost of 8",
+      "represents": "A login: the most expensive thing a page does per user, and the one an operator can neither cache nor optimise away"
+    },
+    {
+      "key": "startup.cold",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Process creation, interpreter start-up and script compilation, timed from outside",
+      "represents": "What a request pays on a host without a warm worker pool"
+    }
+  ],
+  "shapes": [
+    { "key": "single", "measures": "one PHP process at a time; PHP is single-threaded per request and that is the path this module exists to measure" }
+  ],
+  "metrics": [
+    "json.encode",
+    "json.decode",
+    "array.ops",
+    "template.render",
+    "hash.sha256",
+    "hash.password",
+    "startup.cold"
+  ],
+  "derived_metrics": [],
+  "repetitions": {
+    "quick": { "warmup": 1, "measured": 5, "target_rep_ms": 200 },
+    "standard": { "warmup": 2, "measured": 7, "target_rep_ms": 300 },
+    "deep": { "warmup": 3, "measured": 11, "target_rep_ms": 500 },
+    "endurance": { "warmup": 1, "measured": 5, "target_rep_ms": 200 },
+    "note": "The module is not in the standard profile. It executes an interpreter the operator installed, and most machines have no PHP - a standard run that came back Partial on every machine that is not a PHP host would report the profile's own assumptions as a fault of the machine. It runs in `web` and `deep`, which an operator selects because they want it."
+  },
+  "validation": [
+    "The interpreter must be at an allow-listed path that is root-owned and writable only by root, along with every directory above it. A PHP that fails that check is refused and the reason is reported.",
+    "Every workload returns a checksum, and a repetition whose checksum differs from the first is rejected: it means the work performed was not the work that was measured.",
+    "Every metric needs at least three successful repetitions; below that it is withheld rather than reported from noise.",
+    "A debug or ZTS build of PHP is disclosed and degrades the result: neither is comparable with the ordinary NTS release build a host serves sites from."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no allow-listed PHP binary exists",
+    "every PHP binary that exists fails the safe-path check",
+    "the interpreter cannot run the description pass",
+    "an invocation exceeds the 120-second timeout"
+  ],
+  "cleanup": "The workload script is removed from the scratch directory when the module returns, on every path including cancellation and an error. It is not removed on a panic: the release profile sets panic = \"abort\" and destructors do not run on abort, so the next run removes it before writing its own - which is also what handles a machine that lost power mid-run. No configuration is read or altered and no PHP process outlives the run.",
+  "stability_cv_bound": 0.2,
+  "comparability": [
+    "module.version",
+    "agent.build_target",
+    "php.version",
+    "php.sapi",
+    "php.opcache_enabled",
+    "php.zts"
+  ],
+  "limitations": [
+    "This measures the PHP the operator installed, so results are comparable only between machines running the same major version, SAPI and OPcache state. Those fields are recorded in every bundle for exactly that reason.",
+    "The CLI SAPI is what gets measured, because it is the only one that can be invoked without touching the operator's web server configuration. An FPM pool differs in worker model and usually in OPcache state; the SAPI actually used is recorded so nobody reads one as the other.",
+    "OPcache is disclosed, not measured. A framework-free single-file workload compiles once and then loops, so an opcode cache barely touches it - putting a number on it here would put a number on something this workload cannot see. It becomes measurable with the multi-file application workloads in Phase 4.",
+    "Password hashing is pinned to bcrypt cost 8 rather than the runtime's default. bcrypt cost is exponential, so comparing a cost-10 machine against a cost-12 one would compare the configurations rather than the machines.",
+    "`startup.cold` includes process creation as well as interpreter start-up, because that is what a request without a warm worker actually pays."
+  ],
+  "scoring": {
+    "category": "web",
+    "facets": {},
+    "metric_weight": {
+      "hash.password": 1.25,
+      "startup.cold": 1.25,
+      "json.encode": 1.0,
+      "json.decode": 1.0,
+      "array.ops": 1.0,
+      "template.render": 1.0,
+      "hash.sha256": 0.75
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Password hashing and cold start carry the most weight: the first is what decides how many sign-ins a machine survives and cannot be cached away, the second is paid on every request on a host without a warm worker pool. Scored into Web rather than Compute because what is being measured is what an interpreter does on this silicon - a different property from what `cpu.mixed` measures with hand-written Rust, and the one that decides how a PHP site feels. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

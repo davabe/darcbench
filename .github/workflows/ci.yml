@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No toolchain version here on purpose: `rust-toolchain.toml` is the
+      # single source of truth, and `rustup show` installs exactly what it
+      # names. Pinning the version in the workflow as well would let the two
+      # drift apart, which is the failure this pinning exists to prevent.
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify the pinned toolchain is what we are actually using
+        run: |
+          expected="$(grep -oP '(?<=^channel = ")[^"]+' rust-toolchain.toml)"
+          actual="$(rustc --version | cut -d' ' -f2)"
+          echo "pinned=$expected active=$actual"
+          [ "$actual" = "$expected" ] || {
+            echo "::error::rustc $actual does not match the pinned $expected"
+            exit 1
+          }
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Release, not debug: cpu.mixed calibration in a debug build wastes
+      # minutes, and debug builds are not comparable anyway.
+      - name: Test
+        run: cargo test --workspace --release
+
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version` here: action-setup reads the pinned `packageManager` field
+      # from apps/web/package.json, so the pin has exactly one home.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/web/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      # Run from apps/web, the directory the pin lives in and the directory the
+      # build step runs from. Checking from the repository root would report the
+      # ambient pnpm rather than the one that will actually do the install.
+      - name: Verify the pinned package manager is what we are actually using
+        working-directory: apps/web
+        run: |
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          echo "pinned=$expected active=$actual"
+          [ "$actual" = "$expected" ] || {
+            echo "::error::pnpm $actual does not match the pinned $expected"
+            exit 1
+          }
+
+      # Deliberately the whole chain in one step, not two: this is exactly what
+      # a contributor runs, and it is the chain that broke when pnpm 11 turned
+      # ignored build scripts into a hard error. Splitting it would hide a
+      # non-zero exit from `install` behind a separately-green `build`.
+      #
+      # `working-directory`, not `pnpm --dir apps/web` from the root: Corepack
+      # and pnpm's own version manager both resolve `packageManager` from the
+      # invocation directory, and Corepack never sees `--dir`. Running from the
+      # root would test an invocation style that silently ignores the pin, which
+      # is not the one contributors are told to use.
+      - name: Install and build
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    needs: [web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      - name: Build agent with the UI embedded
+        run: cargo build --release -p darcbench-agent
+
+      - name: Protocol parity (Rust enum vs TypeScript)
+        run: ./scripts/check-protocol-parity.sh
+
+      - name: Module manifests match the compiled registry
+        run: ./scripts/check-manifests.sh
+
+      - name: End-to-end
+        run: ./scripts/e2e.sh
+
+  lint-latest:
+    name: Lint on latest stable (advisory)
+    runs-on: ubuntu-latest
+    # Never blocks a merge. Its job is to surface lints from a newer toolchain
+    # *before* someone bumps the pin, instead of discovering them as a red CI
+    # run afterwards - which is precisely how the 1.94-to-1.97 clippy failure
+    # was found.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install current stable
+        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Report the version gap
+        run: |
+          echo "pinned : $(grep -oP '(?<=^channel = ")[^"]+' rust-toolchain.toml)"
+          echo "stable : $(rustup run stable rustc --version | cut -d' ' -f2)"
+      - name: Clippy on stable
+        run: rustup run stable cargo clippy --all-targets --all-features -- -D warnings
+      - name: Format on stable
+        run: rustup run stable cargo fmt --all -- --check
+
+  supply-chain:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Install cargo-audit and cargo-deny
+        run: cargo install cargo-audit cargo-deny --locked
+      - name: Advisory audit
+        run: cargo audit
+      - name: Licence and dependency policy
+        run: cargo deny check licenses bans sources
+      # SBOM generation and artifact signing land in Phase 8; see
+      # docs/RELEASE-STRATEGY.md.
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every documented file exists
+        run: |
+          missing=0
+          for f in $(grep -ohrE '\((\./)?(docs|crates|apps|scripts|benchmarks)/[A-Za-z0-9._/-]+\)' \
+                       README.md docs/*.md 2>/dev/null \
+                     | tr -d '()' | sed 's|^\./||' | sort -u); do
+            [ -e "$f" ] || { echo "broken link target: $f"; missing=1; }
+          done
+          exit $missing

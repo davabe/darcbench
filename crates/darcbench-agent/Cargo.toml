@@ -1,0 +1,43 @@
+[package]
+name = "darcbench-agent"
+description = "The DARCBench agent: CLI, local dashboard server, run orchestration and safety guards."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "darcbench"
+path = "src/main.rs"
+
+[dependencies]
+darcbench-protocol.workspace = true
+darcbench-inventory.workspace = true
+darcbench-scoring.workspace = true
+darcbench-modules.workspace = true
+darcbench-report.workspace = true
+
+anyhow.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+clap.workspace = true
+getrandom.workspace = true
+hex.workspace = true
+ratatui.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,109 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "Apache-2.0"
+repository = "https://github.com/davabe/darcbench"
+homepage = "https://getdarc.com"
+authors = ["Tombatossals Softworks LLC"]
+
+[workspace.dependencies]
+anyhow = "1.0"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+ed25519-dalek = { version = "2.1", features = ["pkcs8", "rand_core"] }
+flate2 = "1.0"
+futures-core = "0.3"
+getrandom = "0.2"
+hex = "0.4"
+# TLS for the network module. `ring` rather than the default `aws-lc-rs`
+# provider: aws-lc-sys needs cmake at build time, and this workspace is
+# otherwise pure Rust with no C toolchain requirement. `rustls-native-certs`
+# rather than `webpki-roots`, both because webpki-roots is MPL-2.0 and outside
+# the deny.toml allow-list, and because a tool running on someone else's server
+# should trust the CAs that machine's administrator trusts rather than a
+# snapshot compiled into the binary. See docs/adr/0011-network-tls-client.md.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-native-certs = "0.8"
+# Self-signed certificates for the loopback origin `web.static` serves itself.
+# The certificate is generated per run, lives in memory, is trusted by exactly
+# one client - this agent's own - and never touches the host trust store. See
+# docs/adr/0012-load-generation.md for why the origin is ours rather than the
+# operator's web server. `ring` is already in the tree via rustls, so this adds
+# no new native toolchain requirement.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
+rustls-pki-types = "1"
+# The live terminal dashboard (`crates/darcbench-agent/src/tui.rs`).
+#
+# Pinned to 0.29 rather than the current 0.30 because 0.30 raises its MSRV to
+# 1.88, and `rust-version` above promises 1.82. The dashboard is not worth
+# silently breaking that promise for consumers who build from source; when the
+# workspace MSRV moves past 1.88 for its own reasons, this can follow.
+#
+# crossterm is deliberately NOT a direct dependency: ratatui re-exports the
+# exact version it was built against as `ratatui::crossterm`, and depending on
+# it separately is how a workspace ends up linking two incompatible copies of
+# the terminal backend and failing `cargo deny check bans` for duplicates.
+ratatui = "0.29"
+# The standalone run index. `bundled` compiles SQLite from the amalgamation
+# shipped in the crate, so the agent keeps its single-static-binary promise on
+# hosts with no libsqlite3 - which is the point of ADR-0005 choosing SQLite at
+# all. It is the one C dependency in the workspace; see
+# docs/adr/0005-database-and-storage.md for why that price is paid here and
+# nowhere else.
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+# `float_roundtrip` is REQUIRED, not a nicety. Without it serde_json's float
+# parser can land one ULP away from the value that was written, so a signed
+# bundle written to disk and read back would fail its own signature check.
+# `preserve_order` must stay OFF: DCJ/1 canonicalisation depends on
+# serde_json::Map being a BTreeMap so object keys serialise in sorted order.
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
+sha2 = "0.10"
+thiserror = "2.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "fs", "io-util"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["set-header", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+darcbench-protocol = { path = "crates/darcbench-protocol", version = "0.1.0" }
+darcbench-inventory = { path = "crates/darcbench-inventory", version = "0.1.0" }
+darcbench-scoring = { path = "crates/darcbench-scoring", version = "0.1.0" }
+darcbench-modules = { path = "crates/darcbench-modules", version = "0.1.0" }
+darcbench-report = { path = "crates/darcbench-report", version = "0.1.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+todo = "warn"
+unimplemented = "deny"
+panic_in_result_fn = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "deny"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# Benchmark workloads must never be built with a different optimisation level
+# than the release profile, otherwise scores are not comparable. See
+# docs/BENCHMARK-METHODOLOGY.md section "Build determinism".
+[profile.bench]
+inherits = "release"

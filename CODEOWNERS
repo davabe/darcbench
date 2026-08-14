@@ -1,0 +1,22 @@
+# Suggested ownership. Areas where a mistake is expensive and hard to detect.
+#
+# These paths need a reviewer who understands the invariants, not just the diff:
+# a plausible-looking change to the scoring model or the verification path can
+# be wrong in a way that only shows up as quietly incorrect published results.
+
+/crates/darcbench-scoring/    @darcbench/methodology
+/crates/darcbench-protocol/   @darcbench/methodology
+/crates/darcbench-modules/    @darcbench/methodology
+/docs/SCORING-SYSTEM.md       @darcbench/methodology
+/docs/BENCHMARK-METHODOLOGY.md @darcbench/methodology
+
+/crates/darcbench-report/src/signing.rs   @darcbench/security
+/crates/darcbench-report/src/canonical.rs @darcbench/security
+/crates/darcbench-report/src/validate.rs  @darcbench/security
+/crates/darcbench-agent/src/server.rs     @darcbench/security
+/crates/darcbench-agent/src/config.rs     @darcbench/security
+/crates/darcbench-inventory/src/redact.rs @darcbench/security
+/docs/THREAT-MODEL.md                     @darcbench/security
+/SECURITY.md                              @darcbench/security
+
+/docs/adr/                    @darcbench/architecture

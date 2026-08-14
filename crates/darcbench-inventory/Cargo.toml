@@ -1,0 +1,23 @@
+[package]
+name = "darcbench-inventory"
+description = "Read-only system inventory, environment classification and low-overhead telemetry sampling."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+darcbench-protocol.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+# Safe, `unsafe`-free-at-our-level wrappers for the handful of syscalls that
+# have no /proc or /sys equivalent (statvfs for free space).
+rustix = { version = "1", features = ["fs"] }
+
+[lints]
+workspace = true

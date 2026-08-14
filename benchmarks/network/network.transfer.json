@@ -1,0 +1,242 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "network.transfer",
+  "version": "1.0.0",
+  "title": "Network transfer and latency",
+  "purpose": "Measure DNS resolution, TCP connect, connect jitter, TLS handshake, time to first byte and single- and multi-stream download throughput against a compile-time allow-list of public measurement endpoints.",
+  "category": "network",
+  "safety_class": "uses_network",
+  "supported_architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "network_transfer::NetworkTransfer",
+    "note": "The connection is driven by hand - TcpStream, then rustls, then a minimal HTTP/1.1 request - rather than through an HTTP client, because a client collapses DNS, connect, handshake and first byte into one call and those four numbers are the deliverable. See docs/adr/0011-network-tls-client.md."
+  },
+  "dependencies": [],
+  "max_bytes_written": 0,
+  "max_network_bytes": 536870912,
+  "required_capabilities": [],
+  "safety": {
+    "endpoint_source": "compile-time allow-list",
+    "allow_list": "crates/darcbench-modules/src/network_endpoints.rs",
+    "transfer_ceiling_bytes": 536870912,
+    "note": "docs/THREAT-MODEL.md (T-DDOS) is binding and permanent: a benchmark suite that lets you point a load generator at an arbitrary URL is a DDoS tool with a scoring model. There is no API field, environment variable or configuration file that can add a host. The only value this module formats into a request line is a byte count it computed and clamped itself. The ceiling is enforced against a running total spanning calibration, warm-ups and every repetition, not merely documented; reaching it stops the module and downgrades the result rather than finishing the run."
+  },
+  "endpoints": [
+    {
+      "host": "speed.cloudflare.com",
+      "port": 443,
+      "operator": "Cloudflare",
+      "role": "throughput",
+      "justification": "Public speed-test service; `__down` exists to return a requested number of bytes for client measurement. Volume bounded by the module's transfer ceiling."
+    },
+    {
+      "host": "one.one.one.one",
+      "port": 443,
+      "operator": "Cloudflare",
+      "role": "latency_probe",
+      "justification": "Public DNS resolver on documented anycast addresses. Handshake-only probe; no queries are issued and no name is looked up through it."
+    },
+    {
+      "host": "dns.google",
+      "port": 443,
+      "operator": "Google Public DNS",
+      "role": "latency_probe",
+      "justification": "Public DNS resolver, documented for unauthenticated public use. Handshake-only probe."
+    },
+    {
+      "host": "dns.quad9.net",
+      "port": 443,
+      "operator": "Quad9",
+      "role": "latency_probe",
+      "justification": "Public DNS resolver run by a non-profit for open public use. Handshake-only probe."
+    }
+  ],
+  "privacy": {
+    "sent_to_endpoints": "An ordinary HTTPS request for a fixed number of padding bytes.",
+    "never_sent": [
+      "inventory",
+      "measurement results",
+      "run id",
+      "installation id",
+      "hostname",
+      "any value that distinguishes one DARCBench user from another"
+    ],
+    "note": "What an endpoint observes is what any web server observes about any client: an IP address and a connection time. Preflight names the volume and every operator before the run starts, and the quick profile excludes this module so a first run opens no outbound connection at all."
+  },
+  "transport": {
+    "tls": "rustls 0.23, ring provider, host trust store via rustls-native-certs",
+    "resumption": "disabled",
+    "http": "HTTP/1.1, one request per connection, Connection: close",
+    "timeout_s": 10,
+    "note": "Session resumption is disabled deliberately. With it on, only the first handshake of a run is a full one and tls_handshake.mean measures an abbreviated handshake on every repetition after it - observed as 0.5 ms against a real 1.3 ms. The metric is the cost a new client pays, so every sample must be a full handshake."
+  },
+  "budget": {
+    "scope": "per run, across calibration, warm-ups and every repetition",
+    "charged": "every read on every connection, including the first",
+    "note": "The opening read of each connection was once uncharged, and a timing-only probe performs exactly one read - so the uncharged share grew with the probe count, which is the majority of connections in a run. Real traffic therefore exceeded the advertised bound. A ceiling described as enforced rather than documented cannot be approximately right."
+  },
+  "preparation": "One reachability probe against the throughput endpoint before anything is measured, so an offline or proxied host fails immediately with a stated reason instead of producing a run full of zeroes. IPv6 availability is resolved once and recorded.",
+  "calibration": "None. Repetition size is fixed rather than calibrated to a duration target, because calibrating would mean a faster machine pulling more data from a third party. The per-stream download size is derived from the transfer ceiling divided by the number of transfers the profile will make, clamped to between 1 MiB and 8 MiB, so a deep or endurance profile shrinks each transfer instead of exceeding the ceiling.",
+  "warmup": "warmup_reps repetitions per metric, streamed and retained but excluded from statistics. This matters more here than elsewhere: the first repetition is the coldest measurement the module ever takes - an empty resolver cache, a routing entry that is not there yet, a TLS stack that has never run - so folding it in is how a steady path comes out looking unstable. Warm-up traffic is charged against the transfer ceiling like any other.",
+  "workloads": [
+    {
+      "key": "dns_resolve.mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Time for the system resolver to turn a hostname into addresses, sampled across every allow-listed host and reduced to one median per repetition.",
+      "represents": "What every outbound request pays before a byte can move"
+    },
+    {
+      "key": "tcp_connect.mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Time to complete the TCP handshake, sampled across every allow-listed host and reduced to one median per repetition.",
+      "represents": "Round-trip time to the nearest major edge: distance and routing"
+    },
+    {
+      "key": "tcp_connect.jitter",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Summary of the per-endpoint standard deviations of connect time. Computed within each path and then combined, never across paths.",
+      "represents": "How steady the round trip is, which is what interactive traffic feels"
+    },
+    {
+      "key": "tls_handshake.mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Full TLS handshake against the throughput endpoint, from the end of the TCP connect to the handshake completing. Resumption is disabled so every sample is a full handshake.",
+      "represents": "The CPU and round trips every new HTTPS connection pays"
+    },
+    {
+      "key": "ttfb.mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "From the request being written to the first response byte arriving, measured against the throughput endpoint only.",
+      "represents": "How long the far end takes to start answering, once the connection exists"
+    },
+    {
+      "key": "download.single",
+      "unit": "Mbit/s",
+      "direction": "higher_is_better",
+      "description": "Body transfer rate over one TCP stream, timed from the first body byte to the last.",
+      "represents": "What one client experiences: window size and loss recovery, not just link capacity"
+    },
+    {
+      "key": "download.multi",
+      "unit": "Mbit/s",
+      "direction": "higher_is_better",
+      "description": "Aggregate body transfer rate over four concurrent streams.",
+      "represents": "What a server serving many clients at once can actually push"
+    }
+  ],
+  "shapes": [
+    {
+      "key": "mean",
+      "measures": "central tendency of a phase across the endpoints sampled in a repetition"
+    },
+    {
+      "key": "jitter",
+      "measures": "within-path variation of connect time"
+    },
+    {
+      "key": "single",
+      "streams": 1,
+      "measures": "one stream, as a single client sees it"
+    },
+    {
+      "key": "multi",
+      "streams": 4,
+      "measures": "four streams, as a busy server sees it",
+      "note": "Both are reported because they answer different questions. A single stream on a long fat path is bounded by window size and loss recovery rather than by the link, so reporting only one understates a good connection; reporting only four hides a machine that cannot fill a pipe with a single connection."
+    }
+  ],
+  "metrics": [
+    "dns_resolve.mean",
+    "tcp_connect.mean",
+    "tcp_connect.jitter",
+    "tls_handshake.mean",
+    "ttfb.mean",
+    "download.single",
+    "download.multi"
+  ],
+  "derived_metrics": [],
+  "repetitions": {
+    "quick": {
+      "warmup": 1,
+      "measured": 5,
+      "target_rep_ms": 200
+    },
+    "standard": {
+      "warmup": 2,
+      "measured": 7,
+      "target_rep_ms": 300
+    },
+    "deep": {
+      "warmup": 3,
+      "measured": 11,
+      "target_rep_ms": 500
+    },
+    "endurance": {
+      "warmup": 2,
+      "measured": 31,
+      "target_rep_ms": 500
+    },
+    "note": "target_rep_ms does not apply: this module does not calibrate. The quick profile does not resolve to this module at all, so its row is what would be used if a custom profile asked for quick-shaped repetitions."
+  },
+  "validation": [
+    "Every metric must have at least 3 successful samples; below that it is withheld rather than reported from noise.",
+    "Reaching the transfer ceiling stops the module and downgrades the result.",
+    "A host that cannot resolve or reach any endpoint fails the module rather than reporting zero.",
+    "A transfer smaller than 512 KiB or shorter than 5 ms is not turned into a rate: below that the clock is measuring itself rather than the link.",
+    "A response that is not a well-formed HTTP/1.x answer fails the measurement rather than being timed.",
+    "A download whose status is not 200 is rejected: an error page or a redirect body drained and timed would be published as this machine's throughput. Timing-only probes accept any well-formed status, because they measure the network rather than the payload.",
+    "Only bytes after the header terminator count towards the transfer, and the body clock starts at the same boundary. Counting the headers would both inflate the total and credit the transfer with bytes that moved before the timer did.",
+    "A download truncated by the transfer ceiling yields no rate at all, because a partial body over a near-zero interval produces an arbitrarily large number.",
+    "Coefficient of variation above 0.30 raises a high-variance warning and downgrades the result to Degraded, for every metric whose samples are one per repetition.",
+    "tcp_connect.jitter is exempt from the variance bound: its samples are one per path, so their spread measures how far apart the endpoints are rather than how unstable the measurement was."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no allow-listed endpoint is reachable",
+    "the host trust store is empty or unreadable",
+    "the transfer ceiling is exhausted"
+  ],
+  "cleanup": "None required: connections are closed when each measurement returns, and nothing is written to disk or left at any remote endpoint.",
+  "stability_cv_bound": 0.3,
+  "comparability": [
+    "module.version",
+    "agent.build_target",
+    "endpoint.host",
+    "endpoint.operator",
+    "network.address_family"
+  ],
+  "limitations": [
+    "Throughput is measured against one provider's anycast network. It describes how well this machine reaches a nearby major edge, which is a reasonable proxy for serving the internet and is NOT universal network capacity. A different provider, a different continent or a congested peer would give a different number.",
+    "Packet loss is not measured. Doing it properly needs ICMP or raw sockets, which need privileges this module does not take; inferring it from TCP behaviour would be a guess wearing a precise name.",
+    "Upload is not measured. Sending bulk data to a third party is a different traffic profile and needs an endpoint whose published purpose covers it.",
+    "Application-layer HTTPS throughput is not the same measurement as raw link capacity, loopback throughput or provider routing quality, and the four are never conflated here.",
+    "A host that reaches the internet only through an HTTP proxy will report the endpoints as unreachable: the module connects directly, because a proxy in the path would be measuring the proxy.",
+    "Download size is fixed rather than calibrated to the repetition target, so on a very fast link a repetition finishes well under it. That is deliberate: calibrating would mean a faster machine pulling more data from a third party."
+  ],
+  "scoring": {
+    "category": "network",
+    "facets": {},
+    "metric_weight": {
+      "download.single": 1.5,
+      "download.multi": 1.5,
+      "ttfb.mean": 1.0,
+      "tcp_connect.mean": 1.0,
+      "tcp_connect.jitter": 0.75,
+      "tls_handshake.mean": 0.75,
+      "dns_resolve.mean": 0.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "Throughput carries the most weight because it is the number buyers compare, and TTFB next because it is what a visitor feels. DNS is weighted lowest: it is largely a property of the resolver the operator configured rather than of the machine or its link. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

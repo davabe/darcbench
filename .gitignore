@@ -1,0 +1,25 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+crates/darcbench-agent/ui-dist/
+*.tsbuildinfo
+
+# DARCBench runtime state (never commit real result bundles or keys)
+.darcbench/
+*.darcbench-key
+darcbench-run-*.json
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Build/test scratch
+/tmp-e2e/
+coverage/

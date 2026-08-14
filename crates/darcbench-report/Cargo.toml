@@ -1,0 +1,26 @@
+[package]
+name = "darcbench-report"
+description = "Result bundles: canonical serialisation, Ed25519 signing, verification and report rendering."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+darcbench-protocol.workspace = true
+darcbench-inventory.workspace = true
+darcbench-scoring.workspace = true
+base64.workspace = true
+chrono.workspace = true
+ed25519-dalek.workspace = true
+getrandom.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
