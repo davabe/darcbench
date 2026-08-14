@@ -33,14 +33,14 @@
 //! | Removal is filtered by our own label | So DARCBench cannot delete the operator's containers | `only_containers_this_agent_labelled_can_be_removed` |
 //! | Data lives on tmpfs | Nothing survives the run, and no host disk is written | `the_data_directory_is_a_tmpfs_that_cannot_outlive_the_run` |
 //!
-//! # The image allow-list is empty, and that is not an oversight
+//! # The image allow-list, and why it was empty for two commits
 //!
 //! [`ALLOWED_IMAGES`] is the same shape as `network_endpoints`' host table: a
 //! compile-time list, each entry justified, with no way to add one at runtime.
-//! It is empty because this commit ships the *tier*, not a module that uses
-//! it, and an image reference must be pinned to a digest resolved against a
-//! real registry. Inventing one would be writing a security control that
-//! cannot work.
+//! Every entry is pinned to a digest resolved against a real registry. The
+//! table carried its two entries unpinned for as long as this project had no
+//! host with a container daemon, because inventing a `sha256:` string would
+//! have been writing a security control that cannot work.
 //!
 //! `Image` cannot be constructed outside this module, and
 //! [`Image::from_allow_list`] is the only way to obtain one - so a module that
@@ -53,8 +53,9 @@
 //! panic, and nothing runs on `SIGKILL`. A container started by a run that
 //! died keeps running.
 //!
-//! `--rm` does not help: it reaps when the *container* exits, not when the
-//! agent does. So the mitigation is reaping rather than prevention -
+//! `--rm` would not help, which is half of why it is not used: it reaps when
+//! the *container* exits, not when the agent does. So the mitigation is
+//! reaping rather than prevention -
 //! [`reap`] removes containers carrying this agent's label, and it is
 //! deliberately label-scoped rather than name-scoped so that no amount of
 //! coincidence in an operator's naming can put one of their containers in
@@ -96,16 +97,54 @@ const OWNER_LABEL: &str = "com.getdarc.darcbench.owned=1";
 /// The filter form of [`OWNER_LABEL`], for `ps` and `rm`.
 const OWNER_FILTER: &str = "label=com.getdarc.darcbench.owned=1";
 
-/// Memory ceiling for a sandboxed service.
-///
-/// Half a gigabyte. Enough for a database with a benchmark-sized dataset,
-/// small enough that a runaway container cannot take the host down - which is
-/// the failure this whole module exists to make impossible. A benchmark that
-/// causes an outage is a failure however accurate its numbers are.
-const MEMORY_LIMIT: &str = "512m";
-
 /// Tmpfs size for the service's data directory.
+///
+/// Sized for the largest dataset any module here builds: `database.oltp` at
+/// pgbench scale 10 occupies about 324 MiB after its indexes, and grows to
+/// roughly 360 MiB once a write phase has cycled some WAL.
 const TMPFS_SIZE_BYTES: u64 = 512 * 1024 * 1024;
+
+/// What the service itself may use, on top of its data.
+///
+/// PostgreSQL's default `shared_buffers` is 128 MiB, and eight `pgbench`
+/// backends and their client add most of the rest. Measured peak for the
+/// heaviest phase this suite runs is 507 MiB of the total below.
+const SERVICE_MEMORY_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Memory ceiling for a sandboxed service: its data plus its working set.
+///
+/// **These are one budget, not two, and that is the whole reason this is
+/// computed rather than written.** A tmpfs lives in the page cache and its
+/// pages are charged to the cgroup that faults them in, so every byte of the
+/// data directory is a byte of the memory limit. The two constants above were
+/// once independent and both `512m`, which read as "half a gig of disk and
+/// half a gig of RAM" and meant "half a gig, and the database may have
+/// whatever the dataset does not want".
+///
+/// It did not want much. `database.oltp` built a 324 MiB dataset and was
+/// OOM-killed part-way through its first write phase — `server process was
+/// terminated by signal 9`, then automatic recovery, then every later phase
+/// refused. What the module published from that was two throughput figures,
+/// one of them from a phase that had died half-way through, and silence about
+/// the other four metrics. A benchmark that reports a number for a database
+/// that was being killed while it was measured is worse than one that reports
+/// nothing.
+///
+/// The ceiling still exists and still matters — a runaway container must not
+/// take the host down, because a benchmark that causes an outage is a failure
+/// however accurate its numbers are. It is now set to what the workload was
+/// measured to need rather than to a round number that sounded safe.
+fn memory_limit() -> String {
+    format!("{}b", TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES)
+}
+
+/// The same figure, for a module declaring its footprint to preflight.
+///
+/// A container's memory is memory on the host, so a module that provisions one
+/// must say so before the operator agrees to the run.
+pub const fn sandbox_memory_budget_bytes() -> u64 {
+    TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES
+}
 
 /// How long the runtime gets to answer a control command.
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -113,8 +152,35 @@ const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long a container gets to start serving before it is given up on.
 const READY_TIMEOUT: Duration = Duration::from_secs(90);
 
-/// Gap between readiness probes.
+/// How long the published port gets to accept a connection, per attempt.
+///
+/// Only a reachability check, not a readiness signal — see
+/// [`Sandbox::wait_ready`]. Short because a loopback connect either succeeds
+/// at once or is refused at once, and a longer value would only slow down the
+/// loop that surrounds it.
 const READY_POLL: Duration = Duration::from_millis(200);
+
+/// Gap between passes of the readiness loop.
+///
+/// Every check in that loop is now a round trip to the daemon, so the cadence
+/// is the loop's cost. One second bounds the wasted wait on a container that
+/// dies at startup to about a second, which is the point, without making the
+/// waiting itself into load on the machine under measurement.
+const LIVENESS_POLL: Duration = Duration::from_secs(1);
+
+/// How long a readiness probe gets before it is treated as "not ready".
+///
+/// Short, and shorter than [`CONTROL_TIMEOUT`] on purpose. A probe is asked
+/// again a second later, so a slow one costs nothing but a wait — where a
+/// probe that hung for the full control timeout would stall the readiness loop
+/// it is supposed to drive.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How much of a failed container's log may reach an error message.
+///
+/// A bundle is an artifact somebody reads and stores. A service that failed by
+/// repeating one line does not get to put all of it in there.
+const LOG_EXCERPT_BYTES: usize = 1024;
 
 // ---------------------------------------------------------------------------
 // Images
@@ -136,6 +202,23 @@ pub struct Image {
     service_port: u16,
     /// Directory inside the container that must be writable, mounted tmpfs.
     data_dir: &'static str,
+    /// The uid and gid of the image's own service account.
+    ///
+    /// The container is started *as* this account rather than as root, so the
+    /// entrypoint never holds the privileges it would otherwise drop. See
+    /// [`run_args`] for why that is the fix rather than granting capabilities
+    /// back.
+    ///
+    /// It is a property of the pinned digest, not of the image name — which is
+    /// the second reason the digest is pinned. `every_allowed_image_runs_as_a_
+    /// service_account` is what stops a future entry defaulting to root.
+    run_as: (u32, u32),
+    /// A command run *inside* the container that exits zero once the service
+    /// is actually serving.
+    ///
+    /// See [`Sandbox::wait_ready`] for why a connect from the host is not one.
+    /// A fixed argv of constants, like everything else this module runs.
+    ready_probe: &'static [&'static str],
     /// Why this image is on the list. Read by a human reviewing the table.
     justification: &'static str,
 }
@@ -171,9 +254,10 @@ pub enum Pin {
 
 /// Every image DARCBench may run.
 ///
-/// Empty, and deliberately so - see the module documentation. This commit
-/// ships the isolation tier; the first database module adds the first entry,
-/// with a digest resolved against a real registry rather than invented.
+/// Two entries, both resolved against Docker Hub on 2026-08-14 on the first
+/// host this project had with a container daemon. Until then the table carried
+/// them as [`Pin::Pending`], because a `sha256:` string that was not resolved
+/// against a registry is a security control that cannot work.
 ///
 /// The rules for adding one, enforced by the tests below:
 ///
@@ -188,18 +272,27 @@ pub enum Pin {
 pub const ALLOWED_IMAGES: &[Image] = &[
     Image {
         key: "postgres",
-        pin: Pin::Pending {
-            resolve_from: "postgres:17-bookworm",
-            blocked_by: "no container daemon or registry access was available on the machine this \
-                     entry was written on, and a digest that was not resolved against a registry \
-                     is not a pin",
-        },
+        // `postgres:17-bookworm` as Docker Hub served it on 2026-08-14. The date
+        // matters as much as the digest: a digest is a fact about a moment, and a
+        // reader six months out needs to know which moment in order to judge
+        // whether a newer one would change a measurement.
+        pin: Pin::Pinned(
+            "postgres@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad",
+        ),
         // 5432 is PostgreSQL's port inside the container. Nothing is published to
         // it except loopback on this host - see `run_args`.
         service_port: 5432,
         // The official image's `PGDATA`. Mounted tmpfs, so the database is created
         // fresh for every run and nothing it writes reaches a host disk.
         data_dir: "/var/lib/postgresql/data",
+        // `postgres:postgres` in the official image, both 999.
+        run_as: (999, 999),
+        // `-h 127.0.0.1` rather than the default socket, and it is the whole
+        // point: `initdb` starts a temporary server during startup that listens
+        // on the unix socket *only*, precisely so that nothing connects to a
+        // database that is still being built. A probe over the socket would
+        // report that one as ready.
+        ready_probe: &["pg_isready", "-q", "-h", "127.0.0.1"],
         justification:
             "The official PostgreSQL image, published by the PostgreSQL Docker Community. \
                     Chosen over a distribution package because the point of the container tier is \
@@ -210,16 +303,21 @@ pub const ALLOWED_IMAGES: &[Image] = &[
     },
     Image {
         key: "valkey",
-        pin: Pin::Pending {
-            resolve_from: "valkey/valkey:8-alpine",
-            blocked_by: "no container daemon or registry access was available on the machine this \
-                     entry was written on, and a digest that was not resolved against a registry \
-                     is not a pin",
-        },
+        // `valkey/valkey:8-alpine` as Docker Hub served it on 2026-08-14.
+        pin: Pin::Pinned(
+            "valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec",
+        ),
         service_port: 6379,
         // Valkey's working directory in the official image. Mounted tmpfs, so an
         // RDB snapshot goes to RAM and nothing reaches a host disk.
         data_dir: "/data",
+        // `valkey:valkey` in the official image. The gid is 1000, not 999 —
+        // they differ, which is exactly why this is a pair per entry rather
+        // than one number reused for both.
+        run_as: (999, 1000),
+        // Exits 1 and says so on a refused connection, which is what makes it
+        // usable as a probe rather than merely as a command that runs.
+        ready_probe: &["redis-cli", "-h", "127.0.0.1", "ping"],
         justification: "The official Valkey image, published by the Valkey project. Valkey rather \
                     than Redis because it is the fork the major distributions and cloud providers \
                     moved to after the 2024 licence change, and because its image is \
@@ -313,8 +411,21 @@ pub enum ContainerError {
     Start { runtime: String, detail: String },
     #[error("the container started but published no loopback port for {port}/tcp")]
     NoPort { port: u16 },
-    #[error("the container did not accept a connection within {}s", .0.as_secs())]
-    NotReady(Duration),
+    #[error(
+        "the container was still not serving after {}s, so nothing was measured. It said: {log}",
+        .waited.as_secs()
+    )]
+    NotReady { waited: Duration, log: String },
+    #[error(
+        "the container started and then exited with status {status} after {}s, so nothing was \
+         measured. It said: {log}",
+        .waited.as_secs()
+    )]
+    Exited {
+        status: String,
+        waited: Duration,
+        log: String,
+    },
     #[error("could not run {runtime}: {source}")]
     Exec {
         runtime: String,
@@ -527,33 +638,72 @@ impl Runtime {
 /// the module. They reach the container's environment and nothing else - they
 /// cannot become flags, because they follow `--env` one value at a time rather
 /// than being spliced into a string.
+///
+/// # Why there is no root inside, and no `--rm`
+///
+/// Both of these were changed by the first run this module ever made against a
+/// real daemon, and neither could have been found without one.
+///
+/// **The container runs as the image's own service account.** With
+/// `--cap-drop ALL` and nothing else, the official PostgreSQL entrypoint dies
+/// on its second line: it starts as root, `chown`s `PGDATA`, and `gosu`s down
+/// to `postgres`. Dropping `CAP_CHOWN` stops the `chown` and `set -e` does the
+/// rest — `chown: changing ownership of '/var/lib/postgresql/data': Operation
+/// not permitted`.
+///
+/// The documented fix, and the one the image's own README gives, is to add
+/// `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` back. That is the
+/// wrong trade here. Those five are close to the whole interesting surface of
+/// a container escape, and they would be granted for no purpose except letting
+/// a process hold privileges long enough to drop them. Starting as `--user
+/// 999:999` skips the entire dance: the entrypoint sees it is not root, does
+/// not try to `chown`, and the privileges are never held rather than held and
+/// surrendered. `no-new-privileges` then makes the state permanent.
+///
+/// The cost is that the tmpfs has to arrive already owned — Docker's default
+/// is root-owned and `1777`, and PostgreSQL refuses a `PGDATA` that is group
+/// or world accessible — so the mount carries `mode`, `uid` and `gid`. `0700`
+/// rather than `0750`: the service account is the only account that has any
+/// business in there.
+///
+/// **`--rm` is gone**, and it was actively harmful. A container that dies
+/// during startup is the case that most needs explaining, and `--rm` deletes
+/// it — along with its logs — before anything can read them. That is not
+/// hypothetical: the failure above was invisible on the first attempt for
+/// exactly this reason, and appeared the moment the flag came off.
+/// [`Sandbox::wait_ready`] now watches for the exit and puts the log in the
+/// error. Removal is [`Drop`]'s job and [`Runtime::reap`]'s, which is where it
+/// always really was — `--rm` never covered the case those two exist for.
 fn run_args<'a>(
     image: &'a Image,
     reference: &'a str,
     name: &'a str,
     env: &'a [String],
 ) -> Vec<String> {
+    let (uid, gid) = image.run_as;
     let mut args: Vec<String> = vec![
         "run".into(),
         "--detach".into(),
-        // Reaped by the runtime when the container exits. Not a substitute for
-        // `reap`: this fires when the container stops, not when the agent does.
-        "--rm".into(),
         "--name".into(),
         name.into(),
         "--label".into(),
         OWNER_LABEL.into(),
+        // The image's own service account, so nothing inside is ever root.
+        "--user".into(),
+        format!("{uid}:{gid}"),
         // Published on loopback, never on a routable address. An unpublished
         // port would be safer still and is not possible: the load has to reach
         // the service from this process.
         "--publish".into(),
         format!("127.0.0.1::{}", image.service_port),
         // Bounds a runaway container. A benchmark that causes an outage is a
-        // failure however accurate its numbers are.
+        // failure however accurate its numbers are. It covers the tmpfs below
+        // as well as the service - see `memory_limit`, which is why it is one
+        // number computed from both rather than two chosen separately.
         "--memory".into(),
-        MEMORY_LIMIT.into(),
+        memory_limit(),
         "--memory-swap".into(),
-        MEMORY_LIMIT.into(),
+        memory_limit(),
         "--pids-limit".into(),
         "512".into(),
         // No new privileges, and every capability dropped that the service
@@ -566,8 +716,15 @@ fn run_args<'a>(
         // and nothing it writes touches a host filesystem or outlives the
         // container. This is also what makes every run start from an identical
         // empty database rather than whatever the last run left.
+        //
+        // Owned by the service account and `0700`, because the container is
+        // not root and so cannot fix the ownership itself - and because the
+        // default, root-owned and `1777`, is one PostgreSQL refuses outright.
         "--tmpfs".into(),
-        format!("{}:rw,size={}", image.data_dir, TMPFS_SIZE_BYTES),
+        format!(
+            "{}:rw,size={},mode=0700,uid={uid},gid={gid}",
+            image.data_dir, TMPFS_SIZE_BYTES
+        ),
     ];
     for pair in env {
         args.push("--env".into());
@@ -591,6 +748,7 @@ pub struct Sandbox {
     runtime: Interpreter,
     name: String,
     address: SocketAddr,
+    ready_probe: &'static [&'static str],
 }
 
 impl Sandbox {
@@ -624,6 +782,7 @@ impl Sandbox {
             runtime: runtime.exec.clone(),
             name: name.clone(),
             address,
+            ready_probe: image.ready_probe,
         };
 
         // From here on every failure has to take the container with it.
@@ -682,19 +841,160 @@ impl Sandbox {
     /// isolation tier for each service it isolates. A module that needs a
     /// stronger readiness signal than "the port answers" is better placed to
     /// send it than this is.
+    /// Polls until the service is serving, the container dies, or the deadline
+    /// passes.
+    ///
+    /// # Why the readiness signal comes from inside the container
+    ///
+    /// This used to be a TCP connect from the host to the published port, on
+    /// the reasoning that it is the one signal every service has in common and
+    /// that speaking a protocol to find out whether that protocol is up would
+    /// put a client for each service into the isolation tier.
+    ///
+    /// The reasoning was sound and the check was worthless, which the first
+    /// real launch showed within a second. Docker publishes a port by putting
+    /// a userland proxy on it, and that proxy starts listening when the
+    /// *container* starts — not when the service inside it does. So the connect
+    /// succeeded immediately, every time, whatever the service was doing.
+    /// Measured on this host: at 0.5 s the host port accepted connections and
+    /// `pg_isready` still said no. `database.oltp` then failed in 0.8 s with
+    /// `connection refused` from `pgbench`, having been handed a sandbox
+    /// declared ready.
+    ///
+    /// `database.cache` passed the same broken check, which is the part worth
+    /// keeping in mind: Valkey starts in about a tenth of a second, so it won
+    /// the race every time. A green result from an unsound check is not
+    /// evidence, and the two modules differed only in how fast their service
+    /// happened to start.
+    ///
+    /// So the probe runs inside the container, and each image brings its own —
+    /// `pg_isready`, `redis-cli ping` — which is not a client in this tier but
+    /// a command in an image the tier already trusts enough to run. The host
+    /// connect stays as a first gate, because it does prove one thing the
+    /// in-container probe cannot: that the port was published where this
+    /// process can reach it, which is where the load will come from.
+    ///
+    /// # And why liveness is checked too
+    ///
+    /// A container that fails during startup never becomes ready, so a loop
+    /// that only polls readiness waits the full ninety seconds and reports a
+    /// timeout — which describes what the loop did, not what went wrong. The
+    /// container had already exited in under a second and said why on the way
+    /// out. So the run now fails in about the time the container took to fail,
+    /// carrying the container's own account of it.
+    ///
+    /// Both of these are daemon round trips, so they run on the coarser
+    /// [`LIVENESS_POLL`] cadence rather than [`READY_POLL`]'s: polling a
+    /// daemon five times a second is itself load on a machine whose spare
+    /// capacity is the thing about to be measured.
     fn wait_ready(&self) -> Result<(), ContainerError> {
-        let deadline = Instant::now() + READY_TIMEOUT;
+        let started = Instant::now();
+        let deadline = started + READY_TIMEOUT;
+        let mut port_reachable = false;
         while Instant::now() < deadline {
-            if TcpStream::connect_timeout(&self.address, READY_POLL).is_ok() {
+            // Cheap, and a precondition rather than a readiness signal: if the
+            // publish did not land, no amount of the service being up helps.
+            if !port_reachable {
+                port_reachable = TcpStream::connect_timeout(&self.address, READY_POLL).is_ok();
+            }
+            if port_reachable && self.probe_says_ready() {
                 return Ok(());
             }
-            std::thread::sleep(READY_POLL);
+            if let Some(status) = self.exited_status() {
+                let log = self.last_log_lines();
+                remove(&self.runtime, &self.name);
+                return Err(ContainerError::Exited {
+                    status,
+                    waited: started.elapsed(),
+                    log,
+                });
+            }
+            std::thread::sleep(LIVENESS_POLL);
         }
         // The container is removed here rather than left for `reap`, because
         // an operator watching a run fail should not also be left with a
         // container consuming memory until the next one starts.
+        let log = self.last_log_lines();
         remove(&self.runtime, &self.name);
-        Err(ContainerError::NotReady(READY_TIMEOUT))
+        Err(ContainerError::NotReady {
+            waited: READY_TIMEOUT,
+            log,
+        })
+    }
+
+    /// Whether the image's own readiness command says the service is serving.
+    ///
+    /// A probe that could not be run is "not ready", never "ready": the whole
+    /// value of this check is that it fails closed, and a daemon hiccup read
+    /// as a green light would hand a module an empty database.
+    fn probe_says_ready(&self) -> bool {
+        self.exec(self.ready_probe, PROBE_TIMEOUT)
+            .map(|output| output.succeeded())
+            .unwrap_or(false)
+    }
+
+    /// `Some(status)` if the container is no longer running.
+    ///
+    /// `None` covers both "running" and "the runtime would not say", and they
+    /// are deliberately the same answer: an inspect that failed is not
+    /// evidence the container died, and treating it as such would turn a
+    /// hiccup in the daemon into a failed benchmark.
+    fn exited_status(&self) -> Option<String> {
+        let output = runtime_exec::run(
+            &self.runtime,
+            &[
+                "inspect",
+                "--format",
+                "{{.State.Status}} {{.State.ExitCode}}",
+                &self.name,
+            ],
+            CONTROL_TIMEOUT,
+        )
+        .ok()?;
+        let reported = output.stdout.trim();
+        let (state, code) = reported.split_once(' ')?;
+        match state {
+            "running" | "created" | "restarting" => None,
+            _ => Some(format!("{state} ({code})")),
+        }
+    }
+
+    /// The tail of the container's own log, for an error message.
+    ///
+    /// Bounded, and both bounds matter. This text goes into a benchmark
+    /// bundle: a service that failed by printing a megabyte of the same line
+    /// would otherwise put a megabyte of it in the artifact, and a database's
+    /// startup log is one of the places a connection string can appear.
+    fn last_log_lines(&self) -> String {
+        let Ok(output) = runtime_exec::run(
+            &self.runtime,
+            &["logs", "--tail", "12", &self.name],
+            CONTROL_TIMEOUT,
+        ) else {
+            return "the runtime would not return the container's log".into();
+        };
+        // Startup failures reach stderr far more often than stdout, and the
+        // interesting line is the last one either way.
+        let mut text: String =
+            format!("{}\n{}", output.stdout.trim_end(), output.stderr.trim_end())
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join(" | ");
+        if text.len() > LOG_EXCERPT_BYTES {
+            let cut = text
+                .char_indices()
+                .map(|(at, _)| at)
+                .take_while(|at| *at <= LOG_EXCERPT_BYTES)
+                .last()
+                .unwrap_or(0);
+            text.truncate(cut);
+            text.push_str(" [...]");
+        }
+        if text.is_empty() {
+            return "the container printed nothing before it exited".into();
+        }
+        text
     }
 }
 
@@ -786,6 +1086,8 @@ mod tests {
         pin: Pin::Pinned(TEST_REFERENCE),
         service_port: 3306,
         data_dir: "/var/lib/testsvc",
+        run_as: (999, 998),
+        ready_probe: &["testsvc-isready"],
         justification: "test fixture; never launched",
     };
 
@@ -848,6 +1150,108 @@ mod tests {
     }
 
     #[test]
+    fn nothing_inside_the_container_is_ever_root() {
+        // The alternative fix for the startup failure this replaced was
+        // `--cap-add CHOWN,DAC_OVERRIDE,FOWNER,SETUID,SETGID`, which is what
+        // the image's own documentation suggests. This test is the reason that
+        // cannot quietly come back: it fails on a `--user` that is missing, on
+        // one that is `0`, and on any capability being added at all.
+        let args = args();
+        let user = args
+            .iter()
+            .position(|arg| arg == "--user")
+            .expect("the container was not given a user, so it runs as root");
+        let spec = &args[user + 1];
+        assert_eq!(spec, "999:998", "ran as {spec}");
+        let (uid, gid) = spec.split_once(':').expect("not a uid:gid pair");
+        assert_ne!(uid, "0", "the container runs as root");
+        assert_ne!(gid, "0", "the container runs as the root group");
+        assert!(
+            !args.iter().any(|arg| arg == "--cap-add"),
+            "a capability was added back: {args:?}"
+        );
+    }
+
+    #[test]
+    fn the_tmpfs_arrives_owned_by_the_service_account_and_closed_to_everyone_else() {
+        // A container that is not root cannot fix the ownership of its own
+        // data directory, so the mount has to arrive correct. Docker's default
+        // is root-owned and 1777, which PostgreSQL refuses outright and which
+        // would be worth refusing anyway.
+        let args = args();
+        let tmpfs = args
+            .iter()
+            .position(|arg| arg == "--tmpfs")
+            .expect("no tmpfs");
+        let spec = &args[tmpfs + 1];
+        assert!(spec.contains("uid=999"), "{spec}");
+        assert!(spec.contains("gid=998"), "{spec}");
+        assert!(spec.contains("mode=0700"), "{spec}");
+    }
+
+    #[test]
+    fn a_container_that_dies_at_startup_is_not_deleted_before_it_can_be_read() {
+        // `--rm` deletes a container the instant it exits, taking its log with
+        // it - and a container that exits during startup is precisely the one
+        // whose log is the whole diagnosis. The first real launch this module
+        // ever made reported nothing at all for this reason.
+        //
+        // Removal is `Drop`'s job and `reap`'s. Neither is `--rm`, which never
+        // covered the case they exist for: an agent killed while a container
+        // is still running.
+        let args = args();
+        assert!(
+            !args.iter().any(|arg| arg == "--rm"),
+            "--rm is back, and a failed container's log will be deleted before it is read"
+        );
+        assert!(
+            args.windows(2)
+                .any(|w| w[0] == "--label" && w[1] == OWNER_LABEL),
+            "without the label, nothing can reap what --rm no longer removes"
+        );
+    }
+
+    #[test]
+    fn every_allowed_image_brings_a_readiness_probe_of_its_own() {
+        // The check this replaced was a TCP connect from the host, which
+        // Docker's userland proxy answers as soon as the container exists and
+        // regardless of what the service inside is doing. It passed instantly
+        // and always, and it handed `database.oltp` a PostgreSQL that was
+        // still running `initdb`.
+        //
+        // A probe is therefore per-image and mandatory. An entry added without
+        // one fails here rather than silently inheriting the old behaviour,
+        // which is the failure mode that made the original worth fixing.
+        for image in ALLOWED_IMAGES {
+            assert!(
+                !image.ready_probe.is_empty(),
+                "{} has no readiness probe, so it would be declared ready as soon as its \
+                 container existed",
+                image.key
+            );
+            for argument in image.ready_probe {
+                assert!(
+                    !argument.is_empty(),
+                    "{}: an empty argument in the probe",
+                    image.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_allowed_image_runs_as_a_service_account() {
+        // Applied to the real table rather than the fixture, because the way
+        // this goes wrong is a new entry added without the field being thought
+        // about.
+        for image in ALLOWED_IMAGES {
+            let (uid, gid) = image.run_as;
+            assert_ne!(uid, 0, "{} would run as root", image.key);
+            assert_ne!(gid, 0, "{} would run as the root group", image.key);
+        }
+    }
+
+    #[test]
     fn the_container_drops_every_capability_and_gains_no_privileges() {
         let args = args();
         assert!(args
@@ -861,13 +1265,35 @@ mod tests {
     #[test]
     fn a_runaway_container_cannot_take_the_host_down() {
         let args = args();
+        let limit = memory_limit();
+        assert!(args.windows(2).any(|w| w[0] == "--memory" && w[1] == limit));
         assert!(args
             .windows(2)
-            .any(|w| w[0] == "--memory" && w[1] == MEMORY_LIMIT));
-        assert!(args
-            .windows(2)
-            .any(|w| w[0] == "--memory-swap" && w[1] == MEMORY_LIMIT));
+            .any(|w| w[0] == "--memory-swap" && w[1] == limit));
         assert!(args.windows(2).any(|w| w[0] == "--pids-limit"));
+    }
+
+    #[test]
+    fn the_memory_limit_covers_the_data_directory_it_has_to_hold() {
+        // A tmpfs is page cache, and its pages are charged to the cgroup that
+        // faults them in. So a limit equal to the tmpfs size leaves the service
+        // nothing: `database.oltp` built a 324 MiB dataset under a 512 MiB
+        // limit with a 512 MiB tmpfs and was OOM-killed mid-phase.
+        //
+        // The point of this test is not the arithmetic, which is trivial. It
+        // is that the two constants are one budget, and that someone raising
+        // the tmpfs to hold a bigger dataset has to raise the ceiling with it.
+        assert!(
+            sandbox_memory_budget_bytes() > TMPFS_SIZE_BYTES,
+            "the memory ceiling does not exceed the tmpfs it must contain, so a full data \
+             directory leaves the service no memory at all"
+        );
+        assert_eq!(
+            sandbox_memory_budget_bytes(),
+            TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES
+        );
+        // And the flag says bytes explicitly, so no unit suffix can be misread.
+        assert!(memory_limit().ends_with('b'), "{}", memory_limit());
     }
 
     #[test]
@@ -907,6 +1333,8 @@ mod tests {
             },
             service_port: 5432,
             data_dir: "/var/lib/x",
+            run_as: (999, 999),
+            ready_probe: &["pg_isready"],
             justification: "a fixture long enough to satisfy the justification check above",
         };
         assert!(!UNPINNED.is_pinned());
@@ -950,8 +1378,8 @@ mod tests {
         // comparable even though nothing in DARCBench changed - and a
         // compromised tag is a compromised benchmark (T-SUPPLY).
         //
-        // The table is empty today; this test is what stops the first entry
-        // from being `mariadb:11.4`.
+        // This is what stopped the first entry from being `postgres:17`, and
+        // it is what will stop the next one.
         for image in ALLOWED_IMAGES {
             if let Pin::Pinned(reference) = image.pin {
                 assert!(
