@@ -199,36 +199,84 @@ pub(crate) struct LatencyProbe {
     pub(crate) samples: u64,
 }
 
-/// Reads `min: 0, max: 3, avg: 0.09 (1234 samples)`.
+/// Reads whichever of `redis-cli --latency`'s two output formats arrived.
+///
+/// # There are two, and this program only ever sees the second
+///
+/// Attached to a terminal the tool redraws one line in place and prints
+/// `min: 0, max: 3, avg: 0.09 (1234 samples)`. Attached to a pipe it prints
+/// neither the labels nor the redraw — just `0 2 0.23 471`, once, on exit.
+///
+/// Every invocation from this module goes through [`Sandbox::exec`], which
+/// captures stdout, so the labelled format is the one it will *never* get.
+/// This parser was written against it anyway, and the result was a probe that
+/// returned zero samples on every run on every machine — found by driving the
+/// module against a real daemon, because there is no way to find it without
+/// one. A fixture written from the documentation agrees with a parser written
+/// from the documentation.
+///
+/// The labelled form is still parsed, and deliberately first: it costs four
+/// lines, and someone will eventually run this attached to a terminal.
 ///
 /// Written against the format rather than with a regular expression, for the
 /// same reason as the pgbench parser: a pattern that silently matched nothing
 /// would produce a confident zero, and a round-trip of zero milliseconds reads
 /// as an extraordinarily fast machine rather than as a probe that did not run.
-/// [`LatencyProbe::is_credible`] is what catches that.
+/// [`LatencyProbe::is_credible`] is what catches that — and it is what turned
+/// this defect into a withheld metric rather than a fabricated one.
 pub(crate) fn parse_latency(output: &str) -> LatencyProbe {
     let mut probe = LatencyProbe::default();
     // The tool redraws one line in place; the last complete one is the result.
-    let Some(line) = output
+    if let Some(line) = output
         .lines()
         .map(str::trim)
         .rfind(|line| line.contains("avg:"))
+    {
+        for part in line.split(',') {
+            let part = part.trim();
+            if let Some(rest) = part.strip_prefix("min:") {
+                probe.min_ms = leading_number(rest).unwrap_or(0.0);
+            } else if let Some(rest) = part.strip_prefix("max:") {
+                probe.max_ms = leading_number(rest).unwrap_or(0.0);
+            } else if let Some(rest) = part.strip_prefix("avg:") {
+                probe.mean_ms = leading_number(rest).unwrap_or(0.0);
+                if let Some(open) = rest.find('(') {
+                    probe.samples = leading_number(&rest[open + 1..]).unwrap_or(0.0) as u64;
+                }
+            }
+        }
+        return probe;
+    }
+
+    // The piped format: `min max avg samples`, and nothing else on the line.
+    // Requiring exactly four fields is what keeps this from matching a stray
+    // line of a banner or an error - a looser match here would resurrect the
+    // confident zero the labelled parser was careful to avoid.
+    let Some(fields) = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            line.split_whitespace()
+                .map(str::parse::<f64>)
+                .collect::<Result<Vec<f64>, _>>()
+        })
+        .filter_map(Result::ok)
+        .rfind(|fields| fields.len() == 4)
     else {
         return probe;
     };
-    for part in line.split(',') {
-        let part = part.trim();
-        if let Some(rest) = part.strip_prefix("min:") {
-            probe.min_ms = leading_number(rest).unwrap_or(0.0);
-        } else if let Some(rest) = part.strip_prefix("max:") {
-            probe.max_ms = leading_number(rest).unwrap_or(0.0);
-        } else if let Some(rest) = part.strip_prefix("avg:") {
-            probe.mean_ms = leading_number(rest).unwrap_or(0.0);
-            if let Some(open) = rest.find('(') {
-                probe.samples = leading_number(&rest[open + 1..]).unwrap_or(0.0) as u64;
-            }
-        }
-    }
+    probe.min_ms = fields[0];
+    probe.max_ms = fields[1];
+    probe.mean_ms = fields[2];
+    // Negative or fractional sample counts are not a thing the tool emits, and
+    // `as u64` on a negative float saturates to zero rather than wrapping - so
+    // a malformed line lands on "not credible" rather than on a huge count.
+    probe.samples = if fields[3] >= 0.0 {
+        fields[3] as u64
+    } else {
+        0
+    };
     probe
 }
 
@@ -321,6 +369,13 @@ impl DatabaseCache {
                 safety_class: SafetyClass::ProvisionsServices,
                 dependencies: vec![
                     "A container runtime (Docker or Podman) whose daemon is reachable".into(),
+                    // The ceiling the isolation tier applies, not what a
+                    // 10,000-key cache needs, which is a rounding error beside
+                    // it. Preflight is where an operator agrees to the largest
+                    // amount this could take, not the likeliest.
+                    "1 GiB of free memory, which is the sandbox's ceiling rather than what this \
+                     workload uses"
+                        .into(),
                 ],
                 max_bytes_written: 0,
                 max_network_bytes: 0,
@@ -428,6 +483,24 @@ impl DatabaseCache {
 impl BenchmarkModule for DatabaseCache {
     fn manifest(&self) -> &ModuleManifest {
         &self.manifest
+    }
+
+    /// redis-benchmark and the server both run in a container this process did
+    /// not fork, so none of their CPU can be attributed to this run.
+    fn workload_runs_outside_this_process(&self) -> bool {
+        true
+    }
+
+    /// The sandbox's ceiling, for the same reason `database.oltp` declares it:
+    /// a container's memory is memory on the host, and preflight is where the
+    /// operator agrees to it.
+    ///
+    /// The same figure as `database.oltp` even though a 10,000-key cache is
+    /// far smaller than a pgbench dataset. The budget is a property of the
+    /// isolation tier, not of the workload, and quoting the tier's ceiling is
+    /// the honest answer to "how much of my machine could this take".
+    fn estimated_peak_memory_bytes(&self, _params: &ModuleParams) -> u64 {
+        crate::container::sandbox_memory_budget_bytes()
     }
 
     fn estimated_duration_s(&self, _params: &ModuleParams) -> u64 {
@@ -836,6 +909,40 @@ mod tests {
         assert_eq!(probe.mean_ms, 0.09);
         assert_eq!(probe.samples, 4213);
         assert!(probe.is_credible());
+    }
+
+    #[test]
+    fn the_latency_probe_reads_the_format_a_pipe_actually_gets() {
+        // Verbatim from `docker exec valkey redis-cli --latency -i 5` with
+        // stdout captured, which is the only way this module ever invokes it.
+        // No labels, no redraw, one line: min, max, avg, samples.
+        //
+        // The parser was written from the documented format and returned zero
+        // samples from this on every run on every machine. It was found by
+        // running the module against a real daemon and not before, because a
+        // fixture written from the documentation agrees with a parser written
+        // from the documentation. This test is that fixture replaced with an
+        // observation.
+        let probe = parse_latency("0 2 0.23 471\n");
+        assert_eq!(probe.min_ms, 0.0);
+        assert_eq!(probe.max_ms, 2.0);
+        assert_eq!(probe.mean_ms, 0.23);
+        assert_eq!(probe.samples, 471);
+        assert!(probe.is_credible());
+    }
+
+    #[test]
+    fn a_bare_line_that_is_not_the_result_is_not_read_as_one() {
+        // The piped format has no labels to key off, so the only thing
+        // separating it from any other line is its shape. Four numbers and
+        // nothing else - a looser match would put a version banner or a
+        // partial line into a benchmark result.
+        assert!(!parse_latency("0 2 0.23\n").is_credible());
+        assert!(!parse_latency("0 2 0.23 471 88\n").is_credible());
+        assert!(!parse_latency("Warning: 0 2 0.23 471\n").is_credible());
+        // And a well-shaped line still has to describe a probe that ran.
+        assert!(!parse_latency("0 0 0.00 0\n").is_credible());
+        assert!(!parse_latency("0 2 0.23 -5\n").is_credible());
     }
 
     #[test]
