@@ -58,8 +58,14 @@ fn main() {
     let module: Box<dyn BenchmarkModule> = match which.as_str() {
         "database.oltp" => Box::new(darcbench_modules::database_oltp::DatabaseOltp::new()),
         "database.cache" => Box::new(darcbench_modules::database_cache::DatabaseCache::new()),
+        "deployment.container" => {
+            Box::new(darcbench_modules::deployment_container::DeploymentContainer::new())
+        }
         other => {
-            eprintln!("unknown module `{other}`; try database.oltp or database.cache");
+            eprintln!(
+                "unknown module `{other}`; try database.oltp, database.cache or \
+                 deployment.container"
+            );
             std::process::exit(2);
         }
     };

@@ -213,6 +213,14 @@ pub struct Image {
     /// the second reason the digest is pinned. `every_allowed_image_runs_as_a_
     /// service_account` is what stops a future entry defaulting to root.
     run_as: (u32, u32),
+    /// Roughly what fetching this image costs in bytes.
+    ///
+    /// The uncompressed size the runtime reports, which over-states the wire
+    /// transfer because layers are pulled compressed. Over-stating is the right
+    /// direction: this feeds `max_network_bytes`, which is a bound an operator
+    /// agrees to at preflight, and a bound that turns out to be generous is a
+    /// better failure than one that turns out to be a lie.
+    download_bytes: u64,
     /// A command run *inside* the container that exits zero once the service
     /// is actually serving.
     ///
@@ -293,6 +301,9 @@ pub const ALLOWED_IMAGES: &[Image] = &[
         // database that is still being built. A probe over the socket would
         // report that one as ready.
         ready_probe: &["pg_isready", "-q", "-h", "127.0.0.1"],
+        // 156 MB. By far the largest thing this program will ever fetch, which
+        // is exactly why it is declared rather than left to the runtime.
+        download_bytes: 156_190_575,
         justification:
             "The official PostgreSQL image, published by the PostgreSQL Docker Community. \
                     Chosen over a distribution package because the point of the container tier is \
@@ -318,12 +329,46 @@ pub const ALLOWED_IMAGES: &[Image] = &[
         // Exits 1 and says so on a refused connection, which is what makes it
         // usable as a probe rather than merely as a command that runs.
         ready_probe: &["redis-cli", "-h", "127.0.0.1", "ping"],
+        download_bytes: 17_456_505,
         justification: "The official Valkey image, published by the Valkey project. Valkey rather \
                     than Redis because it is the fork the major distributions and cloud providers \
                     moved to after the 2024 licence change, and because its image is \
                     BSD-licensed throughout. It carries `redis-benchmark` and `redis-cli`, which \
                     is what makes a cache measurement possible without this workspace growing a \
                     RESP client.",
+    },
+    Image {
+        key: "busybox",
+        // `busybox:stable-musl` as Docker Hub served it on 2026-08-14.
+        pin: Pin::Pinned(
+            "busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213",
+        ),
+        // Above 1024, because the container is not root and cannot bind below it.
+        service_port: 8080,
+        // Empty, and that is the point: `httpd` serving an empty tmpfs answers
+        // every request with a 404, which is a response from a running server
+        // and is all the health measurement needs. Putting a file in there
+        // would take a bind mount, which this tier does not have and will not
+        // get.
+        data_dir: "/srv",
+        // `nobody`, which exists in the image. Nothing here needs an identity.
+        run_as: (65534, 65534),
+        // An in-container TCP connect, which is a true readiness signal where
+        // the same connect from the host is not - inside the container there is
+        // no userland proxy to answer it. `wget` would be the obvious probe and
+        // is wrong: it exits non-zero on the 404 that proves the server is up.
+        ready_probe: &["nc", "-z", "127.0.0.1", "8080"],
+        download_bytes: 877_398,
+        justification:
+            "The official BusyBox image, and the only entry here that is not a service under \
+             measurement. `deployment.container` uses it to measure what starting a container \
+             costs on this machine, which needs an image with something runnable in it and wants \
+             that something to be as close to nothing as possible: 877 KB, one static multi-call \
+             binary, no init system, no package manager and no runtime to warm up. A heavier base \
+             would fold somebody else's start-up into a number that is supposed to describe the \
+             machine. It carries `httpd`, which is what makes the health half measurable without \
+             this workspace shipping a server into a container, and `nc`, which is what makes it \
+             probeable.",
     },
 ];
 
@@ -358,6 +403,11 @@ impl Image {
 
     pub fn is_pinned(&self) -> bool {
         matches!(self.pin, Pin::Pinned(_))
+    }
+
+    /// What a module must declare as `max_network_bytes` if it runs this image.
+    pub fn download_bytes(&self) -> u64 {
+        self.download_bytes
     }
 }
 
@@ -597,6 +647,103 @@ impl Runtime {
         Ok(ids.len())
     }
 
+    /// Makes sure the image is on this machine, fetching it if it is not.
+    ///
+    /// Returns whether it had to fetch, so the module can disclose that it did.
+    ///
+    /// # Why this is a step rather than something the runtime does for you
+    ///
+    /// It is, in fact, something the runtime does for you: `docker run` on an
+    /// absent image pulls it first. That is precisely the problem, and it went
+    /// unnoticed until this host was made to run a module without the image
+    /// already local.
+    ///
+    /// Two things were wrong with letting it happen implicitly.
+    ///
+    /// **The transfer was undeclared.** All three container modules said
+    /// `max_network_bytes: 0`, and `database.oltp`'s comment even stated the
+    /// assumption - "the image is pulled by the container runtime before the
+    /// run" - with nothing making it true. On a machine that has never run
+    /// DARCBench, that module fetches 156 MB while preflight tells the operator
+    /// the run uses no network at all. On a metered VPS that is somebody's
+    /// money, and it is the sort of promise this program does not get to break.
+    ///
+    /// **And the pull landed inside a measurement.** With the base image
+    /// removed, `deployment.container`'s startup figure came back with a 147%
+    /// coefficient of variation: six repetitions of a container start and one
+    /// of a container start plus a download. The variance sweep caught it,
+    /// which is the sweep working - but a metric that needs a warning to be
+    /// interpretable is one measured wrong.
+    ///
+    /// So the fetch is explicit, before the clock starts, and reported.
+    pub fn ensure_image_present(
+        &self,
+        image: &'static Image,
+        timeout: Duration,
+    ) -> Result<bool, ContainerError> {
+        let reference = image.reference()?;
+
+        // `inspect` rather than `pull` with a hope that it is a no-op: a pull
+        // of a present image still contacts the registry to check, which is a
+        // network round trip on a run that may have been promised none.
+        let present = self
+            .control(&["image", "inspect", "--format", "{{.Id}}", reference])
+            .map(|output| output.succeeded())
+            .unwrap_or(false);
+        if present {
+            return Ok(false);
+        }
+
+        let pulled = self.control_with(&["pull", "--quiet", reference], timeout)?;
+        if !pulled.succeeded() {
+            return Err(ContainerError::Start {
+                runtime: self.name(),
+                detail: format!(
+                    "{} could not be fetched: {}",
+                    image.key,
+                    first_line(&format!("{}{}", pulled.stderr, pulled.stdout))
+                ),
+            });
+        }
+        Ok(true)
+    }
+
+    /// Runs one command in a throwaway container and returns how long the
+    /// whole round trip took.
+    ///
+    /// Create, start, exec, exit, remove — measured in the foreground, so the
+    /// figure is a wall clock rather than the resolution of a poll. See
+    /// [`ephemeral_run_args`] for the argument vector and why it is a second
+    /// one.
+    ///
+    /// `None` if the command did not succeed. A container that failed to start
+    /// also "finishes quickly", and timing that would report the fastest
+    /// container start on record.
+    pub fn run_ephemeral(
+        &self,
+        image: &'static Image,
+        run_id: &str,
+        argv: &[&str],
+        timeout: Duration,
+    ) -> Result<Option<Duration>, ContainerError> {
+        let reference = image.reference()?;
+        let name = container_name(run_id, image.key);
+        let args = ephemeral_run_args(image, reference, &name, argv);
+        let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
+
+        let started = Instant::now();
+        let output = self.control_with(&borrowed, timeout)?;
+        let elapsed = started.elapsed();
+
+        if !output.succeeded() {
+            // `--rm` should have removed it; this covers the case where the
+            // failure was early enough that it did not.
+            remove(&self.exec, &name);
+            return Ok(None);
+        }
+        Ok(Some(elapsed))
+    }
+
     /// Removes every container this agent labelled, from this run or any
     /// earlier one.
     ///
@@ -738,6 +885,70 @@ fn run_args<'a>(
     args
 }
 
+/// Builds the `run` arguments for a one-shot foreground command.
+///
+/// The second argument vector in this module, and it exists because
+/// `deployment.container` asks a question the first one cannot answer: **what
+/// does starting a container cost here?** [`run_args`] always detaches,
+/// publishes a port and mounts a tmpfs, because it is building a service to
+/// measure. Timing that would measure the service. What is wanted instead is
+/// the smallest possible round trip — create, start, exec something trivial,
+/// exit, remove — timed in the foreground so the number is a wall clock and not
+/// the resolution of a polling loop.
+///
+/// It is a separate function rather than a flag on the first because the two
+/// vectors have to be *read* separately. This vector is the isolation for every
+/// container that goes through it, so the same tests apply to the whole of it:
+/// no host path, no added capability, nothing privileged, nothing published.
+///
+/// **Nothing is published and nothing is mounted**, which makes this strictly
+/// more contained than [`run_args`] rather than a relaxation of it. `--rm` *is*
+/// used here, and for once it is right: the container is expected to exit, its
+/// exit is the measurement, and there is no startup log to lose because the
+/// command is chosen to do nothing at all.
+///
+/// `argv` is a fixed vector of constants the module owns. Nothing a caller
+/// typed reaches it, for the same reason nothing does in [`Sandbox::exec`].
+fn ephemeral_run_args<'a>(
+    image: &'a Image,
+    reference: &'a str,
+    name: &'a str,
+    argv: &'a [&'a str],
+) -> Vec<String> {
+    let (uid, gid) = image.run_as;
+    let mut args: Vec<String> = vec![
+        "run".into(),
+        // Foreground: the command's own wall time is what is being measured,
+        // and detaching would replace it with how fast this process can poll.
+        "--rm".into(),
+        "--name".into(),
+        name.into(),
+        "--label".into(),
+        OWNER_LABEL.into(),
+        "--user".into(),
+        format!("{uid}:{gid}"),
+        "--network".into(),
+        // Not merely unpublished: no network namespace with an interface at
+        // all. Nothing here has anything to talk to.
+        "none".into(),
+        "--memory".into(),
+        memory_limit(),
+        "--memory-swap".into(),
+        memory_limit(),
+        "--pids-limit".into(),
+        "512".into(),
+        "--security-opt".into(),
+        "no-new-privileges".into(),
+        "--cap-drop".into(),
+        "ALL".into(),
+        reference.into(),
+    ];
+    for argument in argv {
+        args.push((*argument).into());
+    }
+    args
+}
+
 // ---------------------------------------------------------------------------
 // The sandbox
 // ---------------------------------------------------------------------------
@@ -764,10 +975,46 @@ impl Sandbox {
         run_id: &str,
         env: &[String],
     ) -> Result<Self, ContainerError> {
+        let sandbox = Self::launch_without_waiting(runtime, image, run_id, env, &[])?;
+        // `wait_ready` removes the container itself on failure, because it is
+        // the only place that knows the container was reachable but never
+        // answered - a distinction worth keeping out of this function.
+        sandbox.wait_ready()?;
+        Ok(sandbox)
+    }
+
+    /// Starts `image` and returns as soon as its port is published, without
+    /// waiting for the service inside to be serving.
+    ///
+    /// For a caller that wants to *measure* how long becoming ready takes.
+    /// [`Self::wait_ready`] polls on a one-second cadence, which is the right
+    /// cost for a guard and useless as a stopwatch for an event that takes a
+    /// few hundred milliseconds — so `deployment.container` times its own
+    /// tight loop instead of being handed a number rounded to the second.
+    ///
+    /// The container is still a [`Sandbox`], so [`Drop`] still removes it and
+    /// nothing leaks if the caller's loop gives up. What the caller loses is
+    /// the guarantee that anything inside is answering, which is precisely
+    /// what it has undertaken to find out.
+    ///
+    /// `command` overrides the image's own, for an image whose default does
+    /// not serve. Fixed constants from the module, never anything a caller
+    /// typed — the same rule as everywhere else here.
+    pub fn launch_without_waiting(
+        runtime: &Runtime,
+        image: &'static Image,
+        run_id: &str,
+        env: &[String],
+        command: &[&str],
+    ) -> Result<Self, ContainerError> {
         // Before anything else, so an unpinned image never reaches a daemon.
         let reference = image.reference()?;
         let name = container_name(run_id, image.key);
-        let args = run_args(image, reference, &name, env);
+        let mut args = run_args(image, reference, &name, env);
+        // After the reference, which `run_args` puts last: everything past it
+        // is the container's command rather than a flag to the runtime, which
+        // is what makes appending here safe.
+        args.extend(command.iter().map(|part| (*part).to_string()));
         let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
 
         let started = runtime.control(&borrowed)?;
@@ -793,12 +1040,7 @@ impl Sandbox {
                 return Err(error);
             }
         };
-        // `wait_ready` removes the container itself on failure, because it is
-        // the only place that knows the container was reachable but never
-        // answered - a distinction worth keeping out of this function.
-        let sandbox = sandbox(address);
-        sandbox.wait_ready()?;
-        Ok(sandbox)
+        Ok(sandbox(address))
     }
 
     pub fn address(&self) -> SocketAddr {
@@ -1088,6 +1330,7 @@ mod tests {
         data_dir: "/var/lib/testsvc",
         run_as: (999, 998),
         ready_probe: &["testsvc-isready"],
+        download_bytes: 1_000_000,
         justification: "test fixture; never launched",
     };
 
@@ -1252,6 +1495,84 @@ mod tests {
     }
 
     #[test]
+    fn the_ephemeral_vector_is_at_least_as_contained_as_the_service_one() {
+        // A second argument vector is a second chance to get the isolation
+        // wrong, so it gets the same treatment as the first: the whole vector
+        // is read, not the code that builds it.
+        //
+        // Asserted as "at least as contained", not "the same": this one is
+        // strictly tighter. Nothing is published, nothing is mounted and the
+        // network namespace has no interface at all, because a container whose
+        // whole job is to exit has nothing to talk to and nowhere to write.
+        let args = ephemeral_run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &["true"]);
+
+        for forbidden in [
+            "-v",
+            "--volume",
+            "--mount",
+            "--privileged",
+            "--device",
+            "--cap-add",
+            "--publish",
+            "-p",
+            "--tmpfs",
+        ] {
+            assert!(
+                !args.iter().any(|arg| arg == forbidden),
+                "`{forbidden}` reached the ephemeral vector: {args:?}"
+            );
+        }
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--cap-drop" && w[1] == "ALL"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--security-opt" && w[1] == "no-new-privileges"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--network" && w[1] == "none"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--user" && w[1] == "999:998"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--label" && w[1] == OWNER_LABEL));
+        // `--rm` is right here and wrong in `run_args`, which is worth an
+        // assertion rather than a comment: this container is *expected* to
+        // exit, its exit is the measurement, and there is no startup log to
+        // lose because the command does nothing.
+        assert!(args.iter().any(|arg| arg == "--rm"));
+        assert!(!args.iter().any(|arg| arg == "--detach"));
+    }
+
+    #[test]
+    fn the_ephemeral_command_cannot_be_read_as_a_flag() {
+        // Everything after the image reference is the container's command
+        // rather than an argument to the runtime, so the reference has to come
+        // before all of it. If a command element could land ahead of the
+        // reference it would be parsed by the runtime instead of passed to the
+        // container - which is the whole of the difference between running
+        // `true` and running `--privileged`.
+        let hostile = ["--privileged", "-v", "/:/host"];
+        let args = ephemeral_run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &hostile);
+        let reference_at = args
+            .iter()
+            .position(|arg| arg == TEST_REFERENCE)
+            .expect("the image reference is missing");
+        assert_eq!(
+            &args[reference_at + 1..],
+            &hostile,
+            "the command must be exactly the tail after the reference"
+        );
+        for argument in &hostile {
+            assert!(
+                args[..reference_at].iter().all(|arg| arg != argument),
+                "`{argument}` appeared before the image reference: {args:?}"
+            );
+        }
+    }
+
+    #[test]
     fn the_container_drops_every_capability_and_gains_no_privileges() {
         let args = args();
         assert!(args
@@ -1335,6 +1656,7 @@ mod tests {
             data_dir: "/var/lib/x",
             run_as: (999, 999),
             ready_probe: &["pg_isready"],
+            download_bytes: 1_000_000,
             justification: "a fixture long enough to satisfy the justification check above",
         };
         assert!(!UNPINNED.is_pinned());
