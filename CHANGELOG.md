@@ -10,6 +10,150 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ### Added
 
+**The Database category produces a score** — `database.oltp` and
+`database.cache` are registered
+- Both modules were written, tested and unable to run: they need a container
+  daemon and a registry, and the machine they were written on had neither. That
+  block is cleared. The `postgres` and `valkey` digests were resolved against
+  Docker Hub on **2026-08-14** and pinned, with the date recorded beside each in
+  `container.rs` — a digest is a fact about a moment, and a reader six months
+  out needs to know which moment.
+- Registered in `registry::builtin`, anchored in `darcbench-scoring`,
+  manifested under `benchmarks/database/`, and in the **`deep` profile only**.
+  The argument is `php.runtime`'s: most machines in this market have no
+  container runtime, and a standard run coming back `Partial` on every one of
+  them would report the profile's own assumptions as a fault of the machine.
+  They run last within `deep`, because their failure depends on a daemon rather
+  than on this process.
+- The anchors are the first in this file written with a measurement in front of
+  them. They are still **declared targets, not calibration** — DARC-REF-1 is a
+  machine nobody has run this on — but the ratios come from the workload rather
+  than from an estimate of it, and the reasoning records which direction each
+  extrapolation goes and why.
+
+### Fixed
+
+**Five defects that only a real container daemon could find.** `Sandbox::launch`
+had never run. `docs/DEVELOPMENT-HOST.md` said to expect that step to find
+defects and to treat a clean first run as suspicious; it was right on both
+counts. Three of the five are properties of the isolation tier rather than of
+PostgreSQL, so they would have been waiting for every image added after it.
+
+- **A container hardened to the point of not starting.** With `--cap-drop ALL`
+  the official PostgreSQL entrypoint dies on its second line: it starts as
+  root, `chown`s `PGDATA`, and `gosu`s down to `postgres`. The documented fix —
+  the one the image's own README gives — is to hand back `CHOWN`,
+  `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That is close to the whole
+  interesting surface of a container escape, granted so that a process can hold
+  privileges long enough to drop them.
+
+  So the container now starts **as the image's own service account** and the
+  privileges are never held at all. The uid and gid are part of the allow-list
+  entry, which is defensible precisely because the digest is pinned: they are
+  facts about one specific image, and a test refuses an entry that would run as
+  root. The tmpfs has to arrive already owned as a consequence — a non-root
+  container cannot fix it — so the mount carries `mode=0700,uid=,gid=`, where
+  Docker's default is root-owned and `1777`, which PostgreSQL refuses outright.
+
+- **A readiness check that was sound reasoning and worthless in practice.** It
+  was a TCP connect from the host to the published port, on the argument that
+  it is the one signal every service has in common. But Docker publishes a port
+  with a userland proxy, and that proxy listens when the *container* starts, not
+  when the service does. Measured on this host: at 0.5 s the port accepted
+  connections and `pg_isready` still said no. `database.oltp` was handed a
+  sandbox declared ready and failed 0.8 s later with `connection refused`.
+
+  `database.cache` passed the same broken check every time, because Valkey
+  starts in about a tenth of a second and won the race. That is the part worth
+  keeping: **a green result from an unsound check is not evidence**, and the two
+  modules differed only in how fast their service happened to start. Each image
+  now brings its own probe, run inside the container.
+
+- **`--rm` deleted the evidence.** A container that dies during startup is the
+  one whose log *is* the diagnosis, and `--rm` removes it before anything can
+  read it — the capability failure above was invisible on the first attempt for
+  exactly this reason. `wait_ready` now watches for the exit, so a failed
+  container reports in about the time it took to fail rather than after the
+  ninety-second timeout, and the error carries the container's own last words.
+  Removal was always `Drop`'s job and `reap`'s; `--rm` never covered the case
+  those two exist for.
+
+- **The memory limit and the tmpfs were one budget written as two.** Both were
+  `512m`, which reads as half a gig of disk and half a gig of RAM. A tmpfs lives
+  in the page cache and its pages are charged to the cgroup that faults them in,
+  so they were the same half gigabyte. `database.oltp` built a 324 MiB dataset
+  and was OOM-killed part-way through its write phase.
+
+  What it published from that is the part that matters. Not an error: two
+  throughput figures — one from a phase whose backends had been killed half-way
+  through, because pgbench divides what it completed by the window it was asked
+  for and the number therefore looked ordinary — and silence about the other
+  four metrics, because the latency loop had a bare `continue` where the
+  throughput loop had a warning. A plausible wrong number next to an unexplained
+  absence is the worst combination available. The ceiling is now computed from
+  the tmpfs plus a measured service allowance, a phase that lost clients is
+  refused rather than published, the latency loop warns, and both modules
+  declare the footprint to preflight.
+
+- **Two tools whose output is not their documentation.** `--progress 0` reads as
+  "no progress reports" and pgbench rejects it — `-P/--progress must be in range
+  1..2147483647` — so every phase of every run failed with a usage error before
+  a single transaction. And `redis-cli --latency` prints
+  `min: 0, max: 3, avg: 0.09 (1234 samples)` to a terminal but `0 2 0.23 471` to
+  a pipe, which is the only thing this program ever captures, so the parser
+  returned zero samples on every run on every machine.
+
+  Both were caught by the modules' own validity checks rather than published as
+  zeroes, which is the design working — but a metric that is *always* withheld
+  is not a working metric. No fixture would have found either: a fixture written
+  from the documentation agrees with a parser written from the documentation.
+  Both tests now carry output captured from the real tool.
+
+**The runtime load ceiling counted a module's own container as a competing
+tenant.** The first `darcbench run` over the two modules reported
+`database.oltp` degraded on an idle machine: *"work other than this benchmark
+used 100% of the machine's CPU"* — the work being pgbench, in the container the
+module had just started.
+- The ceiling subtracts this process's own CPU from the machine's to see what
+  else is competing. `/proc/self/stat` sums every thread of this process **and
+  its reaped children**, which is why `php.runtime` is counted correctly despite
+  doing all its work in forks — an attribution that was itself a defect found
+  and fixed once already. A container is different in kind: started by a daemon,
+  never this process's child, so nothing it burns can be attributed to the run
+  and the subtraction leaves the benchmark's own workload in the "somebody else"
+  column.
+- The ceiling is now **suspended** while such a module runs, and the bundle
+  discloses it — "the ceiling was not enforced" and "the ceiling was enforced
+  and found nothing" are different claims. A module declares the condition
+  itself, `workload_runs_outside_this_process`, rather than the agent inferring
+  it from a safety class: `web.static` also provisions a service and its origin
+  *is* in this process. The thermal guard and the hard runtime ceiling are
+  untouched; neither depends on attributing CPU to anything.
+- Attributing the container's cgroup back to the run would be better and needs
+  the agent to learn what a container is. Until then this is the choice the
+  guard already makes under container scope, and that `network.transfer` makes
+  about packet loss: a guard that fires on the wrong evidence is worse than one
+  that declares itself absent.
+
+**A CPU test that could not pass on a small host** —
+`multi_thread_shape_reports_more_total_throughput`
+- It was documented as "tests flake under `-j` on a small VPS; re-run pinned to
+  fewer cores". On a two-vCPU host that advice does not work: it failed under
+  `--test-threads=2` and passed only in complete isolation, and it passed and
+  failed on identical code minutes apart.
+- It was a defect in the test. The test already refused to conclude anything
+  when the machine was too *noisy* — but noise is a shape that cannot reproduce
+  itself, and what happened was a shape that reproduced perfectly well while
+  being handed one core, because another test had the other one. No amount of
+  averaging separates "the threaded shape stopped being parallel", which is the
+  defect worth failing on, from "the machine had no second core to give it".
+- The precondition is now measured rather than assumed: CPU seconds burned over
+  wall seconds elapsed, from `/proc/self/stat`, which is how many cores the
+  process really got. Below 1.5 the test says so and asserts only that
+  throughput is positive and finite. A test that cannot pass on a small host
+  teaches people to ignore the suite, which costs more than the coverage is
+  worth.
+
 **A live terminal dashboard for `darcbench run`** — the CLI stops going silent
 - `darcbench run` printed a two-line header and then nothing until the bundle
   was ready: minutes on `quick`, over an hour on `endurance`. The information

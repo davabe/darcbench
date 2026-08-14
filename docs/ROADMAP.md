@@ -541,9 +541,9 @@ and the test drives a synthetic target whose latency it dictates.
 
 | Deliverable | Complexity | Estimate |
 |---|---|---|
-| 🚧 Container-based module isolation tier — *runtime discovery, argument boundary and reaping done; the image allow-list is empty until a module needs an entry* | M | 2 ew |
-| 🚧 `database.oltp` — PostgreSQL, read-only and read-write, durability disclosed. *MariaDB/MySQL not delivered; not registered until its image digest is pinned* | L | 4 ew |
-| 🚧 `database.cache` — Valkey; throughput and unloaded round-trip. *No latency-under-load metric; not registered until its image digest is pinned* | S | 1 ew |
+| ✅ Container-based module isolation tier — discovery, argument boundary, reaping, launch and readiness, exercised against a real daemon | M | 2 ew |
+| ✅ `database.oltp` — PostgreSQL, read-only and read-write, durability disclosed, registered and scored. *MariaDB/MySQL not delivered* | L | 4 ew |
+| ✅ `database.cache` — Valkey; throughput and unloaded round-trip, registered and scored. *No latency-under-load metric* | S | 1 ew |
 | ✅ WordPress fixture generator (deterministic content) — WXR, checksum-pinned | M | 2 ew |
 | `wordpress.*` — Origin, Cached, Database, Admin scores | L | 3 ew |
 | 🚧 `deployment.container` — build (cached and uncached), image write-out and extraction. *Startup and health blocked on a pinned runnable base image* | M | 2 ew |
@@ -584,10 +584,12 @@ is a mutable pointer, so a tag-pinned benchmark measures whatever the publisher
 pushed last and two runs a month apart are not comparable even though nothing
 in DARCBench changed.
 
-**The table is empty, and that is not an oversight.** This commit ships the
-tier, not a module that uses it, and a digest has to be resolved against a real
-registry rather than invented. The test that refuses any entry carrying a tag
-is already there, so the first entry cannot be `mariadb:11.4`.
+**The table was empty for two commits, and that was not an oversight.** A
+digest has to be resolved against a real registry rather than invented, and the
+machine the tier was written on had neither a daemon nor registry access. The
+two entries were pinned on 2026-08-14 against Docker Hub, with the date
+recorded beside each: a digest is a fact about a moment, and a reader six
+months out needs to know which moment.
 
 **What the tier cannot guarantee, stated rather than hidden.** The release
 profile aborts on panic and nothing runs on `SIGKILL`, so a run that dies
@@ -597,18 +599,130 @@ this agent's label — label-scoped rather than name-scoped, so no coincidence i
 an operator's naming can put one of theirs in range. A module calls it before
 starting, which bounds the cost of a crash to "until the next run".
 
-**Validated by the host it was written on.** This machine has the Docker client
-at a root-owned path and no daemon, so `Runtime::discover` takes the branch
-that matters: *"/usr/bin/docker is installed but its daemon did not answer …
-The module is reported as not measured; nothing on this host was used
+**Validated first by a host with no daemon.** That machine had the Docker
+client at a root-owned path and nothing behind it, so `Runtime::discover` took
+the branch that matters: *"/usr/bin/docker is installed but its daemon did not
+answer … The module is reported as not measured; nothing on this host was used
 instead."* Discovery and daemon reachability are separate failures precisely
 because an operator acts on them differently — one is a thing to install, the
 other a thing to start.
 
-**Not exercised here:** launching, readiness and destruction need a daemon this
-host does not have. The argument boundary, the refusals, the naming and the
-port parsing are tested; `Sandbox::launch` is not, and the first database
-module will be what exercises it.
+### What the first real daemon changed
+
+`Sandbox::launch`, `wait_ready`, `exec` and `Drop` first ran against a daemon
+on 2026-08-14. `docs/DEVELOPMENT-HOST.md` said to expect that step to find
+defects and to treat a clean first run as suspicious. It found five, three of
+them in code that had been reviewed and tested and was wrong anyway. They are
+recorded here because each is a *kind* of mistake rather than a typo, and the
+kinds recur.
+
+**A container hardened to the point of not starting.** With `--cap-drop ALL`,
+the official PostgreSQL entrypoint dies on its second line: it starts as root,
+`chown`s `PGDATA`, and `gosu`s down to `postgres`. The documented fix — the one
+the image's own README gives — is to hand back `CHOWN`, `DAC_OVERRIDE`,
+`FOWNER`, `SETUID` and `SETGID`, which is close to the whole interesting
+surface of a container escape, granted so that a process could hold privileges
+long enough to drop them.
+
+The fix taken instead was to start the container *as* the image's service
+account, so the privileges are never held rather than held and surrendered. The
+uid and gid became part of the allow-list entry, which is defensible precisely
+because the digest is pinned: they are facts about a specific image. The tmpfs
+then has to arrive already owned, since a non-root container cannot fix it —
+`mode=0700,uid=,gid=`, where Docker's default is root-owned and `1777`, which
+PostgreSQL refuses outright and which is worth refusing anyway.
+
+**A readiness check that was sound reasoning and worthless in practice.** It was
+a TCP connect from the host to the published port, on the argument that it is
+the one signal every service has in common. But Docker publishes a port with a
+userland proxy, and that proxy listens when the *container* starts, not when
+the service does. Measured here: at 0.5 s the host port accepted connections
+and `pg_isready` still said no. `database.oltp` was handed a sandbox declared
+ready and failed 0.8 s later with `connection refused`.
+
+`database.cache` passed the same broken check every time, because Valkey starts
+in about a tenth of a second and won the race. That is the part worth keeping:
+a green result from an unsound check is not evidence, and the two modules
+differed only in how fast their service happened to start. Each image now
+brings its own probe — `pg_isready`, `redis-cli ping` — run inside the
+container.
+
+**`--rm` deleted the evidence.** A container that dies during startup is the one
+whose log *is* the diagnosis, and `--rm` removes it before anything can read
+it. The capability failure above was invisible on the first attempt for exactly
+this reason and appeared the moment the flag came off. `wait_ready` now watches
+for the exit, fails in about the time the container took to fail rather than
+after the full ninety-second timeout, and puts the container's own last words
+in the error.
+
+**The memory limit and the tmpfs were one budget written as two.** Both were
+`512m`, which reads as half a gig of disk and half a gig of RAM. A tmpfs lives
+in the page cache and its pages are charged to the cgroup that faults them in,
+so they were the same half gigabyte. `database.oltp` built a 324 MiB dataset
+and was OOM-killed part-way through its write phase.
+
+What it published from that is the part that matters. Not an error: two
+throughput figures, one of them from a phase whose backends had been killed
+half-way through — pgbench divides what it completed by the window it was
+asked for, so the number looked ordinary — and silence about the other four
+metrics, because the latency loop had a bare `continue` where the throughput
+loop had a warning. So the module reported a plausible wrong number and an
+unexplained absence, which is the worst combination available. All three are
+fixed: the ceiling is computed from the tmpfs plus a measured service
+allowance, a phase that lost clients is refused rather than published, and the
+latency loop warns.
+
+**And one flag that was simply not accepted.** `--progress 0` reads as "no
+progress reports" and pgbench rejects it: `-P/--progress must be in range
+1..2147483647`. Every phase of every run failed with a usage error before a
+single transaction. The argument vector was correct by inspection; it just was
+not one pgbench accepts. Likewise `redis-cli --latency` prints
+`min: 0, max: 3, avg: 0.09 (1234 samples)` to a terminal and `0 2 0.23 471` to
+a pipe — and this program only ever captures a pipe, so the parser written from
+the documentation returned zero samples on every run on every machine.
+
+Both were caught by the modules' own validity checks rather than published as
+zeroes, which is the design working. But a metric that is *always* withheld is
+not a working metric, and no fixture would have found either: a fixture written
+from the documentation agrees with a parser written from the documentation.
+Both tests now carry output captured from the real tool.
+
+**And a sixth, which only registering them exposed.** The first
+`darcbench run` over the two modules reported `database.oltp` **degraded** on
+an idle machine: *"work other than this benchmark used 100% of the machine's
+CPU."* The work was pgbench, in the container the module had just started.
+
+The runtime load ceiling asks what is competing with the benchmark by
+subtracting this process's own CPU from the machine's. `/proc/self/stat` sums
+every thread of this process *and its reaped children*, which is why
+`php.runtime` is counted correctly despite doing all its work in forks — and
+that attribution was itself a defect this project already found and fixed once,
+recorded under Phase 2 above. A container is different in kind: it is started
+by a daemon and is not this process's child at any remove, so nothing it burns
+can ever be attributed to this run, and the subtraction leaves the benchmark's
+own workload sitting in the "somebody else" column.
+
+The ceiling is therefore **suspended** while such a module runs, and the bundle
+says so. A module declares the condition itself —
+`workload_runs_outside_this_process` — rather than the agent inferring it from
+a safety class, because `web.static` also provisions a service and its origin
+*is* in this process. The thermal guard and the hard runtime ceiling are
+untouched: both read the machine directly and neither depends on attributing
+CPU to anything.
+
+Attributing the container's cgroup back to the run would be better than
+suspending the guard, and it is not something the agent can do without learning
+what a container is. Until then this is the same choice the guard already makes
+under container scope and that `network.transfer` makes about packet loss: a
+guard that fires on the wrong evidence is worse than one that declares itself
+absent.
+
+**The pattern across all six is worth naming**, because it is the argument for
+the development-host document existing at all. Not one was a logic error. Every
+one was a correct-looking piece of code meeting a fact about the world that no
+amount of reading it would have supplied: what an entrypoint does with root,
+when a userland proxy starts listening, where tmpfs pages are charged, what a
+tool prints to a pipe, and which processes a `/proc` file counts.
 
 Then **`database.oltp@1.0.0`** — six metrics: select-only and read-write
 throughput, and the mean and an estimated 95th-percentile latency for each.
@@ -654,17 +768,18 @@ the WAL is written and fsynced, but to RAM, so these figures describe the
 server and the CPU rather than the disk. `storage.mixed` measures the disk, and
 measuring it again here would put the same device in two categories.
 
-**Two things are deliberately not delivered, and the module says so in its own
-limitations rather than leaving them to be discovered:**
+**One thing is deliberately not delivered, and the module says so in its own
+limitations rather than leaving it to be discovered: MariaDB and MySQL.** No
+open-model load tool ships in their official images. `mysqlslap` is
+closed-loop, and reporting its latencies would be publishing the numbers of a
+server that was politely never overloaded — the exact defect Phase 3 spent a
+deliverable fixing.
 
-- **MariaDB and MySQL.** No open-model load tool ships in their official
-  images. `mysqlslap` is closed-loop, and reporting its latencies would be
-  publishing the numbers of a server that was politely never overloaded — the
-  exact defect Phase 3 spent a deliverable fixing.
-- **A registry entry.** The module is not in `registry::builtin`, because its
-  image is `Pin::Pending` and a registered module that cannot run would put a
-  guaranteed precondition failure into every profile containing it. It is
-  registered when the digest is pinned, and that is one line.
+**A registry entry** was the other, and it is now delivered. The module was
+withheld from `registry::builtin` while its image was `Pin::Pending`, because a
+registered module that cannot run puts a guaranteed precondition failure into
+every profile containing it. With the digest pinned it is registered, in `deep`
+only.
 
 Then **`database.cache@1.0.0`** — six metrics: GET, SET and INCR throughput,
 the same GETs pipelined sixteen deep, and the mean and worst round-trip on an
@@ -706,7 +821,8 @@ round-trips rather than the data structure, which is the difference between
 
 Persistence — `appendonly`, `save`, `maxmemory-policy`, `io-threads` — is
 disclosed and never changed, for the same reason `database.oltp` records
-`fsync`. Like it, this module is **not registered** until its digest is pinned.
+`fsync`. Like it, this module was withheld from the registry until its digest
+was pinned, and like it, it is now registered in `deep`.
 
 Then the **WordPress fixture generator**, which is what makes `wordpress.*`
 comparable at all. A WordPress serving twelve posts and one serving twelve
