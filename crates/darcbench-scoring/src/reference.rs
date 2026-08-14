@@ -523,6 +523,129 @@ pub fn provisional_reference() -> ReferenceProfile {
         latency_point(90.0, 1.0, CategoryKey::Web, None),
     );
 
+    // --- database.oltp --------------------------------------------------------
+    //
+    // These are the first anchors written with a measurement in front of them.
+    // Every other block here was derived from published figures; this one was
+    // extrapolated from `database.oltp` actually running, on 2026-08-14. That
+    // does not make them calibrated - DARC-REF-1 is still a machine nobody has
+    // run this on - but the shape and the ratios come from the workload rather
+    // than from an estimate of it.
+    //
+    // **The observing machine was two vCPUs of a Ryzen 9 9900X**, and the
+    // asymmetry is what makes the extrapolation possible in both directions.
+    // Its cores are *faster* than DARC-REF-1's 7700, and it has two of them
+    // against sixteen threads. So the observations are not uniformly low: they
+    // are low where the workload wanted parallelism and roughly right, or
+    // better than the reference, where it wanted one fast core.
+    //
+    // Observed: read 20,900-49,300 tx/s, write ~3,000 tx/s, read latency
+    // 0.74 ms and write 1.53 ms at an offered 200 tx/s.
+    //
+    // The latency anchors sit *below* those observations rather than being
+    // scaled up from them. A latency phase runs four clients and four pgbench
+    // threads beside the server, which is nine runnable processes on two
+    // cores - so most of that 0.74 ms is scheduler queueing rather than query
+    // cost, and a machine with threads to spare removes it. Anchoring at
+    // 0.4 ms assumes about half of it was contention.
+    //
+    // The throughput anchors go up, but by much less than the eightfold the
+    // core count suggests, for two reasons in the module. `pgbench` runs
+    // *inside the container*, so half of any added parallelism goes to the
+    // client rather than the server. And the write path is bounded by
+    // something core count does not help at all: pgbench's built-in workload
+    // updates `pgbench_branches`, of which scale 10 has ten rows, so eight
+    // clients contend on ten rows and the ceiling is lock throughput.
+    //
+    // The wide read spread is a property of the observing machine and is
+    // recorded because an anchor drawn from an unstable observation should say
+    // that it was one.
+    points.insert(
+        "database.oltp/write.tps".into(),
+        point(10_000.0, 1.5, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.oltp/read.tps".into(),
+        point(100_000.0, 1.25, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.oltp/write.latency_mean".into(),
+        latency_point(0.8, 1.0, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.oltp/read.latency_mean".into(),
+        latency_point(0.4, 1.0, CategoryKey::Database, None),
+    );
+    // Both `estimated_p95` anchors carry half the weight of the means they are
+    // derived from, because that is what they are: a normal approximation from
+    // a mean and a standard deviation, not an observed percentile. The module
+    // says so in the metric key. A tail estimate should not move a category
+    // score as much as a measurement does.
+    points.insert(
+        "database.oltp/write.latency_estimated_p95".into(),
+        latency_point(2.0, 0.5, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.oltp/read.latency_estimated_p95".into(),
+        latency_point(1.0, 0.5, CategoryKey::Database, None),
+    );
+
+    // --- database.cache -------------------------------------------------------
+    //
+    // Valkey serves commands from a single thread, so unlike every other
+    // anchor in the Database category these track per-core speed and barely
+    // move with core count. What core count does change is whether the
+    // benchmark client starves the server, because it shares the container:
+    // the observing machine's 88,900 GET/s was two cores split between a
+    // single-threaded server and a fifty-connection client.
+    //
+    // That observing machine had the *faster* core of the two, so the doubling
+    // below is not a per-core speed correction - it is the client no longer
+    // taking half the machine. Which is why these multiply by about two where
+    // the OLTP read anchor multiplies by rather more: there, added threads go
+    // to a server that can use them; here they only stop the client stealing
+    // from one that cannot.
+    //
+    // The consequence worth stating is that this module scores a 96-core
+    // machine and an 8-core one almost identically, and that is correct rather
+    // than a defect. It is the market research's own point about single-thread
+    // paths, arriving in the Database category instead of the Web one.
+    points.insert(
+        "database.cache/get.throughput".into(),
+        point(180_000.0, 1.5, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.cache/set.throughput".into(),
+        point(170_000.0, 1.0, CategoryKey::Database, None),
+    );
+    points.insert(
+        "database.cache/incr.throughput".into(),
+        point(180_000.0, 0.75, CategoryKey::Database, None),
+    );
+    // Pipelining at depth 16 amortises the syscall and round-trip cost that
+    // dominates the three above, so it lands an order of magnitude higher and
+    // measures something different: how fast the machine moves data once the
+    // per-command overhead is taken away.
+    points.insert(
+        "database.cache/pipelined.throughput".into(),
+        point(1_500_000.0, 1.0, CategoryKey::Database, None),
+    );
+    // The floor under every cache hit, and weighted accordingly: an
+    // application that reaches its cache twenty times to build a page pays
+    // this twenty times, and no amount of throughput headroom reduces it.
+    points.insert(
+        "database.cache/roundtrip.unloaded_mean".into(),
+        latency_point(0.08, 1.25, CategoryKey::Database, None),
+    );
+    // The worst single round trip seen while idle - scheduler and allocator
+    // jitter. Weighted lowest in the module because it is one observation
+    // rather than a distribution, and a single outlier is exactly what it is
+    // made of.
+    points.insert(
+        "database.cache/roundtrip.unloaded_max".into(),
+        latency_point(1.0, 0.5, CategoryKey::Database, None),
+    );
+
     ReferenceProfile {
         name: "DARC-REF-1".into(),
         calibrated: false,
@@ -567,6 +690,89 @@ mod tests {
                 .unwrap_or_else(|| panic!("web.static/{key} has no anchor"));
             assert_eq!(anchor.category, CategoryKey::Web, "{key}");
             assert!(anchor.facet.is_none(), "{key}");
+        }
+    }
+
+    #[test]
+    fn the_database_category_has_anchors_for_every_shipped_metric() {
+        let reference = provisional_reference();
+        for (module, keys) in [
+            (
+                "database.oltp",
+                [
+                    "read.tps",
+                    "write.tps",
+                    "read.latency_mean",
+                    "write.latency_mean",
+                    "read.latency_estimated_p95",
+                    "write.latency_estimated_p95",
+                ]
+                .as_slice(),
+            ),
+            (
+                "database.cache",
+                [
+                    "get.throughput",
+                    "set.throughput",
+                    "incr.throughput",
+                    "pipelined.throughput",
+                    "roundtrip.unloaded_mean",
+                    "roundtrip.unloaded_max",
+                ]
+                .as_slice(),
+            ),
+        ] {
+            for key in keys {
+                let anchor = reference
+                    .get(module, key)
+                    .unwrap_or_else(|| panic!("{module}/{key} has no anchor"));
+                assert_eq!(anchor.category, CategoryKey::Database, "{module}/{key}");
+                assert!(anchor.facet.is_none(), "{module}/{key}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_database_read_is_cheaper_than_a_write_and_a_cache_hit_is_cheaper_than_both() {
+        // The ordering, not the numbers. A read that anchored slower than a
+        // write, or a cache round trip anchored slower than a SQL query, would
+        // score every machine against a relationship no database produces -
+        // and unlike a value that is merely off, a wrong ordering cannot be
+        // corrected by calibration. It would take a *faster* machine to look
+        // worse on the metric that was inverted.
+        let reference = provisional_reference();
+        let anchor = |module: &str, key: &str| {
+            reference
+                .get(module, key)
+                .unwrap_or_else(|| panic!("{module}/{key}"))
+                .value
+        };
+        assert!(
+            anchor("database.oltp", "read.tps") > anchor("database.oltp", "write.tps"),
+            "select-only must anchor above read-write: no commit path is cheaper than none"
+        );
+        assert!(
+            anchor("database.oltp", "read.latency_mean")
+                < anchor("database.oltp", "write.latency_mean")
+        );
+        assert!(
+            anchor("database.cache", "roundtrip.unloaded_mean")
+                < anchor("database.oltp", "read.latency_mean"),
+            "a cache exists because it is faster than the database it fronts"
+        );
+        assert!(
+            anchor("database.cache", "pipelined.throughput")
+                > anchor("database.cache", "get.throughput"),
+            "pipelining removes the per-command round trip; it cannot be slower"
+        );
+        // And every p95 estimate must sit above the mean it is derived from,
+        // since it is that mean plus 1.645 standard deviations.
+        for prefix in ["read", "write"] {
+            assert!(
+                anchor("database.oltp", &format!("{prefix}.latency_estimated_p95"))
+                    > anchor("database.oltp", &format!("{prefix}.latency_mean")),
+                "{prefix}: a p95 below its own mean is not reachable"
+            );
         }
     }
 
@@ -677,7 +883,14 @@ mod tests {
     fn anchors_exist_only_for_implemented_modules() {
         // Guards against the temptation to pre-populate anchors for modules
         // that have never been run - those numbers would be fabrications.
-        const IMPLEMENTED: [&str; 7] = [
+        //
+        // "Implemented" here means registered and runnable, not merely written.
+        // The two database modules existed in this crate's sibling for two
+        // commits before they earned a line below: their images were unpinned,
+        // so they could not run, so anchoring them would have been anchoring an
+        // idea. They were added when the digests were pinned and both modules
+        // had produced metrics on real hardware.
+        const IMPLEMENTED: [&str; 9] = [
             "cpu.mixed/",
             "memory.bandwidth/",
             "storage.mixed/",
@@ -685,6 +898,8 @@ mod tests {
             "web.static/",
             "php.runtime/",
             "node.runtime/",
+            "database.oltp/",
+            "database.cache/",
         ];
         let r = provisional_reference();
         for key in r.points.keys() {
@@ -724,6 +939,16 @@ mod tests {
             "php.runtime/startup.cold",
             "web.static/latency.small_mean",
             "web.static/latency.small_p99",
+            // The database latencies. Four of the six say `latency` in the key
+            // and two say `roundtrip`, which is the point the comment above
+            // makes: a heuristic would have caught the first four and scored a
+            // cache's round trip upside down.
+            "database.oltp/read.latency_mean",
+            "database.oltp/read.latency_estimated_p95",
+            "database.oltp/write.latency_mean",
+            "database.oltp/write.latency_estimated_p95",
+            "database.cache/roundtrip.unloaded_mean",
+            "database.cache/roundtrip.unloaded_max",
         ];
 
         let declared: std::collections::BTreeSet<&str> = LOWER_IS_BETTER.iter().copied().collect();

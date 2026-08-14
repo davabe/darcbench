@@ -1,0 +1,149 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "database.oltp",
+  "version": "1.0.0",
+  "title": "Transactional database",
+  "purpose": "Measure transactional throughput and latency against a PostgreSQL instance this agent creates in a container and destroys when the module ends - never against a database already on this machine.",
+  "category": "database",
+  "safety_class": "provisions_services",
+  "supported_architectures": ["x86_64", "aarch64"],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "database_oltp::DatabaseOltp",
+    "note": "The server and the load tool both come from the pinned image. pgbench is run through container::Sandbox::exec with a fixed argument vector, so no database driver exists in this workspace and nothing on the host is involved. See docs/adr/0006-module-isolation.md."
+  },
+  "dependencies": [
+    "A container runtime (Docker or Podman) whose daemon is reachable",
+    "1 GiB of free memory for the sandboxed database, including its dataset, which is held in a tmpfs rather than on disk"
+  ],
+  "max_bytes_written": 0,
+  "max_network_bytes": 0,
+  "required_capabilities": [],
+  "safety": {
+    "target": "a PostgreSQL container this module starts, published on 127.0.0.1 on a port the runtime assigns",
+    "never": [
+      "a database already running on this machine",
+      "an operator-supplied host, port, socket or credential",
+      "any interface other than loopback",
+      "an image that is not pinned to a digest"
+    ],
+    "note": "docs/THREAT-MODEL.md (T-DB) is binding and permanent. This module has no configuration for a host and no code path that could reach one: it gets a sandboxed server or it reports itself not measured. A database module that quietly measured the operator's production database - and, being read-write, wrote to it - would be the worst thing this program could do. The absence of that path is the mitigation."
+  },
+  "sandbox": {
+    "image": "postgres@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad",
+    "resolved_from": "postgres:17-bookworm, against Docker Hub on 2026-08-14",
+    "user": "999:999, the image's own postgres account. The container is never root: the entrypoint's chown-and-drop dance is skipped rather than enabled with capabilities, so CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID are never held.",
+    "capabilities": "all dropped, no-new-privileges set, no host path mounted, no device passed",
+    "data_directory": "/var/lib/postgresql/data on a 512 MiB tmpfs owned by the service account, mode 0700",
+    "memory": "1 GiB, covering the tmpfs and the service together - they are one budget, because tmpfs pages are charged to the container's cgroup",
+    "readiness": "pg_isready -q -h 127.0.0.1, run inside the container. A TCP connect from the host is not a readiness signal: Docker's userland proxy answers it as soon as the container exists.",
+    "lifetime": "removed when the module returns, on every path including failure. Anything a killed run leaves behind carries this agent's label and is reaped at the start of the next one."
+  },
+  "preparation": "pgbench -i -q -s 10 builds the dataset before anything is measured. A build that fails is a Precondition error naming the cause, not a run full of zeroes.",
+  "calibration": "Phases are fixed-duration rather than calibrated to a work size: a repetition count that varied with the profile would make two runs of the same machine incomparable. Throughput phases run unlimited; latency phases run rate-limited below capacity.",
+  "warmup": "None beyond the dataset build and its vacuum. pgbench's own connection establishment is excluded from the reported tps, which is the figure taken.",
+  "workloads": [
+    {
+      "key": "read.tps",
+      "unit": "tx/s",
+      "direction": "higher_is_better",
+      "description": "Select-only transactions, 8 clients, unlimited rate",
+      "represents": "A cached CMS, a read replica, an API reading a hot table"
+    },
+    {
+      "key": "write.tps",
+      "unit": "tx/s",
+      "direction": "higher_is_better",
+      "description": "Read-write transactions, 8 clients, unlimited rate",
+      "represents": "Checkout, publish, anything that commits"
+    },
+    {
+      "key": "read.latency_mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Mean select-only latency at an offered 200 tx/s across 4 clients, measured from when each transaction was due",
+      "represents": "What a page waits on a read query at a load the machine sustains"
+    },
+    {
+      "key": "read.latency_estimated_p95",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "The slow 5% of the same phase, ESTIMATED from the mean and standard deviation",
+      "represents": "A floor on the read tail - useful for `is this acceptable`, wrong for `what is my worst case`"
+    },
+    {
+      "key": "write.latency_mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Mean read-write latency at an offered 200 tx/s across 4 clients",
+      "represents": "Commit path latency, which is where durability shows up"
+    },
+    {
+      "key": "write.latency_estimated_p95",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "The tail on the commit path, ESTIMATED the same way",
+      "represents": "A floor on the write tail"
+    }
+  ],
+  "metrics": [
+    "read.tps",
+    "write.tps",
+    "read.latency_mean",
+    "read.latency_estimated_p95",
+    "write.latency_mean",
+    "write.latency_estimated_p95"
+  ],
+  "derived_metrics": ["read.latency_estimated_p95", "write.latency_estimated_p95"],
+  "repetitions": {
+    "note": "Phase durations are fixed at 20 s regardless of profile, so this module has no per-profile repetition table. A profile-dependent phase length would make two runs of the same machine incomparable, which is the opposite of what a profile is for."
+  },
+  "validation": [
+    "A latency phase whose schedule lag exceeded the tolerance is reported GeneratorSaturated and degrades the result: transactions issued late do not describe the load the phase claims to have offered.",
+    "A phase that processed no transactions is withheld rather than reported as a throughput of zero, which would read as a very slow machine instead of a phase that did not run.",
+    "A phase that lost clients part-way through is withheld. pgbench still reports a rate for one, computed over the whole window it was asked for including the part after the clients were gone, so the figure looks ordinary and is not a measurement of anything.",
+    "An image that is not pinned to a digest is not run at all."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no container runtime, or a runtime whose daemon does not answer",
+    "the container exits during startup, in which case its own log is reported",
+    "the dataset cannot be built"
+  ],
+  "cleanup": "The container is removed when the module ends, including on failure. Anything a crashed run leaves behind carries this agent's label and is removed at the start of the next run - which is the only cleanup available, because the release profile aborts on panic and nothing runs on SIGKILL.",
+  "stability_cv_bound": 0.15,
+  "comparability": [
+    "postgres_image",
+    "postgres_version",
+    "pgbench_version",
+    "scale_factor",
+    "fsync",
+    "synchronous_commit",
+    "wal_level",
+    "data_directory_is_tmpfs"
+  ],
+  "limitations": [
+    "pgbench shares the container with the server, so its CPU is CPU the server did not get. Every figure here is a floor, not an estimate.",
+    "The 95th percentile is ESTIMATED from the mean and standard deviation assuming a normal distribution. A latency distribution is not normal and its tail is exactly where that matters, so it is a floor on the real p95.",
+    "The data directory is a tmpfs. The WAL is written and fsynced, but to RAM, so these figures describe the server and the CPU rather than the disk. storage.mixed is where the disk is measured.",
+    "The workload is pgbench's built-in one, which its own documentation calls loosely based on TPC-B. This is not TPC-B, it is not a TPC result, and no figure here may be compared to a published TPC number.",
+    "MariaDB and MySQL are not measured. No open-model load tool ships in their official images, and a closed-loop one would report latencies of a server that was politely never overloaded.",
+    "Each metric is one phase and one figure, so no coefficient of variation is computed and stability_cv_bound is not enforced against these. On an oversubscribed host the throughput figures were observed to vary by more than a factor of two between runs; comparing single runs across machines of very different core counts should account for that."
+  ],
+  "scoring": {
+    "category": "database",
+    "facets": {},
+    "metric_weight": {
+      "write.tps": 1.5,
+      "read.tps": 1.25,
+      "write.latency_mean": 1.0,
+      "read.latency_mean": 1.0,
+      "write.latency_estimated_p95": 0.5,
+      "read.latency_estimated_p95": 0.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "The write path carries the most weight because it is the one that cannot be cached away and the one a commit waits on. Both estimated percentiles carry half the weight of the means they are derived from: they are a normal approximation, not an observed percentile, and a tail estimate should not move a category score as much as a measurement does. Reference anchors are declared targets, not measurements. See docs/SCORING-SYSTEM.md."
+  },
+  "licence": "Apache-2.0"
+}

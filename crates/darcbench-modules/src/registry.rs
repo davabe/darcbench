@@ -61,6 +61,12 @@ impl Registry {
         let node_runtime: Arc<dyn BenchmarkModule> =
             Arc::new(crate::node_runtime::NodeRuntime::new());
         modules.insert(node_runtime.manifest().id.clone(), node_runtime);
+        let database_oltp: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::database_oltp::DatabaseOltp::new());
+        modules.insert(database_oltp.manifest().id.clone(), database_oltp);
+        let database_cache: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::database_cache::DatabaseCache::new());
+        modules.insert(database_cache.manifest().id.clone(), database_cache);
         Self { modules }
     }
 
@@ -193,6 +199,21 @@ impl Registry {
                 has("web.static"),
                 has("php.runtime"),
                 has("node.runtime"),
+                // The database modules are in `deep` alone, and the argument is
+                // `php.runtime`'s exactly: they need a container runtime with a
+                // reachable daemon, most machines in this market have neither,
+                // and a standard run returning `Partial` on every one of them
+                // would be reporting the profile's assumptions as a fault of
+                // the machine.
+                //
+                // They also run last. Between them they start two containers,
+                // pull nothing but hold a gigabyte each while running, and are
+                // the only modules whose failure depends on a daemon rather
+                // than on this process - so a machine that cannot do it has
+                // still produced every other result by the time that shows up.
+                // Same ordering rule as `web.static`, one tier further out.
+                has("database.oltp"),
+                has("database.cache"),
             ]
             .into_iter()
             .flatten()
