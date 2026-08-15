@@ -547,9 +547,15 @@ impl DeploymentContainer {
             }
         }
 
+        let (runtime_version, storage_driver) = runtime.identity();
         let mut context_map = serde_json::Map::new();
         for (key, value) in [
             ("runtime".to_string(), runtime.name()),
+            ("runtime_version".to_string(), runtime_version),
+            // Declared in `comparability` since this module was written and
+            // recorded nowhere until now. It is the fact that decides whether
+            // two of these results describe comparable machines.
+            ("storage_driver".to_string(), storage_driver),
             ("context_bytes".to_string(), context_bytes.to_string()),
             ("layers".to_string(), LAYERS.to_string()),
             ("files_per_layer".to_string(), FILES_PER_LAYER.to_string()),

@@ -76,6 +76,115 @@ pub struct RunRecord {
     /// would abort a correctly-behaving run for other tenants' work.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guards_not_enforced: Vec<String>,
+    /// Comparability facts a module declared and this bundle does not carry.
+    ///
+    /// Each entry is `module_id/key`. Empty is the healthy state and the
+    /// common one.
+    ///
+    /// # Why this is recorded rather than assumed
+    ///
+    /// Every module's manifest carries a `comparability` list: the facts that
+    /// must match for two of its results to mean the same thing - a PHP
+    /// version, a scale factor, a storage driver. The list is how a reader, or
+    /// a comparison, knows when a difference is the machine and when it is the
+    /// measurement.
+    ///
+    /// It was documentation that nothing checked. An audit of a live bundle
+    /// found that most declared keys resolved to nothing at all:
+    /// `cpu.mixed` declared `params.threads` and recorded `threads`;
+    /// `database.oltp` declared `postgres_image` and recorded the version but
+    /// never the image; `deployment.container` declared `storage_driver`,
+    /// which is the single fact that decides whether two of its numbers may be
+    /// compared, and recorded nothing of the kind.
+    ///
+    /// So the list is now resolved against the bundle when the bundle is
+    /// written, and whatever does not resolve is named here. The same choice
+    /// `ScoreCard::unreferenced_metrics` makes about a metric with no anchor:
+    /// surfaced rather than dropped, because a promise that quietly does not
+    /// hold is worse than one that was never made.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comparability_not_recorded: Vec<String>,
+}
+
+/// Whether a declared comparability key resolves to a fact this bundle carries.
+///
+/// A key is a dotted path, and it is looked for in three places in this order:
+///
+/// * `module.*` - the module reference. `module.version` is the workload
+///   version, which is the fact that matters most and the one every module
+///   declares.
+/// * `agent.*` - the bundle's own metadata: `agent.build_target`,
+///   `agent.build_profile`, `agent.version`.
+/// * anything else - the module's `context` first, then the environment
+///   inventory. Both are walked by dotted path, so `plan.single_bytes` reaches
+///   into a `plan` object and `cpu.architecture` reaches into the inventory.
+///
+/// The context is searched before the environment on purpose: a module that
+/// records its own view of a machine fact is recording what it *used*, and
+/// that is the fact the comparison needs. The inventory is what the machine
+/// said about itself, which is not always the same thing.
+pub fn comparability_key_resolves(
+    key: &str,
+    module: &darcbench_protocol::ModuleResult,
+    meta: &BundleMeta,
+    environment: &serde_json::Value,
+) -> bool {
+    if let Some(rest) = key.strip_prefix("module.") {
+        return match rest {
+            "version" => !module.module.version.is_empty(),
+            "id" => true,
+            _ => false,
+        };
+    }
+    if let Some(rest) = key.strip_prefix("agent.") {
+        return matches!(rest, "build_target" | "build_profile" | "version")
+            && !meta.agent_version.is_empty();
+    }
+    let context = serde_json::Value::Object(module.context.clone().into_iter().collect());
+    walk(&context, key).is_some() || walk(environment, key).is_some()
+}
+
+/// Follows a dotted path into a JSON value.
+///
+/// Tries the whole remaining key at each level before descending, so a literal
+/// key containing a dot - and several modules have one - is found rather than
+/// mistaken for a path.
+fn walk<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+    if let Some(found) = value.get(key) {
+        return Some(found);
+    }
+    let (head, rest) = key.split_once('.')?;
+    walk(value.get(head)?, rest)
+}
+
+/// Every declared comparability fact this bundle does not carry, as
+/// `module_id/key`.
+///
+/// `declared` is the manifest list for each module id, which the caller has
+/// because it has the registry and this crate deliberately does not.
+pub fn comparability_not_recorded(
+    modules: &[darcbench_protocol::ModuleResult],
+    meta: &BundleMeta,
+    environment: &serde_json::Value,
+    declared: &dyn Fn(&darcbench_protocol::ModuleId) -> Vec<String>,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    for module in modules {
+        // A module that failed recorded no context, and reporting every one of
+        // its declared keys as missing would bury the real cases in noise from
+        // a module that never ran.
+        if module.metrics.is_empty() {
+            continue;
+        }
+        for key in declared(&module.module.id) {
+            if !comparability_key_resolves(&key, module, meta, environment) {
+                missing.push(format!("{}/{key}", module.module.id));
+            }
+        }
+    }
+    missing.sort();
+    missing.dedup();
+    missing
 }
 
 /// Aggregated telemetry over the measured window.
@@ -270,6 +379,112 @@ impl Bundle {
 #[cfg(test)]
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
+mod comparability_tests {
+    use super::*;
+    use darcbench_protocol::{ModuleId, ModuleRef};
+
+    fn module(context: serde_json::Value) -> darcbench_protocol::ModuleResult {
+        let object = match context {
+            serde_json::Value::Object(map) => map.into_iter().collect(),
+            _ => Default::default(),
+        };
+        darcbench_protocol::ModuleResult {
+            module: ModuleRef {
+                id: ModuleId::new("cpu.mixed").unwrap(),
+                version: "1.0.1".into(),
+            },
+            status: darcbench_protocol::metrics::ModuleStatus::Completed,
+            cycle: 0,
+            started_at: chrono::Utc::now(),
+            finished_at: chrono::Utc::now(),
+            duration_ms: 1.0,
+            metrics: vec![],
+            warnings: vec![],
+            error: None,
+            context: object,
+        }
+    }
+
+    #[test]
+    fn a_declared_key_resolves_only_if_the_bundle_carries_it() {
+        let result = module(serde_json::json!({
+            "threads": 8,
+            "plan": { "single_bytes": 1024 },
+            // A literal key containing a dot, which several modules have. It
+            // must be found as itself rather than walked into as a path.
+            "shape.single.threads": 1,
+        }));
+        let meta = BundleMeta::new("0.1.0");
+        let environment = serde_json::json!({
+            "platform": { "architecture": "x86_64" },
+            "cpu": { "model": "example" },
+        });
+        let resolves = |key: &str| comparability_key_resolves(key, &result, &meta, &environment);
+
+        // Module context, flat and by path.
+        assert!(resolves("threads"));
+        assert!(resolves("plan.single_bytes"));
+        assert!(resolves("shape.single.threads"));
+        // The environment, by path.
+        assert!(resolves("platform.architecture"));
+        // Bundle-level facts.
+        assert!(resolves("module.version"));
+        assert!(resolves("agent.build_target"));
+
+        // And the four shapes of the defect this exists to catch: a key that
+        // names the input rather than the recorded fact, one under the wrong
+        // root, one that is simply absent, and one that names a namespace with
+        // no leaf.
+        assert!(!resolves("params.threads"));
+        assert!(!resolves("cpu.architecture"));
+        assert!(!resolves("storage_driver"));
+        assert!(!resolves("agent.nonsense"));
+    }
+
+    #[test]
+    fn a_module_that_produced_nothing_is_not_reported_as_missing_everything() {
+        // A module that failed recorded no context. Listing every key it
+        // declared would bury the real cases under noise from one that never
+        // ran, and the reason it failed is already on the result.
+        let mut failed = module(serde_json::json!({}));
+        failed.status = darcbench_protocol::metrics::ModuleStatus::Failed;
+        let meta = BundleMeta::new("0.1.0");
+        let missing = comparability_not_recorded(
+            std::slice::from_ref(&failed),
+            &meta,
+            &serde_json::json!({}),
+            &|_| vec!["threads".to_string(), "plan.single_bytes".to_string()],
+        );
+        assert!(missing.is_empty(), "{missing:?}");
+    }
+
+    #[test]
+    fn what_is_missing_is_named_with_the_module_that_promised_it() {
+        let mut ran = module(serde_json::json!({ "threads": 8 }));
+        ran.metrics.push(darcbench_protocol::metrics::Metric {
+            key: "x".into(),
+            label: "x".into(),
+            unit: "x".into(),
+            value: 1.0,
+            direction: darcbench_protocol::Direction::HigherIsBetter,
+            summary: darcbench_protocol::stats::summarize(&[1.0]).unwrap(),
+            samples: vec![],
+            outliers: vec![],
+        });
+        let meta = BundleMeta::new("0.1.0");
+        let missing = comparability_not_recorded(
+            std::slice::from_ref(&ran),
+            &meta,
+            &serde_json::json!({}),
+            &|_| vec!["threads".to_string(), "params.threads".to_string()],
+        );
+        assert_eq!(missing, vec!["cpu.mixed/params.threads".to_string()]);
+    }
+}
+
+#[cfg(test)]
+// In tests, `unwrap`/`expect` panicking *is* the failure signal.
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
     use super::*;
     use darcbench_inventory::TelemetrySnapshot;
@@ -293,6 +508,7 @@ mod tests {
                 event_count: 3,
                 stopped_because: None,
                 guards_not_enforced: vec![],
+                comparability_not_recorded: vec![],
             },
             environment: inventory,
             modules: vec![],

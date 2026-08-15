@@ -919,6 +919,30 @@ impl Runtime {
         Ok(name)
     }
 
+    /// The runtime's own version and storage driver.
+    ///
+    /// **The storage driver is the fact that decides whether two
+    /// `deployment.container` results may be compared at all.** overlay2 on
+    /// ext4 and a driver that copies whole files on write differ by more than
+    /// any two CPUs in this market do, so a build time from one says nothing
+    /// about a machine running the other. It was declared in that module's
+    /// `comparability` list from the day it was written and recorded nowhere,
+    /// which made the declaration a promise the bundle could not keep.
+    ///
+    /// Both fall back to `unknown` rather than to a guess. An absent fact stops
+    /// a comparison; a wrong one lets it proceed.
+    pub fn identity(&self) -> (String, String) {
+        let ask = |format: &str| -> String {
+            self.control(&["info", "--format", format])
+                .ok()
+                .filter(|output| output.succeeded())
+                .map(|output| output.stdout.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "unknown".to_string())
+        };
+        (ask("{{.ServerVersion}}"), ask("{{.Driver}}"))
+    }
+
     /// Removes one network, best effort.
     pub fn remove_network(&self, name: &str) {
         let _ = self.control(&["network", "rm", name]);

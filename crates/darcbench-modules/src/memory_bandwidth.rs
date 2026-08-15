@@ -725,9 +725,14 @@ impl MemoryBandwidth {
                 ],
                 comparability: vec![
                     "module.version".to_string(),
-                    "cpu.architecture".to_string(),
+                    // `platform.architecture`, not `cpu.architecture`: the inventory puts it
+                    // there, and the name it was declared under for two phases resolved to
+                    // nothing at all.
+                    "platform.architecture".to_string(),
                     "agent.build_target".to_string(),
-                    "params.threads".to_string(),
+                    // The key the context actually carries. `params.threads` was the name
+                    // of the input rather than of the recorded fact.
+                    "threads".to_string(),
                     "plan.single_bytes".to_string(),
                     "plan.multi_bytes_per_thread".to_string(),
                     "plan.llc_bytes".to_string(),

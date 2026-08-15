@@ -1451,8 +1451,27 @@ impl RunManager {
         let events_digest = self.events_digest(handle);
         let event_count = handle.last_seq() + 1;
 
+        // Checked here rather than trusted, because a manifest's comparability
+        // list is a claim about the bundle and this is where the bundle
+        // exists. See `RunRecord::comparability_not_recorded` for what an
+        // audit of a live bundle found the first time anyone looked.
+        let meta = BundleMeta::new(AGENT_VERSION);
+        let environment_json = serde_json::to_value(&inventory).unwrap_or(serde_json::Value::Null);
+        let registry = self.registry.clone();
+        let comparability_not_recorded = darcbench_report::bundle::comparability_not_recorded(
+            &results,
+            &meta,
+            &environment_json,
+            &|id| {
+                registry
+                    .get(id)
+                    .map(|module| module.manifest().comparability.clone())
+                    .unwrap_or_default()
+            },
+        );
+
         let mut bundle = Bundle {
-            meta: BundleMeta::new(AGENT_VERSION),
+            meta,
             run: RunRecord {
                 run_id: handle.id.clone(),
                 profile: handle.profile,
@@ -1465,6 +1484,7 @@ impl RunManager {
                 events_digest,
                 event_count,
                 guards_not_enforced: handle.guards_not_enforced(),
+                comparability_not_recorded,
                 stopped_because: handle
                     .stopped_because
                     .read()

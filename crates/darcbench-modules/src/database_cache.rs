@@ -666,6 +666,18 @@ impl DatabaseCache {
         // Whether this run paid for the image. Always recorded, including when
         // it is `false`: a key that only appears sometimes is one a reader
         // cannot rely on.
+        // The digest, not just the version. Two runs of the same server version
+        // from two different images are not the same measurement, and this key
+        // was declared in `comparability` and recorded nowhere.
+        context.insert(
+            "valkey_image".to_string(),
+            serde_json::Value::String(
+                Image::from_allow_list(IMAGE_KEY)
+                    .and_then(|image| image.reference().ok())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            ),
+        );
         context.insert(
             "image_fetched_during_this_run".into(),
             serde_json::Value::Bool(fetched),
