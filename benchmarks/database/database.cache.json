@@ -18,7 +18,8 @@
     "1 GiB of free memory, which is the sandbox's ceiling rather than what this workload uses"
   ],
   "max_bytes_written": 0,
-  "max_network_bytes": 0,
+  "max_network_bytes": 17456505,
+  "max_network_bytes_note": "The Valkey image, once, on a machine that does not already have it. The fetch is explicit and happens before anything is timed; nothing crosses the network during the measurement itself.",
   "required_capabilities": [],
   "safety": {
     "target": "a Valkey container this module starts, published on 127.0.0.1 on a port the runtime assigns",

@@ -175,6 +175,14 @@ const PHASE_SECONDS: u64 = 20;
 /// [`crate::loadgen::Saturation::ScheduleSlip`].
 const LATENCY_LAG_TOLERANCE_MS: f64 = 5.0;
 
+/// How long fetching the image may take before it is given up on.
+///
+/// Ten minutes, which is generous and deliberately so: this is a one-off on a
+/// machine that has never run DARCBench, it happens before any clock starts,
+/// and the alternative to waiting is reporting the module as not measured on a
+/// slow link. PostgreSQL is 156 MB, which is minutes on a modest connection.
+const PULL_TIMEOUT: Duration = Duration::from_secs(600);
+
 /// How long any one `pgbench` invocation may take before it is killed.
 ///
 /// Generous against the phase length: the dataset build is the long pole and
@@ -354,10 +362,16 @@ impl DatabaseOltp {
                 // The data directory is a tmpfs, so the database writes to RAM
                 // and nothing reaches a host filesystem.
                 max_bytes_written: 0,
-                // The image is pulled by the container runtime before the run,
-                // not by this module, and nothing crosses the network during
-                // the measurement: pgbench and the server share a namespace.
-                max_network_bytes: 0,
+                // The image, once, on a machine that does not already have it.
+                //
+                // This said `0` and the comment beside it said the runtime
+                // pulled the image "before the run" - an assumption nothing
+                // enforced. On a machine that has never run DARCBench, this
+                // module fetched 156 MB while preflight promised the operator
+                // no network at all. The fetch is now explicit and untimed, and
+                // this is what it costs. Nothing crosses the network during the
+                // measurement itself: pgbench and the server share a namespace.
+                max_network_bytes: 156_190_575,
                 cleanup: "The container is removed when the module ends, including on failure. \
                           Anything a crashed run leaves behind carries this agent's label and is \
                           removed at the start of the next run - which is the only cleanup \
@@ -530,6 +544,13 @@ impl BenchmarkModule for DatabaseOltp {
 
         let runtime = Runtime::discover().map_err(not_measured)?;
 
+        // Before anything is timed and before the container is asked for. An
+        // implicit pull inside `docker run` would be an undeclared transfer and
+        // would land inside the measurement - see `ensure_image_present`.
+        let fetched = runtime
+            .ensure_image_present(image, PULL_TIMEOUT)
+            .map_err(not_measured)?;
+
         // Before starting, because a previous run that was killed leaves its
         // container behind and only the next run can clear it.
         let reaped = runtime.reap().map_err(not_measured)?;
@@ -546,7 +567,7 @@ impl BenchmarkModule for DatabaseOltp {
         let sandbox =
             Sandbox::launch(&runtime, image, &unique_suffix(), &env).map_err(not_measured)?;
 
-        let outcome = self.measure(&sandbox, reaped);
+        let outcome = self.measure(&sandbox, reaped, fetched);
         // The sandbox is dropped here whatever happened, and `Drop` removes
         // the container. On a panic it is not - the release profile aborts -
         // which is what `reap` above exists for.
@@ -558,7 +579,12 @@ impl BenchmarkModule for DatabaseOltp {
 impl DatabaseOltp {
     /// Everything after the container is up. Split out so the container's
     /// lifetime is visible in one place in [`BenchmarkModule::run`].
-    fn measure(&self, sandbox: &Sandbox, reaped: usize) -> Result<ModuleOutput, ModuleError> {
+    fn measure(
+        &self,
+        sandbox: &Sandbox,
+        reaped: usize,
+        fetched: bool,
+    ) -> Result<ModuleOutput, ModuleError> {
         let seconds = PHASE_SECONDS.to_string();
 
         let build = sandbox
@@ -758,6 +784,15 @@ impl DatabaseOltp {
                 serde_json::Value::from(reaped as u64),
             );
         }
+        // Whether this run paid for the image, which is the difference between
+        // a run that used the network and one that did not. Always recorded,
+        // including when it is `false`: "no transfer happened" is a fact about
+        // this run, and a key that only appears sometimes is one a reader
+        // cannot rely on.
+        context.insert(
+            "image_fetched_during_this_run".to_string(),
+            serde_json::Value::Bool(fetched),
+        );
         for (key, value) in notes {
             context.insert(key, serde_json::Value::String(value));
         }
@@ -935,7 +970,10 @@ mod tests {
             SafetyClass::ProvisionsServices
         );
         assert_eq!(module.manifest().max_bytes_written, 0);
-        assert_eq!(module.manifest().max_network_bytes, 0);
+        // Not zero: the image has to reach the machine somehow, and a manifest
+        // that says a run uses no network while the runtime fetches 156 MB is
+        // a broken promise rather than a rounding error.
+        assert!(module.manifest().max_network_bytes >= 150_000_000);
     }
 
     #[test]

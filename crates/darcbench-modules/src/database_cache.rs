@@ -134,6 +134,14 @@ const PIPELINE: &str = "16";
 /// How many round-trip samples the unloaded latency probe takes.
 const LATENCY_SECONDS: &str = "5";
 
+/// How long fetching the image may take before it is given up on.
+///
+/// Ten minutes, which is generous and deliberately so: this is a one-off on a
+/// machine that has never run DARCBench, it happens before any clock starts,
+/// and the alternative to waiting is reporting the module as not measured on a
+/// slow link.
+const PULL_TIMEOUT: Duration = Duration::from_secs(600);
+
 /// How long any one measurement may take before it is killed.
 const EXEC_TIMEOUT: Duration = Duration::from_secs(180);
 
@@ -378,7 +386,9 @@ impl DatabaseCache {
                         .into(),
                 ],
                 max_bytes_written: 0,
-                max_network_bytes: 0,
+                // The image, once, on a machine that does not already have it.
+                // See `database.oltp` for why this is no longer zero.
+                max_network_bytes: 17_456_505,
                 cleanup: "The container is removed when the module ends, including on failure. \
                           Anything a crashed run leaves behind carries this agent's label and is \
                           removed at the start of the next run."
@@ -528,6 +538,13 @@ impl BenchmarkModule for DatabaseCache {
         image.reference().map_err(not_measured)?;
 
         let runtime = Runtime::discover().map_err(not_measured)?;
+
+        // Before anything is timed and before the container is asked for. An
+        // implicit pull inside `docker run` would be an undeclared transfer and
+        // would land inside the measurement - see `ensure_image_present`.
+        let fetched = runtime
+            .ensure_image_present(image, PULL_TIMEOUT)
+            .map_err(not_measured)?;
         let reaped = runtime.reap().map_err(not_measured)?;
 
         // No environment at all. Valkey's image needs no credential to start,
@@ -536,14 +553,19 @@ impl BenchmarkModule for DatabaseCache {
         // an argument vector.
         let sandbox =
             Sandbox::launch(&runtime, image, &unique_suffix(), &[]).map_err(not_measured)?;
-        let outcome = self.measure(&sandbox, reaped);
+        let outcome = self.measure(&sandbox, reaped, fetched);
         drop(sandbox);
         outcome
     }
 }
 
 impl DatabaseCache {
-    fn measure(&self, sandbox: &Sandbox, reaped: usize) -> Result<ModuleOutput, ModuleError> {
+    fn measure(
+        &self,
+        sandbox: &Sandbox,
+        reaped: usize,
+        fetched: bool,
+    ) -> Result<ModuleOutput, ModuleError> {
         let mut metrics = Vec::new();
         let mut warnings = Vec::new();
 
@@ -641,6 +663,13 @@ impl DatabaseCache {
                 serde_json::Value::from(reaped as u64),
             );
         }
+        // Whether this run paid for the image. Always recorded, including when
+        // it is `false`: a key that only appears sometimes is one a reader
+        // cannot rely on.
+        context.insert(
+            "image_fetched_during_this_run".into(),
+            serde_json::Value::Bool(fetched),
+        );
 
         Ok(ModuleOutput {
             metrics,
@@ -806,7 +835,7 @@ mod tests {
             SafetyClass::ProvisionsServices
         );
         assert_eq!(module.manifest().max_bytes_written, 0);
-        assert_eq!(module.manifest().max_network_bytes, 0);
+        assert!(module.manifest().max_network_bytes >= 17_000_000);
     }
 
     #[test]

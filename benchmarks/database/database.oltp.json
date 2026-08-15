@@ -18,7 +18,8 @@
     "1 GiB of free memory for the sandboxed database, including its dataset, which is held in a tmpfs rather than on disk"
   ],
   "max_bytes_written": 0,
-  "max_network_bytes": 0,
+  "max_network_bytes": 156190575,
+  "max_network_bytes_note": "The PostgreSQL image, once, on a machine that does not already have it. The fetch is explicit and happens before anything is timed; nothing crosses the network during the measurement itself, because pgbench and the server share a namespace.",
   "required_capabilities": [],
   "safety": {
     "target": "a PostgreSQL container this module starts, published on 127.0.0.1 on a port the runtime assigns",
