@@ -31,6 +31,48 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
   than from an estimate of it, and the reasoning records which direction each
   extrapolation goes and why.
 
+**Every module's `comparability` list is now a checked property** — it was
+documentation nothing consumed
+- The list is how a reader, or a comparison, knows when a difference is the
+  machine and when it is the measurement. `comparability_gaps` compares
+  run-level facts only and never reads it, and a claim in this changelog's own
+  earlier entry that a module "records the runtime so the comparison layer can
+  refuse on evidence" was therefore false.
+- An audit of a live bundle found most declared keys resolved to nothing:
+  `cpu.mixed` declared `params.threads` and recorded `threads`;
+  `memory.bandwidth` declared `cpu.architecture` where the inventory puts it
+  under `platform`; `database.oltp` declared `postgres_image` and recorded no
+  image; `deployment.container` declared `storage_driver` — the fact that
+  decides whether two of its numbers may be compared at all — and recorded
+  nothing of the kind.
+- Worst of the set: `storage.mixed` declared `storage.filesystem` and **nothing
+  anywhere in the bundle recorded which filesystem the fixture was written on**,
+  which ROADMAP.md names as the mitigation for storage results not being
+  comparable across machines. It is now read from `/proc/self/mountinfo` by
+  longest-matching mount point, and reports `unknown` rather than a guess — a
+  wrong filesystem in a comparability key is worse than an absent one, because
+  it lets two results from different stacks be compared as though they matched.
+- Declared keys are now resolved against the bundle when the bundle is written —
+  by dotted path through the module's context, the environment inventory and the
+  run's metadata, so `plan.single_bytes` reaches into a `plan` object — and
+  `RunRecord.comparability_not_recorded` names whatever does not resolve. The
+  same choice `ScoreCard::unreferenced_metrics` makes about a metric with no
+  anchor. Five keys were unresolved when the check first ran; all five are now
+  recorded, and a live run reports none.
+
+**`wordpress.site` measures capacity as well as latency** — `origin.capacity`
+- A machine that renders in 40 ms and one that renders in 40 ms while serving
+  four times as many people are the same number and different purchases.
+- Closed-loop, through the existing `loadgen::measure_capacity`, and that is not
+  a contradiction of what this project says about coordinated omission: workers
+  looping flat out ask the machine for everything it will give, which is exactly
+  the capacity question, and the phase produces no latency distribution for the
+  omission to distort.
+- **It runs last, and that is a precondition rather than an ordering
+  preference.** The phase saturates the machine; anything timed after it would
+  be timed against a stack still working through the queue it left. Verified:
+  adding it left `origin.warm` unchanged at 41 ms.
+
 **`wordpress.site` — the module this product is aimed at**, and the last
 unwritten Phase 4 deliverable
 - Four metrics against a WordPress and MariaDB the agent starts and destroys: a

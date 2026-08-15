@@ -742,6 +742,33 @@ came from running code that had already worked, on a machine deliberately put
 back into the state a new one would be in. **A benchmark that has only ever
 been run twice on the same host has not been run on a second host.**
 
+**A tenth, and it invalidated something this document said.** The roadmap and a
+commit message both claimed that `deployment.container` "records the runtime so
+the comparison layer can refuse on evidence". It does not and it could not:
+`comparability_gaps` compares run-level facts only — environment digest, scoring
+model, profile, build target, agent version — and never reads a module's
+`comparability` list at all.
+
+Checking that turned up a bigger thing. The list is the mechanism by which a
+reader knows when a difference is the machine and when it is the measurement,
+and an audit of a live bundle found most of its entries resolved to nothing:
+`cpu.mixed` declared `params.threads` and recorded `threads`; `memory.bandwidth`
+declared `cpu.architecture` where the inventory puts it under `platform`;
+`database.oltp` declared `postgres_image` and recorded no image at all; and
+`storage.mixed` declared `storage.filesystem` while **nothing anywhere in the
+bundle recorded which filesystem the fixture was written on** — the single fact
+this document names as the mitigation for storage results not being comparable
+across machines.
+
+So the list is now resolved against the bundle when the bundle is written, by
+dotted path through the module's context, the inventory and the run's own
+metadata, and `RunRecord.comparability_not_recorded` names whatever does not
+resolve. The same choice `ScoreCard::unreferenced_metrics` makes about a metric
+with no anchor: surfaced rather than dropped. Five keys were unresolved when the
+check first ran; all five are now recorded, including `storage_driver`, which is
+the fact that decides whether two `deployment.container` results describe
+comparable machines at all.
+
 **The pattern across the first six is worth naming**, because it is the argument
 for the development-host document existing at all. Not one was a logic error.
 Every one was a correct-looking piece of code meeting a fact about the world
@@ -963,10 +990,23 @@ one is a finding about the order, not the machine. One warm-up pass over every
 path now precedes any timing: 42 ms at 10.7%, and correctly faster than the
 archive.
 
-**Capacity is not measured.** This is single-request latency. How many
-concurrent visitors the machine sustains is a different question, and answering
-it means pointing the open-model load generator at a stack that takes minutes to
-build — worth doing, and not this deliverable.
+**Capacity is measured too**, by `origin.capacity`, and it is the half a
+latency figure cannot answer: a machine that renders in 40 ms and one that
+renders in 40 ms while serving four times as many people are the same number
+and different purchases.
+
+Closed-loop, which is not a contradiction of everything this project says about
+coordinated omission. Workers looping flat out ask the machine for everything it
+will give and report what it gave — that is exactly the capacity question, and
+the phase produces no latency distribution for the omission to distort. The
+argument is `loadgen::measure_capacity`'s own.
+
+**It runs last, and that placement is a precondition rather than an ordering
+preference.** The phase saturates the machine; anything timed after it would be
+timed against a stack still working through the queue it left. The three
+latency metrics are all taken first, on a quiet stack, which is what makes them
+latency figures rather than latency-under-undeclared-load figures. Verified:
+adding the phase left `origin.warm` at 41 ms, unchanged.
 
 Then **`deployment.container@1.0.0`** — five metrics: a cold-cache build, the
 same build warm, what the layer cache is worth as a ratio, and the rates for

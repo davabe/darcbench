@@ -257,6 +257,7 @@ Ordered by how much time they will waste before you work it out.
 | `database.oltp` prints `skipping` or withholds a phase | The server was killed, or a phase lost clients | Read the warning; it now says which. Silence here was a defect and is gone |
 | `database.oltp` throughput varies by 2x between runs on the same machine | Two vCPUs running eight clients, eight pgbench threads and a server | Each metric is one phase and one figure, so there is no CV to flag it. Declared in the module's `limitations` |
 | `cpu.mixed` prints `skipping the speedup assertion` | Either the machine is too noisy to reproduce itself, or it never got a second core | Both are measured preconditions, not assumptions. See below |
+| `e2e.sh` fails only `doctor --json exits 0`, and passes on a re-run | The machine was still loaded from the release build the gate just did | `doctor` is right: it raises a load warning, and preflight does not pass a warning at `ProductionRisk` without `--force`. Run the gate's steps with a gap, or accept that the first e2e after a build may see the machine it just used. Observed 1 failure in 3 consecutive runs on 2 vCPUs |
 
 ### The one that was a defect
 
