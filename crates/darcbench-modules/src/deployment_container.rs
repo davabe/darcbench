@@ -714,9 +714,16 @@ impl DeploymentContainer {
 /// measurement.
 fn time_to_serving(runtime: &Runtime, image: &'static Image) -> Option<f64> {
     let started = Instant::now();
-    let sandbox =
-        Sandbox::launch_without_waiting(runtime, image, &unique_suffix(), &[], HEALTH_COMMAND)
-            .ok()?;
+    let sandbox = Sandbox::launch_without_waiting(
+        runtime,
+        image,
+        &unique_suffix(),
+        &crate::container::Launch {
+            command: HEALTH_COMMAND,
+            ..Default::default()
+        },
+    )
+    .ok()?;
     let deadline = started + HEALTH_TIMEOUT;
     while Instant::now() < deadline {
         if http_answered(sandbox.address()) {

@@ -221,6 +221,19 @@ pub struct Image {
     /// agrees to at preflight, and a bound that turns out to be generous is a
     /// better failure than one that turns out to be a lie.
     download_bytes: u64,
+    /// Whether [`Self::data_dir`] is mounted as a tmpfs.
+    ///
+    /// True everywhere but WordPress. A tmpfs is visible to exactly one
+    /// container, and `wordpress.*` needs a second one - WP-CLI - to see the
+    /// same files. So that entry falls back to the image's own declared volume,
+    /// which lives in the daemon's storage on a host filesystem, and the module
+    /// discloses it exactly as `deployment.container` discloses its build.
+    data_on_tmpfs: bool,
+    /// Kernel parameters set for this container's namespaces.
+    ///
+    /// Empty for almost everything. Where it is not, it is because the
+    /// alternative was granting a capability - see the `wordpress` entry.
+    sysctls: &'static [&'static str],
     /// A command run *inside* the container that exits zero once the service
     /// is actually serving.
     ///
@@ -304,6 +317,8 @@ pub const ALLOWED_IMAGES: &[Image] = &[
         // 156 MB. By far the largest thing this program will ever fetch, which
         // is exactly why it is declared rather than left to the runtime.
         download_bytes: 156_190_575,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification:
             "The official PostgreSQL image, published by the PostgreSQL Docker Community. \
                     Chosen over a distribution package because the point of the container tier is \
@@ -330,6 +345,8 @@ pub const ALLOWED_IMAGES: &[Image] = &[
         // usable as a probe rather than merely as a command that runs.
         ready_probe: &["redis-cli", "-h", "127.0.0.1", "ping"],
         download_bytes: 17_456_505,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification: "The official Valkey image, published by the Valkey project. Valkey rather \
                     than Redis because it is the fork the major distributions and cloud providers \
                     moved to after the 2024 licence change, and because its image is \
@@ -359,6 +376,8 @@ pub const ALLOWED_IMAGES: &[Image] = &[
         // is wrong: it exits non-zero on the 404 that proves the server is up.
         ready_probe: &["nc", "-z", "127.0.0.1", "8080"],
         download_bytes: 877_398,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification:
             "The official BusyBox image, and the only entry here that is not a service under \
              measurement. `deployment.container` uses it to measure what starting a container \
@@ -369,6 +388,89 @@ pub const ALLOWED_IMAGES: &[Image] = &[
              machine. It carries `httpd`, which is what makes the health half measurable without \
              this workspace shipping a server into a container, and `nc`, which is what makes it \
              probeable.",
+    },
+    Image {
+        key: "mariadb",
+        // `mariadb:11` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "mariadb@sha256:d9f7eb2637296652f24b484afd5d246f759f49f5babcadc6a9e344c9acb75fbf",
+        ),
+        service_port: 3306,
+        data_dir: "/var/lib/mysql",
+        run_as: (999, 999),
+        // `mariadb-admin ping` speaks the protocol rather than opening a
+        // socket, which matters here more than usual: MariaDB accepts
+        // connections during its own bootstrap and refuses to answer them.
+        ready_probe: &[
+            "mariadb-admin",
+            "ping",
+            "-h",
+            "127.0.0.1",
+            "--silent",
+        ],
+        download_bytes: 106_220_996,
+        data_on_tmpfs: true,
+        sysctls: &[],
+        justification:
+            "The official MariaDB image, published by the MariaDB Foundation. It is here for              `wordpress.*` rather than for a database module of its own: `database.oltp` measures              PostgreSQL because no open-model load tool ships in MariaDB's image, but WordPress              runs on MySQL-family databases and measuring it on anything else would be measuring              a stack nobody deploys. MariaDB rather than MySQL because it is what the WordPress              hosting market overwhelmingly ships.",
+    },
+    Image {
+        key: "wordpress",
+        // `wordpress:6-php8.3-apache` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "wordpress@sha256:5d2c212561c4b5442ebc4d98933a9cbadcf3dee8888ed3fd9ed44667c27cc905",
+        ),
+        service_port: 80,
+        // Apache's document root, and the one place in this table that is *not*
+        // a tmpfs: `wordpress.*` needs a second container to see these files,
+        // and a tmpfs is visible to exactly one. See the module for the
+        // disclosure that costs.
+        data_dir: "/var/www/html",
+        // `www-data`, which Apache would drop to anyway. Starting as it means
+        // the master process is never root either.
+        run_as: (33, 33),
+        // PHP rather than a shell test, and from *inside* rather than a
+        // connect from the host, for the reason `wait_ready` records: the
+        // runtime's userland proxy answers a host connect the moment the
+        // container exists. This proves Apache is listening, which the image's
+        // entrypoint only reaches after it has unpacked WordPress and written
+        // `wp-config.php` - and WP-CLI run against a half-written one fails
+        // with `Strange wp-config.php file`, which is exactly how this probe
+        // came to exist.
+        ready_probe: &[
+            "php",
+            "-r",
+            "exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);",
+        ],
+        download_bytes: 266_322_653,
+        data_on_tmpfs: false,
+        // **The alternative was `--cap-add NET_BIND_SERVICE`, and this is the
+        // same trade the PostgreSQL entry makes.** Apache listens on 80, a
+        // non-root process may not bind below 1024, and the documented fix is
+        // to hand the capability back. This instead moves the boundary: the
+        // sysctl is namespaced to this container, grants no capability to
+        // anything, and cannot escape a network namespace that has no route
+        // off the machine anyway.
+        sysctls: &["net.ipv4.ip_unprivileged_port_start=0"],
+        justification:
+            "The official WordPress image, Apache and PHP-FPM variant. The market research names              WordPress hosting as the segment this product is for, so this is the one workload              where measuring the real stack matters more than measuring a proxy for it. Pinned to              the Apache variant because it is what shared hosts run.",
+    },
+    Image {
+        key: "wordpress-cli",
+        // `wordpress:cli-php8.3` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "wordpress@sha256:2b5e9d4d3e51909dca1aaa4732e9f5e5bf0377c2114dbd8ff39f060bff202586",
+        ),
+        // Never published. This image is only ever run to completion.
+        service_port: 0,
+        data_dir: "/tmp/darcbench-unused",
+        run_as: (33, 33),
+        ready_probe: &["true"],
+        download_bytes: 69_069_790,
+        data_on_tmpfs: true,
+        sysctls: &[],
+        justification:
+            "The official WP-CLI image, from the same publisher as the WordPress image and              matching its PHP version. It is how content gets into the site: `wp eval-file` runs              a script against a fully loaded WordPress, so the fixture is inserted by WordPress's              own `wp_insert_post` rather than by SQL this workspace invented. The alternative was              `wp plugin install wordpress-importer`, which downloads an unpinned plugin from              wordpress.org at run time - a supply-chain dependency this table exists to refuse,              and one whose version would silently change what an import does.",
     },
 ];
 
@@ -726,22 +828,120 @@ impl Runtime {
         argv: &[&str],
         timeout: Duration,
     ) -> Result<Option<Duration>, ContainerError> {
+        let started = Instant::now();
+        let output =
+            self.run_ephemeral_with(image, run_id, argv, &Ephemeral::default(), timeout)?;
+        Ok(output.succeeded().then(|| started.elapsed()))
+    }
+
+    /// Runs one command in a throwaway container and returns what it printed.
+    ///
+    /// The general form. [`Self::run_ephemeral`] is the timing-only shape over
+    /// it; this one is for a caller that wants the output, a network, another
+    /// container's volumes, or to hand the command its input over a pipe.
+    pub fn run_ephemeral_with(
+        &self,
+        image: &'static Image,
+        run_id: &str,
+        argv: &[&str],
+        options: &Ephemeral<'_>,
+        timeout: Duration,
+    ) -> Result<runtime_exec::Output, ContainerError> {
         let reference = image.reference()?;
         let name = container_name(run_id, image.key);
-        let args = ephemeral_run_args(image, reference, &name, argv);
+        let args = ephemeral_run_args(image, reference, &name, argv, options);
         let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
 
-        let started = Instant::now();
-        let output = self.control_with(&borrowed, timeout)?;
-        let elapsed = started.elapsed();
+        let output = runtime_exec::run_with_stdin(&self.exec, &borrowed, options.stdin, timeout)
+            .map_err(|source| ContainerError::Exec {
+                runtime: self.name(),
+                source,
+            })?;
 
         if !output.succeeded() {
             // `--rm` should have removed it; this covers the case where the
             // failure was early enough that it did not.
             remove(&self.exec, &name);
-            return Ok(None);
         }
-        Ok(Some(elapsed))
+        Ok(output)
+    }
+
+    /// Creates a private network for one run and returns its name.
+    ///
+    /// # Why a network exists at all, when nothing else here needed one
+    ///
+    /// Every module before `wordpress.*` measured a single container. WordPress
+    /// is the first workload that is genuinely two - a web server and a
+    /// database that have to find each other - and Docker's default bridge does
+    /// not give containers names to find each other *by*.
+    ///
+    /// The alternative was `--network container:<other>`, which makes the two
+    /// share one network namespace and lets them talk over `127.0.0.1` with no
+    /// new object to manage. It was rejected because it also makes them share
+    /// one *published port surface*: the ports have to be declared on whichever
+    /// container is created first, so the web server's port would be published
+    /// by the database. That is the kind of arrangement that is clever on the
+    /// day it is written and wrong the first time somebody changes it.
+    ///
+    /// A network carries this agent's label like everything else, so
+    /// [`Self::reap_networks`] can clear one a killed run left behind without
+    /// ever matching one an operator made.
+    ///
+    /// # It is not `--internal`, and the reason is worth knowing
+    ///
+    /// The first version was. An internal network has no route off the machine,
+    /// which is exactly what a benchmark stack should have - and it also has no
+    /// port publishing, because Docker sets that up on the bridge an internal
+    /// network deliberately lacks. `docker port` answered *"no public port
+    /// '80/tcp' published"* and the web server was unreachable from the process
+    /// that had to measure it.
+    ///
+    /// The two cannot both be had at this layer, so the block moved up a layer
+    /// to where it is actually enforceable: `wordpress.*` sets
+    /// `WP_HTTP_BLOCK_EXTERNAL`, which is WordPress's own switch for refusing
+    /// every outbound HTTP request it would otherwise make. That is a better
+    /// control than the network one it replaces, because it stops the thing
+    /// that would actually have happened - a plugin or core update check
+    /// against api.wordpress.org, mid-measurement - rather than stopping
+    /// packets and hoping nothing depended on them.
+    pub fn create_network(&self, run_id: &str) -> Result<String, ContainerError> {
+        let name = format!("darcbench-{}", safe_suffix(run_id));
+        let created = self.control(&["network", "create", "--label", OWNER_LABEL, &name])?;
+        if !created.succeeded() {
+            return Err(ContainerError::Start {
+                runtime: self.name(),
+                detail: format!(
+                    "could not create the run's private network: {}",
+                    first_line(&format!("{}{}", created.stderr, created.stdout))
+                ),
+            });
+        }
+        Ok(name)
+    }
+
+    /// Removes one network, best effort.
+    pub fn remove_network(&self, name: &str) {
+        let _ = self.control(&["network", "rm", name]);
+    }
+
+    /// Removes every network this agent labelled.
+    ///
+    /// Reaped *after* containers, which is the opposite order from images: a
+    /// network cannot be removed while a container is attached to it, and an
+    /// image cannot be removed while a container made from it exists. The
+    /// containers are what has to go first in both cases.
+    pub fn reap_networks(&self) -> Result<usize, ContainerError> {
+        let listed = self.control(&["network", "ls", "-q", "--filter", OWNER_FILTER])?;
+        let ids: Vec<&str> = listed.stdout.split_whitespace().collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut args = vec!["network", "rm"];
+        args.extend_from_slice(&ids);
+        // Best effort on the whole batch: a network with a container still
+        // attached refuses, and that container is somebody's live run.
+        let _ = self.control(&args);
+        Ok(ids.len())
     }
 
     /// Removes every container this agent labelled, from this run or any
@@ -821,12 +1021,7 @@ impl Runtime {
 /// [`Sandbox::wait_ready`] now watches for the exit and puts the log in the
 /// error. Removal is [`Drop`]'s job and [`Runtime::reap`]'s, which is where it
 /// always really was — `--rm` never covered the case those two exist for.
-fn run_args<'a>(
-    image: &'a Image,
-    reference: &'a str,
-    name: &'a str,
-    env: &'a [String],
-) -> Vec<String> {
+fn run_args(image: &Image, reference: &str, name: &str, options: &Launch<'_>) -> Vec<String> {
     let (uid, gid) = image.run_as;
     let mut args: Vec<String> = vec![
         "run".into(),
@@ -838,11 +1033,6 @@ fn run_args<'a>(
         // The image's own service account, so nothing inside is ever root.
         "--user".into(),
         format!("{uid}:{gid}"),
-        // Published on loopback, never on a routable address. An unpublished
-        // port would be safer still and is not possible: the load has to reach
-        // the service from this process.
-        "--publish".into(),
-        format!("127.0.0.1::{}", image.service_port),
         // Bounds a runaway container. A benchmark that causes an outage is a
         // failure however accurate its numbers are. It covers the tmpfs below
         // as well as the service - see `memory_limit`, which is why it is one
@@ -859,6 +1049,35 @@ fn run_args<'a>(
         "no-new-privileges".into(),
         "--cap-drop".into(),
         "ALL".into(),
+    ];
+
+    // Published on loopback, never on a routable address. An unpublished port
+    // would be safer still and is not possible for a service this process has
+    // to reach - but WP-CLI is not one of those, and an entry with no service
+    // port publishes nothing at all.
+    if image.service_port != 0 {
+        args.push("--publish".into());
+        args.push(format!("127.0.0.1::{}", image.service_port));
+    }
+
+    // A private network when the run has one, so two containers can find each
+    // other by name. Without it the container gets Docker's default bridge,
+    // which is what every single-container module here wants.
+    if let Some(network) = options.network {
+        args.push("--network".into());
+        args.push(network.into());
+        args.push("--network-alias".into());
+        args.push(image.key.into());
+    }
+
+    // Namespaced kernel parameters. Present for exactly one image, where the
+    // alternative was granting a capability - see the `wordpress` entry.
+    for sysctl in image.sysctls {
+        args.push("--sysctl".into());
+        args.push((*sysctl).into());
+    }
+
+    if image.data_on_tmpfs {
         // The data directory is a tmpfs, so the service has somewhere to write
         // and nothing it writes touches a host filesystem or outlives the
         // container. This is also what makes every run start from an identical
@@ -867,13 +1086,18 @@ fn run_args<'a>(
         // Owned by the service account and `0700`, because the container is
         // not root and so cannot fix the ownership itself - and because the
         // default, root-owned and `1777`, is one PostgreSQL refuses outright.
-        "--tmpfs".into(),
-        format!(
+        args.push("--tmpfs".into());
+        args.push(format!(
             "{}:rw,size={},mode=0700,uid={uid},gid={gid}",
             image.data_dir, TMPFS_SIZE_BYTES
-        ),
-    ];
-    for pair in env {
+        ));
+    }
+    // The `else` is deliberately empty rather than mounting something. An
+    // entry that is not on a tmpfs takes the image's own declared volume,
+    // which Docker creates anonymously - so still nothing of the host is named
+    // here, and `remove` takes the volume with the container.
+
+    for pair in options.env {
         args.push("--env".into());
         args.push(pair.clone());
     }
@@ -882,7 +1106,31 @@ fn run_args<'a>(
     // image cannot reach this line at all. Nothing a caller typed can appear
     // here either.
     args.push(reference.into());
+    // Everything past the reference is the container's command rather than a
+    // flag to the runtime, which is what makes appending here safe.
+    for part in options.command {
+        args.push((*part).into());
+    }
     args
+}
+
+/// What a caller may vary about a launch.
+///
+/// A struct rather than four more parameters, because three of the four are
+/// `None` or empty for every module that existed before `wordpress.*` and a
+/// call site full of `None, None, &[], &[]` says nothing about which is which.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Launch<'a> {
+    /// `KEY=VALUE` pairs the image needs to start. They reach the container's
+    /// environment and nothing else - they cannot become flags, because each
+    /// follows its own `--env` rather than being spliced into a string.
+    pub env: &'a [String],
+    /// Overrides the image's own command. Fixed constants from a module.
+    pub command: &'a [&'a str],
+    /// A private network from [`Runtime::create_network`]. The container also
+    /// gets an alias equal to the image key, which is how the other container
+    /// addresses it.
+    pub network: Option<&'a str>,
 }
 
 /// Builds the `run` arguments for a one-shot foreground command.
@@ -909,11 +1157,12 @@ fn run_args<'a>(
 ///
 /// `argv` is a fixed vector of constants the module owns. Nothing a caller
 /// typed reaches it, for the same reason nothing does in [`Sandbox::exec`].
-fn ephemeral_run_args<'a>(
-    image: &'a Image,
-    reference: &'a str,
-    name: &'a str,
-    argv: &'a [&'a str],
+fn ephemeral_run_args(
+    image: &Image,
+    reference: &str,
+    name: &str,
+    argv: &[&str],
+    options: &Ephemeral<'_>,
 ) -> Vec<String> {
     let (uid, gid) = image.run_as;
     let mut args: Vec<String> = vec![
@@ -927,10 +1176,6 @@ fn ephemeral_run_args<'a>(
         OWNER_LABEL.into(),
         "--user".into(),
         format!("{uid}:{gid}"),
-        "--network".into(),
-        // Not merely unpublished: no network namespace with an interface at
-        // all. Nothing here has anything to talk to.
-        "none".into(),
         "--memory".into(),
         memory_limit(),
         "--memory-swap".into(),
@@ -941,12 +1186,69 @@ fn ephemeral_run_args<'a>(
         "no-new-privileges".into(),
         "--cap-drop".into(),
         "ALL".into(),
-        reference.into(),
     ];
+
+    // Only when there is something to send. Without it the runtime gives the
+    // container a closed standard input, and a command waiting to read from it
+    // gets EOF immediately - which is not an error, just silence, and cost one
+    // debugging cycle to see: `wp eval-file -` produced no output at all
+    // rather than complaining.
+    //
+    // `-i` and not `-t`: a pseudo-terminal would make the runtime line-buffer
+    // and echo, and this is a pipe between two programs rather than a session
+    // for a person.
+    if options.stdin.is_some() {
+        args.push("--interactive".into());
+    }
+
+    match options.network {
+        // Not merely unpublished: no network namespace with an interface at
+        // all. Nothing here has anything to talk to.
+        None => {
+            args.push("--network".into());
+            args.push("none".into());
+        }
+        Some(network) => {
+            args.push("--network".into());
+            args.push(network.into());
+        }
+    }
+
+    // The *only* way a filesystem is shared between two containers here, and
+    // it names a container rather than a host path - which is what keeps
+    // `no_host_path_can_reach_the_argument_vector` true. WP-CLI has to see the
+    // same WordPress that Apache is serving; a tmpfs is visible to one
+    // container and a bind mount is forbidden, so this is what is left.
+    if let Some(container) = options.volumes_from {
+        args.push("--volumes-from".into());
+        args.push(container.into());
+    }
+
+    for pair in options.env {
+        args.push("--env".into());
+        args.push(pair.clone());
+    }
+
+    args.push(reference.into());
     for argument in argv {
         args.push((*argument).into());
     }
     args
+}
+
+/// What a caller may vary about a one-shot container.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Ephemeral<'a> {
+    pub env: &'a [String],
+    /// A private network, or `None` for no network interface at all.
+    pub network: Option<&'a str>,
+    /// A container whose volumes this one should see.
+    pub volumes_from: Option<&'a str>,
+    /// Written to the command's standard input.
+    ///
+    /// How a 1.6 MB fixture reaches a container without a host path appearing
+    /// in an argument vector. See `runtime_exec::run_with_stdin`.
+    pub stdin: Option<&'a [u8]>,
 }
 
 // ---------------------------------------------------------------------------
@@ -975,7 +1277,25 @@ impl Sandbox {
         run_id: &str,
         env: &[String],
     ) -> Result<Self, ContainerError> {
-        let sandbox = Self::launch_without_waiting(runtime, image, run_id, env, &[])?;
+        Self::launch_with(
+            runtime,
+            image,
+            run_id,
+            &Launch {
+                env,
+                ..Launch::default()
+            },
+        )
+    }
+
+    /// [`Self::launch`], with everything a caller may vary.
+    pub fn launch_with(
+        runtime: &Runtime,
+        image: &'static Image,
+        run_id: &str,
+        options: &Launch<'_>,
+    ) -> Result<Self, ContainerError> {
+        let sandbox = Self::launch_without_waiting(runtime, image, run_id, options)?;
         // `wait_ready` removes the container itself on failure, because it is
         // the only place that knows the container was reachable but never
         // answered - a distinction worth keeping out of this function.
@@ -997,24 +1317,19 @@ impl Sandbox {
     /// the guarantee that anything inside is answering, which is precisely
     /// what it has undertaken to find out.
     ///
-    /// `command` overrides the image's own, for an image whose default does
-    /// not serve. Fixed constants from the module, never anything a caller
+    /// `options.command` overrides the image's own, for an image whose default
+    /// does not serve. Fixed constants from the module, never anything a caller
     /// typed — the same rule as everywhere else here.
     pub fn launch_without_waiting(
         runtime: &Runtime,
         image: &'static Image,
         run_id: &str,
-        env: &[String],
-        command: &[&str],
+        options: &Launch<'_>,
     ) -> Result<Self, ContainerError> {
         // Before anything else, so an unpinned image never reaches a daemon.
         let reference = image.reference()?;
         let name = container_name(run_id, image.key);
-        let mut args = run_args(image, reference, &name, env);
-        // After the reference, which `run_args` puts last: everything past it
-        // is the container's command rather than a flag to the runtime, which
-        // is what makes appending here safe.
-        args.extend(command.iter().map(|part| (*part).to_string()));
+        let args = run_args(image, reference, &name, options);
         let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
 
         let started = runtime.control(&borrowed)?;
@@ -1253,7 +1568,12 @@ impl Drop for Sandbox {
 /// is [`Runtime::reap`]: anything missed here is labelled, and the next run
 /// clears it.
 fn remove(runtime: &Interpreter, name: &str) {
-    let _ = runtime_exec::run(runtime, &["rm", "-f", name], CONTROL_TIMEOUT);
+    // `-v` takes the container's anonymous volumes with it. Every entry but
+    // WordPress puts its data on a tmpfs, which is not a volume and needs no
+    // flag - but the WordPress image declares `VOLUME /var/www/html`, so Docker
+    // creates one whether anyone asked or not, and without this the daemon
+    // would accumulate a few hundred megabytes of orphaned WordPress per run.
+    let _ = runtime_exec::run(runtime, &["rm", "-f", "-v", name], CONTROL_TIMEOUT);
 }
 
 /// The container's name: this agent, this run, this image.
@@ -1264,12 +1584,21 @@ fn remove(runtime: &Interpreter, name: &str) {
 /// property of a type two crates away and this is the string that becomes an
 /// argument.
 fn container_name(run_id: &str, key: &str) -> String {
-    let safe: String = run_id
+    format!("darcbench-{}-{key}", safe_suffix(run_id))
+}
+
+/// The filtered form of a run id, for anything that becomes a runtime object's
+/// name.
+///
+/// Filtered rather than trusted for the reason above: "it cannot contain that"
+/// is a property of a type two crates away, and this is the string that becomes
+/// an argument.
+fn safe_suffix(run_id: &str) -> String {
+    run_id
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
         .take(48)
-        .collect();
-    format!("darcbench-{safe}-{key}")
+        .collect()
 }
 
 /// Asks the runtime which loopback port the service was published on.
@@ -1331,15 +1660,21 @@ mod tests {
         run_as: (999, 998),
         ready_probe: &["testsvc-isready"],
         download_bytes: 1_000_000,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification: "test fixture; never launched",
     };
 
     fn args() -> Vec<String> {
+        let env = ["PASSWORD=x".to_string()];
         run_args(
             &TEST_IMAGE,
             TEST_REFERENCE,
             "darcbench-run_abc-testsvc",
-            &["PASSWORD=x".to_string()],
+            &Launch {
+                env: &env,
+                ..Launch::default()
+            },
         )
     }
 
@@ -1504,7 +1839,13 @@ mod tests {
         // strictly tighter. Nothing is published, nothing is mounted and the
         // network namespace has no interface at all, because a container whose
         // whole job is to exit has nothing to talk to and nowhere to write.
-        let args = ephemeral_run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &["true"]);
+        let args = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral::default(),
+        );
 
         for forbidden in [
             "-v",
@@ -1546,6 +1887,39 @@ mod tests {
     }
 
     #[test]
+    fn a_command_given_input_is_given_a_standard_input_to_read_it_from() {
+        // The runtime closes stdin unless asked not to, so a command that
+        // reads gets EOF and does nothing - silently. `wp eval-file -` did
+        // exactly that: no output, no error, no import.
+        let payload = b"<?php".to_vec();
+        let with = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral {
+                stdin: Some(&payload),
+                ..Ephemeral::default()
+            },
+        );
+        assert!(with.iter().any(|arg| arg == "--interactive"));
+        // And never a TTY: this is a pipe between two programs, and a
+        // pseudo-terminal would line-buffer and echo it.
+        assert!(!with.iter().any(|arg| arg == "--tty" || arg == "-t"));
+
+        // Absent when there is nothing to send, so the default stays "a child
+        // that reads from stdin exits rather than blocking".
+        let without = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral::default(),
+        );
+        assert!(!without.iter().any(|arg| arg == "--interactive"));
+    }
+
+    #[test]
     fn the_ephemeral_command_cannot_be_read_as_a_flag() {
         // Everything after the image reference is the container's command
         // rather than an argument to the runtime, so the reference has to come
@@ -1554,7 +1928,13 @@ mod tests {
         // container - which is the whole of the difference between running
         // `true` and running `--privileged`.
         let hostile = ["--privileged", "-v", "/:/host"];
-        let args = ephemeral_run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &hostile);
+        let args = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &hostile,
+            &Ephemeral::default(),
+        );
         let reference_at = args
             .iter()
             .position(|arg| arg == TEST_REFERENCE)
@@ -1625,7 +2005,15 @@ mod tests {
             "PASSWORD=--privileged".to_string(),
             "X=a b --volume /:/host".to_string(),
         ];
-        let args = run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &hostile);
+        let args = run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &Launch {
+                env: &hostile,
+                ..Launch::default()
+            },
+        );
         for pair in &hostile {
             let at = args.iter().position(|arg| arg == pair).unwrap();
             assert_eq!(args[at - 1], "--env", "{pair} was not preceded by --env");
@@ -1657,6 +2045,8 @@ mod tests {
             run_as: (999, 999),
             ready_probe: &["pg_isready"],
             download_bytes: 1_000_000,
+            data_on_tmpfs: true,
+            sysctls: &[],
             justification: "a fixture long enough to satisfy the justification check above",
         };
         assert!(!UNPINNED.is_pinned());
@@ -1736,7 +2126,13 @@ mod tests {
         // image is the allow-list. A caller cannot assemble one from a string,
         // which is what keeps configuration, an HTTP request or a command line
         // from reaching "run this image".
-        assert!(Image::from_allow_list("mariadb").is_none());
+        // `mysql` rather than `mariadb`, which this test used until MariaDB
+        // joined the list for `wordpress.*`. The example has to be a service
+        // somebody would plausibly reach for and that is deliberately absent -
+        // and MySQL is exactly that: `database.oltp` explains why the
+        // MySQL family is not measured, and nothing may route around it by
+        // naming the image.
+        assert!(Image::from_allow_list("mysql").is_none());
         assert!(Image::from_allow_list("postgres").is_some());
         assert!(Image::from_allow_list("../../etc").is_none());
         assert!(Image::from_allow_list("").is_none());
