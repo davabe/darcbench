@@ -297,6 +297,39 @@ pub trait BenchmarkModule: Send + Sync {
         0
     }
 
+    /// Whether this module's work happens where the agent's own CPU accounting
+    /// cannot see it.
+    ///
+    /// The runtime load ceiling asks "is anything other than this benchmark
+    /// using the CPU" by subtracting this process's own consumption from the
+    /// machine's. `/proc/self/stat` sums every thread of this process **and
+    /// its reaped children**, so a module that forks an interpreter is counted
+    /// correctly - which is why `php.runtime` and `node.runtime` return `false`
+    /// here despite doing all their work in child processes.
+    ///
+    /// A container is different in kind. It is started by a daemon and is not
+    /// this process's child at any remove, so nothing it burns can ever be
+    /// attributed to this run. The subtraction then leaves the benchmark's own
+    /// workload sitting in the "somebody else" column, and the ceiling fires on
+    /// an idle machine.
+    ///
+    /// That is not hypothetical: the first `darcbench run` over the database
+    /// modules reported `database.oltp` **degraded** on a quiet host, with
+    /// *"work other than this benchmark used 100% of the machine's CPU"* - the
+    /// work being pgbench, in the container the module had just started.
+    ///
+    /// A module that returns `true` has the ceiling **suspended** while it
+    /// runs, and the run discloses that rather than reporting a guard it did
+    /// not apply. It is the same choice the guard already makes under container
+    /// scope and that `network.transfer` makes about packet loss: a guard that
+    /// fires on the wrong evidence is worse than one that declares itself
+    /// absent. Attributing a container's cgroup back to this run would be
+    /// better still, and is not something this crate can do without the agent
+    /// learning what a container is.
+    fn workload_runs_outside_this_process(&self) -> bool {
+        false
+    }
+
     /// Runs the workload. Must be cancellation-responsive and must clean up
     /// everything it created before returning, including on the error paths.
     fn run(

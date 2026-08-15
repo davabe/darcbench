@@ -373,6 +373,97 @@ impl Fixture {
         hex::encode(hasher.finalize())
     }
 
+    /// Renders the corpus as a PHP script that inserts it through WordPress's
+    /// own API.
+    ///
+    /// # Why not WXR and `wp import`, when WXR is right there
+    ///
+    /// `wp import` needs the WordPress Importer, which is a plugin, which is
+    /// not in any image and would have to be fetched from wordpress.org at run
+    /// time. That is an **unpinned download inside a benchmark** - the exact
+    /// supply-chain dependency the image allow-list exists to refuse, and one
+    /// whose version could change what an import does without anything here
+    /// changing. The same objection this codebase already makes to a tag
+    /// instead of a digest.
+    ///
+    /// Two other routes were rejected on measurement grounds rather than
+    /// supply-chain ones. **`wp post create` per item** is a WP-CLI process per
+    /// post, which for a standard corpus is three hundred PHP interpreter
+    /// start-ups - minutes of setup measuring process spawn. **Direct SQL**
+    /// would be fast and would put this workspace in the business of knowing
+    /// WordPress's schema: term relationships, comment counts, `guid`, slug
+    /// uniqueness. Get one wrong and the site renders differently from a real
+    /// one, which is the whole thing the fixture exists to prevent.
+    ///
+    /// So: one PHP script, run once by `wp eval-file`, calling
+    /// `wp_insert_post` and `wp_insert_comment`. Those are the functions the
+    /// importer itself calls. WordPress does its own sanitising, its own
+    /// slug de-duplication and its own comment counting, and the resulting
+    /// database is one WordPress made.
+    ///
+    /// # The escaping, which is the part worth checking
+    ///
+    /// The corpus is inert by construction - every string comes from a fixed
+    /// list of lowercase ASCII words and from integers - but this output is
+    /// *executed*, so it is escaped as though it were not.
+    ///
+    /// The whole corpus becomes **one JSON document**, and that document
+    /// becomes **one PHP single-quoted string**. So there is exactly one
+    /// escaping problem rather than one per field: JSON handles every quote,
+    /// newline and backslash in the content, and a single-quoted PHP string has
+    /// precisely two metacharacters left. A version that emitted a PHP literal
+    /// per field would have had that surface multiplied by every field, and
+    /// each one would have to stay right as the corpus grew.
+    pub fn to_php_import(&self) -> String {
+        let json = self.to_import_json();
+        format!(
+            "<?php\n{PHP_IMPORT_PRELUDE}\n$darcbench_json = '{}';\n{PHP_IMPORT_BODY}\n",
+            escape_php_single_quoted(&json)
+        )
+    }
+
+    /// The corpus as the JSON the import script consumes.
+    fn to_import_json(&self) -> String {
+        let posts: Vec<serde_json::Value> = self
+            .posts
+            .iter()
+            .map(|post| {
+                serde_json::json!({
+                    "title": post.title,
+                    "slug": post.slug,
+                    "body": post.body,
+                    "excerpt": post.excerpt,
+                    "date": post.date,
+                    "author": post.author,
+                    "category": post.category,
+                    "tags": post.tags,
+                    "kind": post.kind,
+                    "comments": post.comments.iter().map(|comment| serde_json::json!({
+                        "id": comment.id,
+                        "author": comment.author,
+                        "email": comment.email,
+                        "body": comment.body,
+                        "date": comment.date,
+                        "parent": comment.parent,
+                    })).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "fixture_version": FIXTURE_VERSION,
+            "size": self.size.as_str(),
+            "checksum": self.checksum(),
+            "categories": self.categories.iter().map(|term| serde_json::json!({
+                "slug": term.slug, "name": term.name,
+            })).collect::<Vec<_>>(),
+            "tags": self.tags.iter().map(|term| serde_json::json!({
+                "slug": term.slug, "name": term.name,
+            })).collect::<Vec<_>>(),
+            "posts": posts,
+        })
+        .to_string()
+    }
+
     /// Renders the corpus as a WordPress eXtended RSS document.
     pub fn to_wxr(&self) -> String {
         // Pre-sized generously; a standard corpus is a couple of megabytes and
@@ -746,6 +837,120 @@ fn escape_xml(text: &str) -> String {
     out
 }
 
+/// Escapes a string for a PHP single-quoted literal.
+///
+/// Two metacharacters and no others: a single-quoted PHP string interpolates
+/// nothing, so `$`, backticks, newlines and every other byte pass through
+/// untouched. That is the entire reason the corpus is carried as JSON inside
+/// one such string rather than as PHP literals per field.
+///
+/// The backslash is replaced first. Doing it second would escape the
+/// backslashes this function had just introduced, doubling them.
+fn escape_php_single_quoted(text: &str) -> String {
+    text.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+/// Everything the import script needs before the data.
+const PHP_IMPORT_PRELUDE: &str = r#"
+// Generated by DARCBench. Inserts a fixed corpus through WordPress's own API.
+if ( ! function_exists( 'wp_insert_post' ) ) {
+    fwrite( STDERR, "WordPress is not loaded
+" );
+    exit( 1 );
+}
+"#;
+
+/// Everything after the data.
+///
+/// A constant rather than generated, so what runs is auditable in this file
+/// rather than assembled at run time. The only thing that varies between runs
+/// is the JSON above, and the only thing that varies between *machines* is
+/// nothing at all.
+const PHP_IMPORT_BODY: &str = r#"
+$darcbench = json_decode( $darcbench_json, true );
+if ( ! is_array( $darcbench ) ) {
+    fwrite( STDERR, "the fixture did not decode
+" );
+    exit( 1 );
+}
+
+// Terms first: a post that names a category before it exists would silently
+// land in Uncategorised, and the archive measurement would then be an archive
+// of everything.
+foreach ( array( 'categories' => 'category', 'tags' => 'post_tag' ) as $key => $taxonomy ) {
+    foreach ( $darcbench[ $key ] as $term ) {
+        if ( ! term_exists( $term['slug'], $taxonomy ) ) {
+            wp_insert_term( $term['name'], $taxonomy, array( 'slug' => $term['slug'] ) );
+        }
+    }
+}
+
+$posts = 0;
+$comments = 0;
+foreach ( $darcbench['posts'] as $item ) {
+    $id = wp_insert_post( array(
+        'post_title'   => $item['title'],
+        'post_name'    => $item['slug'],
+        'post_content' => $item['body'],
+        'post_excerpt' => $item['excerpt'],
+        'post_date'    => $item['date'],
+        'post_date_gmt'=> $item['date'],
+        'post_status'  => 'publish',
+        'post_type'    => $item['kind'],
+        'post_author'  => 1,
+        // Off for the same reason the corpus is deterministic: a revision per
+        // insert would double the row count and make the database measurement
+        // depend on how the content arrived.
+        'post_category'=> array(),
+    ), true );
+
+    if ( is_wp_error( $id ) ) {
+        fwrite( STDERR, 'insert failed: ' . $id->get_error_message() . "
+" );
+        exit( 1 );
+    }
+    $posts++;
+
+    if ( 'post' === $item['kind'] ) {
+        wp_set_object_terms( $id, array( $item['category'] ), 'category', false );
+        if ( ! empty( $item['tags'] ) ) {
+            wp_set_object_terms( $id, $item['tags'], 'post_tag', false );
+        }
+    }
+
+    // Threading is preserved: a flat comment list would let a theme's comment
+    // loop look cheaper than it is, which is the reason the fixture generates
+    // a tree in the first place.
+    $mapped = array();
+    foreach ( $item['comments'] as $comment ) {
+        $parent = 0;
+        if ( ! empty( $comment['parent'] ) && isset( $mapped[ $comment['parent'] ] ) ) {
+            $parent = $mapped[ $comment['parent'] ];
+        }
+        $inserted = wp_insert_comment( array(
+            'comment_post_ID'      => $id,
+            'comment_author'       => $comment['author'],
+            'comment_author_email' => $comment['email'],
+            'comment_content'      => $comment['body'],
+            'comment_date'         => $comment['date'],
+            'comment_date_gmt'     => $comment['date'],
+            'comment_parent'       => $parent,
+            'comment_approved'     => 1,
+        ) );
+        if ( $inserted ) {
+            $mapped[ $comment['id'] ] = $inserted;
+            $comments++;
+        }
+    }
+}
+
+// The last line is parsed by the module, so it is a fixed shape rather than
+// prose. A run that inserted the wrong number of anything is a run whose
+// measurements describe a different site.
+printf( "DARCBENCH_IMPORT posts=%d comments=%d checksum=%s
+", $posts, $comments, $darcbench['checksum'] );
+"#;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -763,6 +968,70 @@ mod tests {
     /// update the hash. In that order, and never the other way round.
     const STANDARD_CHECKSUM: &str =
         "a6d33e85264906f9927e388792e5c0e060369e4e0ad9cef056b3d9f5d2b80e5d";
+
+    #[test]
+    fn the_php_escaper_handles_the_two_metacharacters_and_nothing_else() {
+        // A single-quoted PHP string interpolates nothing, so these two are the
+        // whole surface. The test exists because the corpus cannot currently
+        // produce either - every string is lowercase ASCII words and integers -
+        // and a future word list must not be able to make them reachable
+        // quietly. The same reason the CDATA and XML escapers are tested
+        // against strings the generator cannot emit.
+        assert_eq!(escape_php_single_quoted("plain"), "plain");
+        assert_eq!(escape_php_single_quoted("it's"), r"it\'s");
+        assert_eq!(escape_php_single_quoted(r"a\b"), r"a\\b");
+        // The order matters: escaping the quote first would then escape the
+        // backslash this introduced, and `\'` would become `\\'` - a literal
+        // backslash followed by a string terminator.
+        assert_eq!(escape_php_single_quoted(r"\'"), r"\\\'");
+        // Everything a PHP double-quoted string would interpolate passes
+        // through untouched, which is why single quotes were chosen.
+        assert_eq!(escape_php_single_quoted("$var {$x} \n"), "$var {$x} \n");
+    }
+
+    #[test]
+    fn the_import_script_carries_the_whole_corpus_and_nothing_executable() {
+        let fixture = Fixture::generate(FixtureSize::Small);
+        let php = fixture.to_php_import();
+
+        assert!(php.starts_with("<?php"));
+        assert!(
+            php.contains("wp_insert_post"),
+            "must use WordPress's own API"
+        );
+        assert!(php.contains("wp_insert_comment"));
+        // No route to the network and no route to a shell. The importer plugin
+        // this replaces would have needed the first.
+        for forbidden in [
+            "shell_exec",
+            "system(",
+            "exec(",
+            "passthru",
+            "proc_open",
+            "eval(",
+            "file_get_contents('http",
+            "curl_",
+            "wp_remote_",
+        ] {
+            assert!(
+                !php.contains(forbidden),
+                "`{forbidden}` is in the import script"
+            );
+        }
+
+        // The corpus survives the round trip through JSON and the PHP literal.
+        let json = fixture.to_import_json();
+        let decoded: serde_json::Value = serde_json::from_str(&json).expect("valid json");
+        assert_eq!(
+            decoded["posts"].as_array().expect("posts").len(),
+            fixture.posts.len()
+        );
+        assert_eq!(decoded["checksum"], fixture.checksum());
+
+        // And the checksum in the script is the fixture's own, so a site built
+        // from it can be checked against the corpus it claims to be.
+        assert!(php.contains(&fixture.checksum()));
+    }
 
     #[test]
     fn the_standard_corpus_has_a_stable_checksum() {

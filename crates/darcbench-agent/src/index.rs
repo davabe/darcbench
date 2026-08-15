@@ -995,6 +995,7 @@ mod tests {
                 event_count: 5,
                 stopped_because: None,
                 guards_not_enforced: vec![],
+                comparability_not_recorded: vec![],
             },
             environment: darcbench_inventory::Inventory::collect(),
             modules: vec![ModuleResult {

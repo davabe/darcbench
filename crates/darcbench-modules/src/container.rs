@@ -33,14 +33,14 @@
 //! | Removal is filtered by our own label | So DARCBench cannot delete the operator's containers | `only_containers_this_agent_labelled_can_be_removed` |
 //! | Data lives on tmpfs | Nothing survives the run, and no host disk is written | `the_data_directory_is_a_tmpfs_that_cannot_outlive_the_run` |
 //!
-//! # The image allow-list is empty, and that is not an oversight
+//! # The image allow-list, and why it was empty for two commits
 //!
 //! [`ALLOWED_IMAGES`] is the same shape as `network_endpoints`' host table: a
 //! compile-time list, each entry justified, with no way to add one at runtime.
-//! It is empty because this commit ships the *tier*, not a module that uses
-//! it, and an image reference must be pinned to a digest resolved against a
-//! real registry. Inventing one would be writing a security control that
-//! cannot work.
+//! Every entry is pinned to a digest resolved against a real registry. The
+//! table carried its two entries unpinned for as long as this project had no
+//! host with a container daemon, because inventing a `sha256:` string would
+//! have been writing a security control that cannot work.
 //!
 //! `Image` cannot be constructed outside this module, and
 //! [`Image::from_allow_list`] is the only way to obtain one - so a module that
@@ -53,8 +53,9 @@
 //! panic, and nothing runs on `SIGKILL`. A container started by a run that
 //! died keeps running.
 //!
-//! `--rm` does not help: it reaps when the *container* exits, not when the
-//! agent does. So the mitigation is reaping rather than prevention -
+//! `--rm` would not help, which is half of why it is not used: it reaps when
+//! the *container* exits, not when the agent does. So the mitigation is
+//! reaping rather than prevention -
 //! [`reap`] removes containers carrying this agent's label, and it is
 //! deliberately label-scoped rather than name-scoped so that no amount of
 //! coincidence in an operator's naming can put one of their containers in
@@ -96,16 +97,54 @@ const OWNER_LABEL: &str = "com.getdarc.darcbench.owned=1";
 /// The filter form of [`OWNER_LABEL`], for `ps` and `rm`.
 const OWNER_FILTER: &str = "label=com.getdarc.darcbench.owned=1";
 
-/// Memory ceiling for a sandboxed service.
-///
-/// Half a gigabyte. Enough for a database with a benchmark-sized dataset,
-/// small enough that a runaway container cannot take the host down - which is
-/// the failure this whole module exists to make impossible. A benchmark that
-/// causes an outage is a failure however accurate its numbers are.
-const MEMORY_LIMIT: &str = "512m";
-
 /// Tmpfs size for the service's data directory.
+///
+/// Sized for the largest dataset any module here builds: `database.oltp` at
+/// pgbench scale 10 occupies about 324 MiB after its indexes, and grows to
+/// roughly 360 MiB once a write phase has cycled some WAL.
 const TMPFS_SIZE_BYTES: u64 = 512 * 1024 * 1024;
+
+/// What the service itself may use, on top of its data.
+///
+/// PostgreSQL's default `shared_buffers` is 128 MiB, and eight `pgbench`
+/// backends and their client add most of the rest. Measured peak for the
+/// heaviest phase this suite runs is 507 MiB of the total below.
+const SERVICE_MEMORY_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Memory ceiling for a sandboxed service: its data plus its working set.
+///
+/// **These are one budget, not two, and that is the whole reason this is
+/// computed rather than written.** A tmpfs lives in the page cache and its
+/// pages are charged to the cgroup that faults them in, so every byte of the
+/// data directory is a byte of the memory limit. The two constants above were
+/// once independent and both `512m`, which read as "half a gig of disk and
+/// half a gig of RAM" and meant "half a gig, and the database may have
+/// whatever the dataset does not want".
+///
+/// It did not want much. `database.oltp` built a 324 MiB dataset and was
+/// OOM-killed part-way through its first write phase — `server process was
+/// terminated by signal 9`, then automatic recovery, then every later phase
+/// refused. What the module published from that was two throughput figures,
+/// one of them from a phase that had died half-way through, and silence about
+/// the other four metrics. A benchmark that reports a number for a database
+/// that was being killed while it was measured is worse than one that reports
+/// nothing.
+///
+/// The ceiling still exists and still matters — a runaway container must not
+/// take the host down, because a benchmark that causes an outage is a failure
+/// however accurate its numbers are. It is now set to what the workload was
+/// measured to need rather than to a round number that sounded safe.
+fn memory_limit() -> String {
+    format!("{}b", TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES)
+}
+
+/// The same figure, for a module declaring its footprint to preflight.
+///
+/// A container's memory is memory on the host, so a module that provisions one
+/// must say so before the operator agrees to the run.
+pub const fn sandbox_memory_budget_bytes() -> u64 {
+    TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES
+}
 
 /// How long the runtime gets to answer a control command.
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -113,8 +152,35 @@ const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long a container gets to start serving before it is given up on.
 const READY_TIMEOUT: Duration = Duration::from_secs(90);
 
-/// Gap between readiness probes.
+/// How long the published port gets to accept a connection, per attempt.
+///
+/// Only a reachability check, not a readiness signal — see
+/// [`Sandbox::wait_ready`]. Short because a loopback connect either succeeds
+/// at once or is refused at once, and a longer value would only slow down the
+/// loop that surrounds it.
 const READY_POLL: Duration = Duration::from_millis(200);
+
+/// Gap between passes of the readiness loop.
+///
+/// Every check in that loop is now a round trip to the daemon, so the cadence
+/// is the loop's cost. One second bounds the wasted wait on a container that
+/// dies at startup to about a second, which is the point, without making the
+/// waiting itself into load on the machine under measurement.
+const LIVENESS_POLL: Duration = Duration::from_secs(1);
+
+/// How long a readiness probe gets before it is treated as "not ready".
+///
+/// Short, and shorter than [`CONTROL_TIMEOUT`] on purpose. A probe is asked
+/// again a second later, so a slow one costs nothing but a wait — where a
+/// probe that hung for the full control timeout would stall the readiness loop
+/// it is supposed to drive.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How much of a failed container's log may reach an error message.
+///
+/// A bundle is an artifact somebody reads and stores. A service that failed by
+/// repeating one line does not get to put all of it in there.
+const LOG_EXCERPT_BYTES: usize = 1024;
 
 // ---------------------------------------------------------------------------
 // Images
@@ -136,6 +202,44 @@ pub struct Image {
     service_port: u16,
     /// Directory inside the container that must be writable, mounted tmpfs.
     data_dir: &'static str,
+    /// The uid and gid of the image's own service account.
+    ///
+    /// The container is started *as* this account rather than as root, so the
+    /// entrypoint never holds the privileges it would otherwise drop. See
+    /// [`run_args`] for why that is the fix rather than granting capabilities
+    /// back.
+    ///
+    /// It is a property of the pinned digest, not of the image name — which is
+    /// the second reason the digest is pinned. `every_allowed_image_runs_as_a_
+    /// service_account` is what stops a future entry defaulting to root.
+    run_as: (u32, u32),
+    /// Roughly what fetching this image costs in bytes.
+    ///
+    /// The uncompressed size the runtime reports, which over-states the wire
+    /// transfer because layers are pulled compressed. Over-stating is the right
+    /// direction: this feeds `max_network_bytes`, which is a bound an operator
+    /// agrees to at preflight, and a bound that turns out to be generous is a
+    /// better failure than one that turns out to be a lie.
+    download_bytes: u64,
+    /// Whether [`Self::data_dir`] is mounted as a tmpfs.
+    ///
+    /// True everywhere but WordPress. A tmpfs is visible to exactly one
+    /// container, and `wordpress.*` needs a second one - WP-CLI - to see the
+    /// same files. So that entry falls back to the image's own declared volume,
+    /// which lives in the daemon's storage on a host filesystem, and the module
+    /// discloses it exactly as `deployment.container` discloses its build.
+    data_on_tmpfs: bool,
+    /// Kernel parameters set for this container's namespaces.
+    ///
+    /// Empty for almost everything. Where it is not, it is because the
+    /// alternative was granting a capability - see the `wordpress` entry.
+    sysctls: &'static [&'static str],
+    /// A command run *inside* the container that exits zero once the service
+    /// is actually serving.
+    ///
+    /// See [`Sandbox::wait_ready`] for why a connect from the host is not one.
+    /// A fixed argv of constants, like everything else this module runs.
+    ready_probe: &'static [&'static str],
     /// Why this image is on the list. Read by a human reviewing the table.
     justification: &'static str,
 }
@@ -171,9 +275,10 @@ pub enum Pin {
 
 /// Every image DARCBench may run.
 ///
-/// Empty, and deliberately so - see the module documentation. This commit
-/// ships the isolation tier; the first database module adds the first entry,
-/// with a digest resolved against a real registry rather than invented.
+/// Two entries, both resolved against Docker Hub on 2026-08-14 on the first
+/// host this project had with a container daemon. Until then the table carried
+/// them as [`Pin::Pending`], because a `sha256:` string that was not resolved
+/// against a registry is a security control that cannot work.
 ///
 /// The rules for adding one, enforced by the tests below:
 ///
@@ -188,18 +293,32 @@ pub enum Pin {
 pub const ALLOWED_IMAGES: &[Image] = &[
     Image {
         key: "postgres",
-        pin: Pin::Pending {
-            resolve_from: "postgres:17-bookworm",
-            blocked_by: "no container daemon or registry access was available on the machine this \
-                     entry was written on, and a digest that was not resolved against a registry \
-                     is not a pin",
-        },
+        // `postgres:17-bookworm` as Docker Hub served it on 2026-08-14. The date
+        // matters as much as the digest: a digest is a fact about a moment, and a
+        // reader six months out needs to know which moment in order to judge
+        // whether a newer one would change a measurement.
+        pin: Pin::Pinned(
+            "postgres@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad",
+        ),
         // 5432 is PostgreSQL's port inside the container. Nothing is published to
         // it except loopback on this host - see `run_args`.
         service_port: 5432,
         // The official image's `PGDATA`. Mounted tmpfs, so the database is created
         // fresh for every run and nothing it writes reaches a host disk.
         data_dir: "/var/lib/postgresql/data",
+        // `postgres:postgres` in the official image, both 999.
+        run_as: (999, 999),
+        // `-h 127.0.0.1` rather than the default socket, and it is the whole
+        // point: `initdb` starts a temporary server during startup that listens
+        // on the unix socket *only*, precisely so that nothing connects to a
+        // database that is still being built. A probe over the socket would
+        // report that one as ready.
+        ready_probe: &["pg_isready", "-q", "-h", "127.0.0.1"],
+        // 156 MB. By far the largest thing this program will ever fetch, which
+        // is exactly why it is declared rather than left to the runtime.
+        download_bytes: 156_190_575,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification:
             "The official PostgreSQL image, published by the PostgreSQL Docker Community. \
                     Chosen over a distribution package because the point of the container tier is \
@@ -210,22 +329,148 @@ pub const ALLOWED_IMAGES: &[Image] = &[
     },
     Image {
         key: "valkey",
-        pin: Pin::Pending {
-            resolve_from: "valkey/valkey:8-alpine",
-            blocked_by: "no container daemon or registry access was available on the machine this \
-                     entry was written on, and a digest that was not resolved against a registry \
-                     is not a pin",
-        },
+        // `valkey/valkey:8-alpine` as Docker Hub served it on 2026-08-14.
+        pin: Pin::Pinned(
+            "valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec",
+        ),
         service_port: 6379,
         // Valkey's working directory in the official image. Mounted tmpfs, so an
         // RDB snapshot goes to RAM and nothing reaches a host disk.
         data_dir: "/data",
+        // `valkey:valkey` in the official image. The gid is 1000, not 999 —
+        // they differ, which is exactly why this is a pair per entry rather
+        // than one number reused for both.
+        run_as: (999, 1000),
+        // Exits 1 and says so on a refused connection, which is what makes it
+        // usable as a probe rather than merely as a command that runs.
+        ready_probe: &["redis-cli", "-h", "127.0.0.1", "ping"],
+        download_bytes: 17_456_505,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification: "The official Valkey image, published by the Valkey project. Valkey rather \
                     than Redis because it is the fork the major distributions and cloud providers \
                     moved to after the 2024 licence change, and because its image is \
                     BSD-licensed throughout. It carries `redis-benchmark` and `redis-cli`, which \
                     is what makes a cache measurement possible without this workspace growing a \
                     RESP client.",
+    },
+    Image {
+        key: "busybox",
+        // `busybox:stable-musl` as Docker Hub served it on 2026-08-14.
+        pin: Pin::Pinned(
+            "busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213",
+        ),
+        // Above 1024, because the container is not root and cannot bind below it.
+        service_port: 8080,
+        // Empty, and that is the point: `httpd` serving an empty tmpfs answers
+        // every request with a 404, which is a response from a running server
+        // and is all the health measurement needs. Putting a file in there
+        // would take a bind mount, which this tier does not have and will not
+        // get.
+        data_dir: "/srv",
+        // `nobody`, which exists in the image. Nothing here needs an identity.
+        run_as: (65534, 65534),
+        // An in-container TCP connect, which is a true readiness signal where
+        // the same connect from the host is not - inside the container there is
+        // no userland proxy to answer it. `wget` would be the obvious probe and
+        // is wrong: it exits non-zero on the 404 that proves the server is up.
+        ready_probe: &["nc", "-z", "127.0.0.1", "8080"],
+        download_bytes: 877_398,
+        data_on_tmpfs: true,
+        sysctls: &[],
+        justification:
+            "The official BusyBox image, and the only entry here that is not a service under \
+             measurement. `deployment.container` uses it to measure what starting a container \
+             costs on this machine, which needs an image with something runnable in it and wants \
+             that something to be as close to nothing as possible: 877 KB, one static multi-call \
+             binary, no init system, no package manager and no runtime to warm up. A heavier base \
+             would fold somebody else's start-up into a number that is supposed to describe the \
+             machine. It carries `httpd`, which is what makes the health half measurable without \
+             this workspace shipping a server into a container, and `nc`, which is what makes it \
+             probeable.",
+    },
+    Image {
+        key: "mariadb",
+        // `mariadb:11` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "mariadb@sha256:d9f7eb2637296652f24b484afd5d246f759f49f5babcadc6a9e344c9acb75fbf",
+        ),
+        service_port: 3306,
+        data_dir: "/var/lib/mysql",
+        run_as: (999, 999),
+        // `mariadb-admin ping` speaks the protocol rather than opening a
+        // socket, which matters here more than usual: MariaDB accepts
+        // connections during its own bootstrap and refuses to answer them.
+        ready_probe: &[
+            "mariadb-admin",
+            "ping",
+            "-h",
+            "127.0.0.1",
+            "--silent",
+        ],
+        download_bytes: 106_220_996,
+        data_on_tmpfs: true,
+        sysctls: &[],
+        justification:
+            "The official MariaDB image, published by the MariaDB Foundation. It is here for              `wordpress.*` rather than for a database module of its own: `database.oltp` measures              PostgreSQL because no open-model load tool ships in MariaDB's image, but WordPress              runs on MySQL-family databases and measuring it on anything else would be measuring              a stack nobody deploys. MariaDB rather than MySQL because it is what the WordPress              hosting market overwhelmingly ships.",
+    },
+    Image {
+        key: "wordpress",
+        // `wordpress:6-php8.3-apache` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "wordpress@sha256:5d2c212561c4b5442ebc4d98933a9cbadcf3dee8888ed3fd9ed44667c27cc905",
+        ),
+        service_port: 80,
+        // Apache's document root, and the one place in this table that is *not*
+        // a tmpfs: `wordpress.*` needs a second container to see these files,
+        // and a tmpfs is visible to exactly one. See the module for the
+        // disclosure that costs.
+        data_dir: "/var/www/html",
+        // `www-data`, which Apache would drop to anyway. Starting as it means
+        // the master process is never root either.
+        run_as: (33, 33),
+        // PHP rather than a shell test, and from *inside* rather than a
+        // connect from the host, for the reason `wait_ready` records: the
+        // runtime's userland proxy answers a host connect the moment the
+        // container exists. This proves Apache is listening, which the image's
+        // entrypoint only reaches after it has unpacked WordPress and written
+        // `wp-config.php` - and WP-CLI run against a half-written one fails
+        // with `Strange wp-config.php file`, which is exactly how this probe
+        // came to exist.
+        ready_probe: &[
+            "php",
+            "-r",
+            "exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);",
+        ],
+        download_bytes: 266_322_653,
+        data_on_tmpfs: false,
+        // **The alternative was `--cap-add NET_BIND_SERVICE`, and this is the
+        // same trade the PostgreSQL entry makes.** Apache listens on 80, a
+        // non-root process may not bind below 1024, and the documented fix is
+        // to hand the capability back. This instead moves the boundary: the
+        // sysctl is namespaced to this container, grants no capability to
+        // anything, and cannot escape a network namespace that has no route
+        // off the machine anyway.
+        sysctls: &["net.ipv4.ip_unprivileged_port_start=0"],
+        justification:
+            "The official WordPress image, Apache and PHP-FPM variant. The market research names              WordPress hosting as the segment this product is for, so this is the one workload              where measuring the real stack matters more than measuring a proxy for it. Pinned to              the Apache variant because it is what shared hosts run.",
+    },
+    Image {
+        key: "wordpress-cli",
+        // `wordpress:cli-php8.3` as Docker Hub served it on 2026-08-15.
+        pin: Pin::Pinned(
+            "wordpress@sha256:2b5e9d4d3e51909dca1aaa4732e9f5e5bf0377c2114dbd8ff39f060bff202586",
+        ),
+        // Never published. This image is only ever run to completion.
+        service_port: 0,
+        data_dir: "/tmp/darcbench-unused",
+        run_as: (33, 33),
+        ready_probe: &["true"],
+        download_bytes: 69_069_790,
+        data_on_tmpfs: true,
+        sysctls: &[],
+        justification:
+            "The official WP-CLI image, from the same publisher as the WordPress image and              matching its PHP version. It is how content gets into the site: `wp eval-file` runs              a script against a fully loaded WordPress, so the fixture is inserted by WordPress's              own `wp_insert_post` rather than by SQL this workspace invented. The alternative was              `wp plugin install wordpress-importer`, which downloads an unpinned plugin from              wordpress.org at run time - a supply-chain dependency this table exists to refuse,              and one whose version would silently change what an import does.",
     },
 ];
 
@@ -260,6 +505,11 @@ impl Image {
 
     pub fn is_pinned(&self) -> bool {
         matches!(self.pin, Pin::Pinned(_))
+    }
+
+    /// What a module must declare as `max_network_bytes` if it runs this image.
+    pub fn download_bytes(&self) -> u64 {
+        self.download_bytes
     }
 }
 
@@ -313,8 +563,21 @@ pub enum ContainerError {
     Start { runtime: String, detail: String },
     #[error("the container started but published no loopback port for {port}/tcp")]
     NoPort { port: u16 },
-    #[error("the container did not accept a connection within {}s", .0.as_secs())]
-    NotReady(Duration),
+    #[error(
+        "the container was still not serving after {}s, so nothing was measured. It said: {log}",
+        .waited.as_secs()
+    )]
+    NotReady { waited: Duration, log: String },
+    #[error(
+        "the container started and then exited with status {status} after {}s, so nothing was \
+         measured. It said: {log}",
+        .waited.as_secs()
+    )]
+    Exited {
+        status: String,
+        waited: Duration,
+        log: String,
+    },
     #[error("could not run {runtime}: {source}")]
     Exec {
         runtime: String,
@@ -486,6 +749,225 @@ impl Runtime {
         Ok(ids.len())
     }
 
+    /// Makes sure the image is on this machine, fetching it if it is not.
+    ///
+    /// Returns whether it had to fetch, so the module can disclose that it did.
+    ///
+    /// # Why this is a step rather than something the runtime does for you
+    ///
+    /// It is, in fact, something the runtime does for you: `docker run` on an
+    /// absent image pulls it first. That is precisely the problem, and it went
+    /// unnoticed until this host was made to run a module without the image
+    /// already local.
+    ///
+    /// Two things were wrong with letting it happen implicitly.
+    ///
+    /// **The transfer was undeclared.** All three container modules said
+    /// `max_network_bytes: 0`, and `database.oltp`'s comment even stated the
+    /// assumption - "the image is pulled by the container runtime before the
+    /// run" - with nothing making it true. On a machine that has never run
+    /// DARCBench, that module fetches 156 MB while preflight tells the operator
+    /// the run uses no network at all. On a metered VPS that is somebody's
+    /// money, and it is the sort of promise this program does not get to break.
+    ///
+    /// **And the pull landed inside a measurement.** With the base image
+    /// removed, `deployment.container`'s startup figure came back with a 147%
+    /// coefficient of variation: six repetitions of a container start and one
+    /// of a container start plus a download. The variance sweep caught it,
+    /// which is the sweep working - but a metric that needs a warning to be
+    /// interpretable is one measured wrong.
+    ///
+    /// So the fetch is explicit, before the clock starts, and reported.
+    pub fn ensure_image_present(
+        &self,
+        image: &'static Image,
+        timeout: Duration,
+    ) -> Result<bool, ContainerError> {
+        let reference = image.reference()?;
+
+        // `inspect` rather than `pull` with a hope that it is a no-op: a pull
+        // of a present image still contacts the registry to check, which is a
+        // network round trip on a run that may have been promised none.
+        let present = self
+            .control(&["image", "inspect", "--format", "{{.Id}}", reference])
+            .map(|output| output.succeeded())
+            .unwrap_or(false);
+        if present {
+            return Ok(false);
+        }
+
+        let pulled = self.control_with(&["pull", "--quiet", reference], timeout)?;
+        if !pulled.succeeded() {
+            return Err(ContainerError::Start {
+                runtime: self.name(),
+                detail: format!(
+                    "{} could not be fetched: {}",
+                    image.key,
+                    first_line(&format!("{}{}", pulled.stderr, pulled.stdout))
+                ),
+            });
+        }
+        Ok(true)
+    }
+
+    /// Runs one command in a throwaway container and returns how long the
+    /// whole round trip took.
+    ///
+    /// Create, start, exec, exit, remove — measured in the foreground, so the
+    /// figure is a wall clock rather than the resolution of a poll. See
+    /// [`ephemeral_run_args`] for the argument vector and why it is a second
+    /// one.
+    ///
+    /// `None` if the command did not succeed. A container that failed to start
+    /// also "finishes quickly", and timing that would report the fastest
+    /// container start on record.
+    pub fn run_ephemeral(
+        &self,
+        image: &'static Image,
+        run_id: &str,
+        argv: &[&str],
+        timeout: Duration,
+    ) -> Result<Option<Duration>, ContainerError> {
+        let started = Instant::now();
+        let output =
+            self.run_ephemeral_with(image, run_id, argv, &Ephemeral::default(), timeout)?;
+        Ok(output.succeeded().then(|| started.elapsed()))
+    }
+
+    /// Runs one command in a throwaway container and returns what it printed.
+    ///
+    /// The general form. [`Self::run_ephemeral`] is the timing-only shape over
+    /// it; this one is for a caller that wants the output, a network, another
+    /// container's volumes, or to hand the command its input over a pipe.
+    pub fn run_ephemeral_with(
+        &self,
+        image: &'static Image,
+        run_id: &str,
+        argv: &[&str],
+        options: &Ephemeral<'_>,
+        timeout: Duration,
+    ) -> Result<runtime_exec::Output, ContainerError> {
+        let reference = image.reference()?;
+        let name = container_name(run_id, image.key);
+        let args = ephemeral_run_args(image, reference, &name, argv, options);
+        let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
+
+        let output = runtime_exec::run_with_stdin(&self.exec, &borrowed, options.stdin, timeout)
+            .map_err(|source| ContainerError::Exec {
+                runtime: self.name(),
+                source,
+            })?;
+
+        if !output.succeeded() {
+            // `--rm` should have removed it; this covers the case where the
+            // failure was early enough that it did not.
+            remove(&self.exec, &name);
+        }
+        Ok(output)
+    }
+
+    /// Creates a private network for one run and returns its name.
+    ///
+    /// # Why a network exists at all, when nothing else here needed one
+    ///
+    /// Every module before `wordpress.*` measured a single container. WordPress
+    /// is the first workload that is genuinely two - a web server and a
+    /// database that have to find each other - and Docker's default bridge does
+    /// not give containers names to find each other *by*.
+    ///
+    /// The alternative was `--network container:<other>`, which makes the two
+    /// share one network namespace and lets them talk over `127.0.0.1` with no
+    /// new object to manage. It was rejected because it also makes them share
+    /// one *published port surface*: the ports have to be declared on whichever
+    /// container is created first, so the web server's port would be published
+    /// by the database. That is the kind of arrangement that is clever on the
+    /// day it is written and wrong the first time somebody changes it.
+    ///
+    /// A network carries this agent's label like everything else, so
+    /// [`Self::reap_networks`] can clear one a killed run left behind without
+    /// ever matching one an operator made.
+    ///
+    /// # It is not `--internal`, and the reason is worth knowing
+    ///
+    /// The first version was. An internal network has no route off the machine,
+    /// which is exactly what a benchmark stack should have - and it also has no
+    /// port publishing, because Docker sets that up on the bridge an internal
+    /// network deliberately lacks. `docker port` answered *"no public port
+    /// '80/tcp' published"* and the web server was unreachable from the process
+    /// that had to measure it.
+    ///
+    /// The two cannot both be had at this layer, so the block moved up a layer
+    /// to where it is actually enforceable: `wordpress.*` sets
+    /// `WP_HTTP_BLOCK_EXTERNAL`, which is WordPress's own switch for refusing
+    /// every outbound HTTP request it would otherwise make. That is a better
+    /// control than the network one it replaces, because it stops the thing
+    /// that would actually have happened - a plugin or core update check
+    /// against api.wordpress.org, mid-measurement - rather than stopping
+    /// packets and hoping nothing depended on them.
+    pub fn create_network(&self, run_id: &str) -> Result<String, ContainerError> {
+        let name = format!("darcbench-{}", safe_suffix(run_id));
+        let created = self.control(&["network", "create", "--label", OWNER_LABEL, &name])?;
+        if !created.succeeded() {
+            return Err(ContainerError::Start {
+                runtime: self.name(),
+                detail: format!(
+                    "could not create the run's private network: {}",
+                    first_line(&format!("{}{}", created.stderr, created.stdout))
+                ),
+            });
+        }
+        Ok(name)
+    }
+
+    /// The runtime's own version and storage driver.
+    ///
+    /// **The storage driver is the fact that decides whether two
+    /// `deployment.container` results may be compared at all.** overlay2 on
+    /// ext4 and a driver that copies whole files on write differ by more than
+    /// any two CPUs in this market do, so a build time from one says nothing
+    /// about a machine running the other. It was declared in that module's
+    /// `comparability` list from the day it was written and recorded nowhere,
+    /// which made the declaration a promise the bundle could not keep.
+    ///
+    /// Both fall back to `unknown` rather than to a guess. An absent fact stops
+    /// a comparison; a wrong one lets it proceed.
+    pub fn identity(&self) -> (String, String) {
+        let ask = |format: &str| -> String {
+            self.control(&["info", "--format", format])
+                .ok()
+                .filter(|output| output.succeeded())
+                .map(|output| output.stdout.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "unknown".to_string())
+        };
+        (ask("{{.ServerVersion}}"), ask("{{.Driver}}"))
+    }
+
+    /// Removes one network, best effort.
+    pub fn remove_network(&self, name: &str) {
+        let _ = self.control(&["network", "rm", name]);
+    }
+
+    /// Removes every network this agent labelled.
+    ///
+    /// Reaped *after* containers, which is the opposite order from images: a
+    /// network cannot be removed while a container is attached to it, and an
+    /// image cannot be removed while a container made from it exists. The
+    /// containers are what has to go first in both cases.
+    pub fn reap_networks(&self) -> Result<usize, ContainerError> {
+        let listed = self.control(&["network", "ls", "-q", "--filter", OWNER_FILTER])?;
+        let ids: Vec<&str> = listed.stdout.split_whitespace().collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut args = vec!["network", "rm"];
+        args.extend_from_slice(&ids);
+        // Best effort on the whole batch: a network with a container still
+        // attached refuses, and that container is somebody's live run.
+        let _ = self.control(&args);
+        Ok(ids.len())
+    }
+
     /// Removes every container this agent labelled, from this run or any
     /// earlier one.
     ///
@@ -527,33 +1009,62 @@ impl Runtime {
 /// the module. They reach the container's environment and nothing else - they
 /// cannot become flags, because they follow `--env` one value at a time rather
 /// than being spliced into a string.
-fn run_args<'a>(
-    image: &'a Image,
-    reference: &'a str,
-    name: &'a str,
-    env: &'a [String],
-) -> Vec<String> {
+///
+/// # Why there is no root inside, and no `--rm`
+///
+/// Both of these were changed by the first run this module ever made against a
+/// real daemon, and neither could have been found without one.
+///
+/// **The container runs as the image's own service account.** With
+/// `--cap-drop ALL` and nothing else, the official PostgreSQL entrypoint dies
+/// on its second line: it starts as root, `chown`s `PGDATA`, and `gosu`s down
+/// to `postgres`. Dropping `CAP_CHOWN` stops the `chown` and `set -e` does the
+/// rest — `chown: changing ownership of '/var/lib/postgresql/data': Operation
+/// not permitted`.
+///
+/// The documented fix, and the one the image's own README gives, is to add
+/// `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` back. That is the
+/// wrong trade here. Those five are close to the whole interesting surface of
+/// a container escape, and they would be granted for no purpose except letting
+/// a process hold privileges long enough to drop them. Starting as `--user
+/// 999:999` skips the entire dance: the entrypoint sees it is not root, does
+/// not try to `chown`, and the privileges are never held rather than held and
+/// surrendered. `no-new-privileges` then makes the state permanent.
+///
+/// The cost is that the tmpfs has to arrive already owned — Docker's default
+/// is root-owned and `1777`, and PostgreSQL refuses a `PGDATA` that is group
+/// or world accessible — so the mount carries `mode`, `uid` and `gid`. `0700`
+/// rather than `0750`: the service account is the only account that has any
+/// business in there.
+///
+/// **`--rm` is gone**, and it was actively harmful. A container that dies
+/// during startup is the case that most needs explaining, and `--rm` deletes
+/// it — along with its logs — before anything can read them. That is not
+/// hypothetical: the failure above was invisible on the first attempt for
+/// exactly this reason, and appeared the moment the flag came off.
+/// [`Sandbox::wait_ready`] now watches for the exit and puts the log in the
+/// error. Removal is [`Drop`]'s job and [`Runtime::reap`]'s, which is where it
+/// always really was — `--rm` never covered the case those two exist for.
+fn run_args(image: &Image, reference: &str, name: &str, options: &Launch<'_>) -> Vec<String> {
+    let (uid, gid) = image.run_as;
     let mut args: Vec<String> = vec![
         "run".into(),
         "--detach".into(),
-        // Reaped by the runtime when the container exits. Not a substitute for
-        // `reap`: this fires when the container stops, not when the agent does.
-        "--rm".into(),
         "--name".into(),
         name.into(),
         "--label".into(),
         OWNER_LABEL.into(),
-        // Published on loopback, never on a routable address. An unpublished
-        // port would be safer still and is not possible: the load has to reach
-        // the service from this process.
-        "--publish".into(),
-        format!("127.0.0.1::{}", image.service_port),
+        // The image's own service account, so nothing inside is ever root.
+        "--user".into(),
+        format!("{uid}:{gid}"),
         // Bounds a runaway container. A benchmark that causes an outage is a
-        // failure however accurate its numbers are.
+        // failure however accurate its numbers are. It covers the tmpfs below
+        // as well as the service - see `memory_limit`, which is why it is one
+        // number computed from both rather than two chosen separately.
         "--memory".into(),
-        MEMORY_LIMIT.into(),
+        memory_limit(),
         "--memory-swap".into(),
-        MEMORY_LIMIT.into(),
+        memory_limit(),
         "--pids-limit".into(),
         "512".into(),
         // No new privileges, and every capability dropped that the service
@@ -562,14 +1073,55 @@ fn run_args<'a>(
         "no-new-privileges".into(),
         "--cap-drop".into(),
         "ALL".into(),
+    ];
+
+    // Published on loopback, never on a routable address. An unpublished port
+    // would be safer still and is not possible for a service this process has
+    // to reach - but WP-CLI is not one of those, and an entry with no service
+    // port publishes nothing at all.
+    if image.service_port != 0 {
+        args.push("--publish".into());
+        args.push(format!("127.0.0.1::{}", image.service_port));
+    }
+
+    // A private network when the run has one, so two containers can find each
+    // other by name. Without it the container gets Docker's default bridge,
+    // which is what every single-container module here wants.
+    if let Some(network) = options.network {
+        args.push("--network".into());
+        args.push(network.into());
+        args.push("--network-alias".into());
+        args.push(image.key.into());
+    }
+
+    // Namespaced kernel parameters. Present for exactly one image, where the
+    // alternative was granting a capability - see the `wordpress` entry.
+    for sysctl in image.sysctls {
+        args.push("--sysctl".into());
+        args.push((*sysctl).into());
+    }
+
+    if image.data_on_tmpfs {
         // The data directory is a tmpfs, so the service has somewhere to write
         // and nothing it writes touches a host filesystem or outlives the
         // container. This is also what makes every run start from an identical
         // empty database rather than whatever the last run left.
-        "--tmpfs".into(),
-        format!("{}:rw,size={}", image.data_dir, TMPFS_SIZE_BYTES),
-    ];
-    for pair in env {
+        //
+        // Owned by the service account and `0700`, because the container is
+        // not root and so cannot fix the ownership itself - and because the
+        // default, root-owned and `1777`, is one PostgreSQL refuses outright.
+        args.push("--tmpfs".into());
+        args.push(format!(
+            "{}:rw,size={},mode=0700,uid={uid},gid={gid}",
+            image.data_dir, TMPFS_SIZE_BYTES
+        ));
+    }
+    // The `else` is deliberately empty rather than mounting something. An
+    // entry that is not on a tmpfs takes the image's own declared volume,
+    // which Docker creates anonymously - so still nothing of the host is named
+    // here, and `remove` takes the volume with the container.
+
+    for pair in options.env {
         args.push("--env".into());
         args.push(pair.clone());
     }
@@ -578,7 +1130,149 @@ fn run_args<'a>(
     // image cannot reach this line at all. Nothing a caller typed can appear
     // here either.
     args.push(reference.into());
+    // Everything past the reference is the container's command rather than a
+    // flag to the runtime, which is what makes appending here safe.
+    for part in options.command {
+        args.push((*part).into());
+    }
     args
+}
+
+/// What a caller may vary about a launch.
+///
+/// A struct rather than four more parameters, because three of the four are
+/// `None` or empty for every module that existed before `wordpress.*` and a
+/// call site full of `None, None, &[], &[]` says nothing about which is which.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Launch<'a> {
+    /// `KEY=VALUE` pairs the image needs to start. They reach the container's
+    /// environment and nothing else - they cannot become flags, because each
+    /// follows its own `--env` rather than being spliced into a string.
+    pub env: &'a [String],
+    /// Overrides the image's own command. Fixed constants from a module.
+    pub command: &'a [&'a str],
+    /// A private network from [`Runtime::create_network`]. The container also
+    /// gets an alias equal to the image key, which is how the other container
+    /// addresses it.
+    pub network: Option<&'a str>,
+}
+
+/// Builds the `run` arguments for a one-shot foreground command.
+///
+/// The second argument vector in this module, and it exists because
+/// `deployment.container` asks a question the first one cannot answer: **what
+/// does starting a container cost here?** [`run_args`] always detaches,
+/// publishes a port and mounts a tmpfs, because it is building a service to
+/// measure. Timing that would measure the service. What is wanted instead is
+/// the smallest possible round trip — create, start, exec something trivial,
+/// exit, remove — timed in the foreground so the number is a wall clock and not
+/// the resolution of a polling loop.
+///
+/// It is a separate function rather than a flag on the first because the two
+/// vectors have to be *read* separately. This vector is the isolation for every
+/// container that goes through it, so the same tests apply to the whole of it:
+/// no host path, no added capability, nothing privileged, nothing published.
+///
+/// **Nothing is published and nothing is mounted**, which makes this strictly
+/// more contained than [`run_args`] rather than a relaxation of it. `--rm` *is*
+/// used here, and for once it is right: the container is expected to exit, its
+/// exit is the measurement, and there is no startup log to lose because the
+/// command is chosen to do nothing at all.
+///
+/// `argv` is a fixed vector of constants the module owns. Nothing a caller
+/// typed reaches it, for the same reason nothing does in [`Sandbox::exec`].
+fn ephemeral_run_args(
+    image: &Image,
+    reference: &str,
+    name: &str,
+    argv: &[&str],
+    options: &Ephemeral<'_>,
+) -> Vec<String> {
+    let (uid, gid) = image.run_as;
+    let mut args: Vec<String> = vec![
+        "run".into(),
+        // Foreground: the command's own wall time is what is being measured,
+        // and detaching would replace it with how fast this process can poll.
+        "--rm".into(),
+        "--name".into(),
+        name.into(),
+        "--label".into(),
+        OWNER_LABEL.into(),
+        "--user".into(),
+        format!("{uid}:{gid}"),
+        "--memory".into(),
+        memory_limit(),
+        "--memory-swap".into(),
+        memory_limit(),
+        "--pids-limit".into(),
+        "512".into(),
+        "--security-opt".into(),
+        "no-new-privileges".into(),
+        "--cap-drop".into(),
+        "ALL".into(),
+    ];
+
+    // Only when there is something to send. Without it the runtime gives the
+    // container a closed standard input, and a command waiting to read from it
+    // gets EOF immediately - which is not an error, just silence, and cost one
+    // debugging cycle to see: `wp eval-file -` produced no output at all
+    // rather than complaining.
+    //
+    // `-i` and not `-t`: a pseudo-terminal would make the runtime line-buffer
+    // and echo, and this is a pipe between two programs rather than a session
+    // for a person.
+    if options.stdin.is_some() {
+        args.push("--interactive".into());
+    }
+
+    match options.network {
+        // Not merely unpublished: no network namespace with an interface at
+        // all. Nothing here has anything to talk to.
+        None => {
+            args.push("--network".into());
+            args.push("none".into());
+        }
+        Some(network) => {
+            args.push("--network".into());
+            args.push(network.into());
+        }
+    }
+
+    // The *only* way a filesystem is shared between two containers here, and
+    // it names a container rather than a host path - which is what keeps
+    // `no_host_path_can_reach_the_argument_vector` true. WP-CLI has to see the
+    // same WordPress that Apache is serving; a tmpfs is visible to one
+    // container and a bind mount is forbidden, so this is what is left.
+    if let Some(container) = options.volumes_from {
+        args.push("--volumes-from".into());
+        args.push(container.into());
+    }
+
+    for pair in options.env {
+        args.push("--env".into());
+        args.push(pair.clone());
+    }
+
+    args.push(reference.into());
+    for argument in argv {
+        args.push((*argument).into());
+    }
+    args
+}
+
+/// What a caller may vary about a one-shot container.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Ephemeral<'a> {
+    pub env: &'a [String],
+    /// A private network, or `None` for no network interface at all.
+    pub network: Option<&'a str>,
+    /// A container whose volumes this one should see.
+    pub volumes_from: Option<&'a str>,
+    /// Written to the command's standard input.
+    ///
+    /// How a 1.6 MB fixture reaches a container without a host path appearing
+    /// in an argument vector. See `runtime_exec::run_with_stdin`.
+    pub stdin: Option<&'a [u8]>,
 }
 
 // ---------------------------------------------------------------------------
@@ -591,6 +1285,7 @@ pub struct Sandbox {
     runtime: Interpreter,
     name: String,
     address: SocketAddr,
+    ready_probe: &'static [&'static str],
 }
 
 impl Sandbox {
@@ -606,10 +1301,59 @@ impl Sandbox {
         run_id: &str,
         env: &[String],
     ) -> Result<Self, ContainerError> {
+        Self::launch_with(
+            runtime,
+            image,
+            run_id,
+            &Launch {
+                env,
+                ..Launch::default()
+            },
+        )
+    }
+
+    /// [`Self::launch`], with everything a caller may vary.
+    pub fn launch_with(
+        runtime: &Runtime,
+        image: &'static Image,
+        run_id: &str,
+        options: &Launch<'_>,
+    ) -> Result<Self, ContainerError> {
+        let sandbox = Self::launch_without_waiting(runtime, image, run_id, options)?;
+        // `wait_ready` removes the container itself on failure, because it is
+        // the only place that knows the container was reachable but never
+        // answered - a distinction worth keeping out of this function.
+        sandbox.wait_ready()?;
+        Ok(sandbox)
+    }
+
+    /// Starts `image` and returns as soon as its port is published, without
+    /// waiting for the service inside to be serving.
+    ///
+    /// For a caller that wants to *measure* how long becoming ready takes.
+    /// [`Self::wait_ready`] polls on a one-second cadence, which is the right
+    /// cost for a guard and useless as a stopwatch for an event that takes a
+    /// few hundred milliseconds — so `deployment.container` times its own
+    /// tight loop instead of being handed a number rounded to the second.
+    ///
+    /// The container is still a [`Sandbox`], so [`Drop`] still removes it and
+    /// nothing leaks if the caller's loop gives up. What the caller loses is
+    /// the guarantee that anything inside is answering, which is precisely
+    /// what it has undertaken to find out.
+    ///
+    /// `options.command` overrides the image's own, for an image whose default
+    /// does not serve. Fixed constants from the module, never anything a caller
+    /// typed — the same rule as everywhere else here.
+    pub fn launch_without_waiting(
+        runtime: &Runtime,
+        image: &'static Image,
+        run_id: &str,
+        options: &Launch<'_>,
+    ) -> Result<Self, ContainerError> {
         // Before anything else, so an unpinned image never reaches a daemon.
         let reference = image.reference()?;
         let name = container_name(run_id, image.key);
-        let args = run_args(image, reference, &name, env);
+        let args = run_args(image, reference, &name, options);
         let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
 
         let started = runtime.control(&borrowed)?;
@@ -624,6 +1368,7 @@ impl Sandbox {
             runtime: runtime.exec.clone(),
             name: name.clone(),
             address,
+            ready_probe: image.ready_probe,
         };
 
         // From here on every failure has to take the container with it.
@@ -634,12 +1379,7 @@ impl Sandbox {
                 return Err(error);
             }
         };
-        // `wait_ready` removes the container itself on failure, because it is
-        // the only place that knows the container was reachable but never
-        // answered - a distinction worth keeping out of this function.
-        let sandbox = sandbox(address);
-        sandbox.wait_ready()?;
-        Ok(sandbox)
+        Ok(sandbox(address))
     }
 
     pub fn address(&self) -> SocketAddr {
@@ -682,19 +1422,160 @@ impl Sandbox {
     /// isolation tier for each service it isolates. A module that needs a
     /// stronger readiness signal than "the port answers" is better placed to
     /// send it than this is.
+    /// Polls until the service is serving, the container dies, or the deadline
+    /// passes.
+    ///
+    /// # Why the readiness signal comes from inside the container
+    ///
+    /// This used to be a TCP connect from the host to the published port, on
+    /// the reasoning that it is the one signal every service has in common and
+    /// that speaking a protocol to find out whether that protocol is up would
+    /// put a client for each service into the isolation tier.
+    ///
+    /// The reasoning was sound and the check was worthless, which the first
+    /// real launch showed within a second. Docker publishes a port by putting
+    /// a userland proxy on it, and that proxy starts listening when the
+    /// *container* starts — not when the service inside it does. So the connect
+    /// succeeded immediately, every time, whatever the service was doing.
+    /// Measured on this host: at 0.5 s the host port accepted connections and
+    /// `pg_isready` still said no. `database.oltp` then failed in 0.8 s with
+    /// `connection refused` from `pgbench`, having been handed a sandbox
+    /// declared ready.
+    ///
+    /// `database.cache` passed the same broken check, which is the part worth
+    /// keeping in mind: Valkey starts in about a tenth of a second, so it won
+    /// the race every time. A green result from an unsound check is not
+    /// evidence, and the two modules differed only in how fast their service
+    /// happened to start.
+    ///
+    /// So the probe runs inside the container, and each image brings its own —
+    /// `pg_isready`, `redis-cli ping` — which is not a client in this tier but
+    /// a command in an image the tier already trusts enough to run. The host
+    /// connect stays as a first gate, because it does prove one thing the
+    /// in-container probe cannot: that the port was published where this
+    /// process can reach it, which is where the load will come from.
+    ///
+    /// # And why liveness is checked too
+    ///
+    /// A container that fails during startup never becomes ready, so a loop
+    /// that only polls readiness waits the full ninety seconds and reports a
+    /// timeout — which describes what the loop did, not what went wrong. The
+    /// container had already exited in under a second and said why on the way
+    /// out. So the run now fails in about the time the container took to fail,
+    /// carrying the container's own account of it.
+    ///
+    /// Both of these are daemon round trips, so they run on the coarser
+    /// [`LIVENESS_POLL`] cadence rather than [`READY_POLL`]'s: polling a
+    /// daemon five times a second is itself load on a machine whose spare
+    /// capacity is the thing about to be measured.
     fn wait_ready(&self) -> Result<(), ContainerError> {
-        let deadline = Instant::now() + READY_TIMEOUT;
+        let started = Instant::now();
+        let deadline = started + READY_TIMEOUT;
+        let mut port_reachable = false;
         while Instant::now() < deadline {
-            if TcpStream::connect_timeout(&self.address, READY_POLL).is_ok() {
+            // Cheap, and a precondition rather than a readiness signal: if the
+            // publish did not land, no amount of the service being up helps.
+            if !port_reachable {
+                port_reachable = TcpStream::connect_timeout(&self.address, READY_POLL).is_ok();
+            }
+            if port_reachable && self.probe_says_ready() {
                 return Ok(());
             }
-            std::thread::sleep(READY_POLL);
+            if let Some(status) = self.exited_status() {
+                let log = self.last_log_lines();
+                remove(&self.runtime, &self.name);
+                return Err(ContainerError::Exited {
+                    status,
+                    waited: started.elapsed(),
+                    log,
+                });
+            }
+            std::thread::sleep(LIVENESS_POLL);
         }
         // The container is removed here rather than left for `reap`, because
         // an operator watching a run fail should not also be left with a
         // container consuming memory until the next one starts.
+        let log = self.last_log_lines();
         remove(&self.runtime, &self.name);
-        Err(ContainerError::NotReady(READY_TIMEOUT))
+        Err(ContainerError::NotReady {
+            waited: READY_TIMEOUT,
+            log,
+        })
+    }
+
+    /// Whether the image's own readiness command says the service is serving.
+    ///
+    /// A probe that could not be run is "not ready", never "ready": the whole
+    /// value of this check is that it fails closed, and a daemon hiccup read
+    /// as a green light would hand a module an empty database.
+    fn probe_says_ready(&self) -> bool {
+        self.exec(self.ready_probe, PROBE_TIMEOUT)
+            .map(|output| output.succeeded())
+            .unwrap_or(false)
+    }
+
+    /// `Some(status)` if the container is no longer running.
+    ///
+    /// `None` covers both "running" and "the runtime would not say", and they
+    /// are deliberately the same answer: an inspect that failed is not
+    /// evidence the container died, and treating it as such would turn a
+    /// hiccup in the daemon into a failed benchmark.
+    fn exited_status(&self) -> Option<String> {
+        let output = runtime_exec::run(
+            &self.runtime,
+            &[
+                "inspect",
+                "--format",
+                "{{.State.Status}} {{.State.ExitCode}}",
+                &self.name,
+            ],
+            CONTROL_TIMEOUT,
+        )
+        .ok()?;
+        let reported = output.stdout.trim();
+        let (state, code) = reported.split_once(' ')?;
+        match state {
+            "running" | "created" | "restarting" => None,
+            _ => Some(format!("{state} ({code})")),
+        }
+    }
+
+    /// The tail of the container's own log, for an error message.
+    ///
+    /// Bounded, and both bounds matter. This text goes into a benchmark
+    /// bundle: a service that failed by printing a megabyte of the same line
+    /// would otherwise put a megabyte of it in the artifact, and a database's
+    /// startup log is one of the places a connection string can appear.
+    fn last_log_lines(&self) -> String {
+        let Ok(output) = runtime_exec::run(
+            &self.runtime,
+            &["logs", "--tail", "12", &self.name],
+            CONTROL_TIMEOUT,
+        ) else {
+            return "the runtime would not return the container's log".into();
+        };
+        // Startup failures reach stderr far more often than stdout, and the
+        // interesting line is the last one either way.
+        let mut text: String =
+            format!("{}\n{}", output.stdout.trim_end(), output.stderr.trim_end())
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join(" | ");
+        if text.len() > LOG_EXCERPT_BYTES {
+            let cut = text
+                .char_indices()
+                .map(|(at, _)| at)
+                .take_while(|at| *at <= LOG_EXCERPT_BYTES)
+                .last()
+                .unwrap_or(0);
+            text.truncate(cut);
+            text.push_str(" [...]");
+        }
+        if text.is_empty() {
+            return "the container printed nothing before it exited".into();
+        }
+        text
     }
 }
 
@@ -711,7 +1592,12 @@ impl Drop for Sandbox {
 /// is [`Runtime::reap`]: anything missed here is labelled, and the next run
 /// clears it.
 fn remove(runtime: &Interpreter, name: &str) {
-    let _ = runtime_exec::run(runtime, &["rm", "-f", name], CONTROL_TIMEOUT);
+    // `-v` takes the container's anonymous volumes with it. Every entry but
+    // WordPress puts its data on a tmpfs, which is not a volume and needs no
+    // flag - but the WordPress image declares `VOLUME /var/www/html`, so Docker
+    // creates one whether anyone asked or not, and without this the daemon
+    // would accumulate a few hundred megabytes of orphaned WordPress per run.
+    let _ = runtime_exec::run(runtime, &["rm", "-f", "-v", name], CONTROL_TIMEOUT);
 }
 
 /// The container's name: this agent, this run, this image.
@@ -722,12 +1608,21 @@ fn remove(runtime: &Interpreter, name: &str) {
 /// property of a type two crates away and this is the string that becomes an
 /// argument.
 fn container_name(run_id: &str, key: &str) -> String {
-    let safe: String = run_id
+    format!("darcbench-{}-{key}", safe_suffix(run_id))
+}
+
+/// The filtered form of a run id, for anything that becomes a runtime object's
+/// name.
+///
+/// Filtered rather than trusted for the reason above: "it cannot contain that"
+/// is a property of a type two crates away, and this is the string that becomes
+/// an argument.
+fn safe_suffix(run_id: &str) -> String {
+    run_id
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
         .take(48)
-        .collect();
-    format!("darcbench-{safe}-{key}")
+        .collect()
 }
 
 /// Asks the runtime which loopback port the service was published on.
@@ -786,15 +1681,24 @@ mod tests {
         pin: Pin::Pinned(TEST_REFERENCE),
         service_port: 3306,
         data_dir: "/var/lib/testsvc",
+        run_as: (999, 998),
+        ready_probe: &["testsvc-isready"],
+        download_bytes: 1_000_000,
+        data_on_tmpfs: true,
+        sysctls: &[],
         justification: "test fixture; never launched",
     };
 
     fn args() -> Vec<String> {
+        let env = ["PASSWORD=x".to_string()];
         run_args(
             &TEST_IMAGE,
             TEST_REFERENCE,
             "darcbench-run_abc-testsvc",
-            &["PASSWORD=x".to_string()],
+            &Launch {
+                env: &env,
+                ..Launch::default()
+            },
         )
     }
 
@@ -848,6 +1752,231 @@ mod tests {
     }
 
     #[test]
+    fn nothing_inside_the_container_is_ever_root() {
+        // The alternative fix for the startup failure this replaced was
+        // `--cap-add CHOWN,DAC_OVERRIDE,FOWNER,SETUID,SETGID`, which is what
+        // the image's own documentation suggests. This test is the reason that
+        // cannot quietly come back: it fails on a `--user` that is missing, on
+        // one that is `0`, and on any capability being added at all.
+        let args = args();
+        let user = args
+            .iter()
+            .position(|arg| arg == "--user")
+            .expect("the container was not given a user, so it runs as root");
+        let spec = &args[user + 1];
+        assert_eq!(spec, "999:998", "ran as {spec}");
+        let (uid, gid) = spec.split_once(':').expect("not a uid:gid pair");
+        assert_ne!(uid, "0", "the container runs as root");
+        assert_ne!(gid, "0", "the container runs as the root group");
+        assert!(
+            !args.iter().any(|arg| arg == "--cap-add"),
+            "a capability was added back: {args:?}"
+        );
+    }
+
+    #[test]
+    fn the_tmpfs_arrives_owned_by_the_service_account_and_closed_to_everyone_else() {
+        // A container that is not root cannot fix the ownership of its own
+        // data directory, so the mount has to arrive correct. Docker's default
+        // is root-owned and 1777, which PostgreSQL refuses outright and which
+        // would be worth refusing anyway.
+        let args = args();
+        let tmpfs = args
+            .iter()
+            .position(|arg| arg == "--tmpfs")
+            .expect("no tmpfs");
+        let spec = &args[tmpfs + 1];
+        assert!(spec.contains("uid=999"), "{spec}");
+        assert!(spec.contains("gid=998"), "{spec}");
+        assert!(spec.contains("mode=0700"), "{spec}");
+    }
+
+    #[test]
+    fn a_container_that_dies_at_startup_is_not_deleted_before_it_can_be_read() {
+        // `--rm` deletes a container the instant it exits, taking its log with
+        // it - and a container that exits during startup is precisely the one
+        // whose log is the whole diagnosis. The first real launch this module
+        // ever made reported nothing at all for this reason.
+        //
+        // Removal is `Drop`'s job and `reap`'s. Neither is `--rm`, which never
+        // covered the case they exist for: an agent killed while a container
+        // is still running.
+        let args = args();
+        assert!(
+            !args.iter().any(|arg| arg == "--rm"),
+            "--rm is back, and a failed container's log will be deleted before it is read"
+        );
+        assert!(
+            args.windows(2)
+                .any(|w| w[0] == "--label" && w[1] == OWNER_LABEL),
+            "without the label, nothing can reap what --rm no longer removes"
+        );
+    }
+
+    #[test]
+    fn every_allowed_image_brings_a_readiness_probe_of_its_own() {
+        // The check this replaced was a TCP connect from the host, which
+        // Docker's userland proxy answers as soon as the container exists and
+        // regardless of what the service inside is doing. It passed instantly
+        // and always, and it handed `database.oltp` a PostgreSQL that was
+        // still running `initdb`.
+        //
+        // A probe is therefore per-image and mandatory. An entry added without
+        // one fails here rather than silently inheriting the old behaviour,
+        // which is the failure mode that made the original worth fixing.
+        for image in ALLOWED_IMAGES {
+            assert!(
+                !image.ready_probe.is_empty(),
+                "{} has no readiness probe, so it would be declared ready as soon as its \
+                 container existed",
+                image.key
+            );
+            for argument in image.ready_probe {
+                assert!(
+                    !argument.is_empty(),
+                    "{}: an empty argument in the probe",
+                    image.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_allowed_image_runs_as_a_service_account() {
+        // Applied to the real table rather than the fixture, because the way
+        // this goes wrong is a new entry added without the field being thought
+        // about.
+        for image in ALLOWED_IMAGES {
+            let (uid, gid) = image.run_as;
+            assert_ne!(uid, 0, "{} would run as root", image.key);
+            assert_ne!(gid, 0, "{} would run as the root group", image.key);
+        }
+    }
+
+    #[test]
+    fn the_ephemeral_vector_is_at_least_as_contained_as_the_service_one() {
+        // A second argument vector is a second chance to get the isolation
+        // wrong, so it gets the same treatment as the first: the whole vector
+        // is read, not the code that builds it.
+        //
+        // Asserted as "at least as contained", not "the same": this one is
+        // strictly tighter. Nothing is published, nothing is mounted and the
+        // network namespace has no interface at all, because a container whose
+        // whole job is to exit has nothing to talk to and nowhere to write.
+        let args = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral::default(),
+        );
+
+        for forbidden in [
+            "-v",
+            "--volume",
+            "--mount",
+            "--privileged",
+            "--device",
+            "--cap-add",
+            "--publish",
+            "-p",
+            "--tmpfs",
+        ] {
+            assert!(
+                !args.iter().any(|arg| arg == forbidden),
+                "`{forbidden}` reached the ephemeral vector: {args:?}"
+            );
+        }
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--cap-drop" && w[1] == "ALL"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--security-opt" && w[1] == "no-new-privileges"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--network" && w[1] == "none"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--user" && w[1] == "999:998"));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--label" && w[1] == OWNER_LABEL));
+        // `--rm` is right here and wrong in `run_args`, which is worth an
+        // assertion rather than a comment: this container is *expected* to
+        // exit, its exit is the measurement, and there is no startup log to
+        // lose because the command does nothing.
+        assert!(args.iter().any(|arg| arg == "--rm"));
+        assert!(!args.iter().any(|arg| arg == "--detach"));
+    }
+
+    #[test]
+    fn a_command_given_input_is_given_a_standard_input_to_read_it_from() {
+        // The runtime closes stdin unless asked not to, so a command that
+        // reads gets EOF and does nothing - silently. `wp eval-file -` did
+        // exactly that: no output, no error, no import.
+        let payload = b"<?php".to_vec();
+        let with = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral {
+                stdin: Some(&payload),
+                ..Ephemeral::default()
+            },
+        );
+        assert!(with.iter().any(|arg| arg == "--interactive"));
+        // And never a TTY: this is a pipe between two programs, and a
+        // pseudo-terminal would line-buffer and echo it.
+        assert!(!with.iter().any(|arg| arg == "--tty" || arg == "-t"));
+
+        // Absent when there is nothing to send, so the default stays "a child
+        // that reads from stdin exits rather than blocking".
+        let without = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &["true"],
+            &Ephemeral::default(),
+        );
+        assert!(!without.iter().any(|arg| arg == "--interactive"));
+    }
+
+    #[test]
+    fn the_ephemeral_command_cannot_be_read_as_a_flag() {
+        // Everything after the image reference is the container's command
+        // rather than an argument to the runtime, so the reference has to come
+        // before all of it. If a command element could land ahead of the
+        // reference it would be parsed by the runtime instead of passed to the
+        // container - which is the whole of the difference between running
+        // `true` and running `--privileged`.
+        let hostile = ["--privileged", "-v", "/:/host"];
+        let args = ephemeral_run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &hostile,
+            &Ephemeral::default(),
+        );
+        let reference_at = args
+            .iter()
+            .position(|arg| arg == TEST_REFERENCE)
+            .expect("the image reference is missing");
+        assert_eq!(
+            &args[reference_at + 1..],
+            &hostile,
+            "the command must be exactly the tail after the reference"
+        );
+        for argument in &hostile {
+            assert!(
+                args[..reference_at].iter().all(|arg| arg != argument),
+                "`{argument}` appeared before the image reference: {args:?}"
+            );
+        }
+    }
+
+    #[test]
     fn the_container_drops_every_capability_and_gains_no_privileges() {
         let args = args();
         assert!(args
@@ -861,13 +1990,35 @@ mod tests {
     #[test]
     fn a_runaway_container_cannot_take_the_host_down() {
         let args = args();
+        let limit = memory_limit();
+        assert!(args.windows(2).any(|w| w[0] == "--memory" && w[1] == limit));
         assert!(args
             .windows(2)
-            .any(|w| w[0] == "--memory" && w[1] == MEMORY_LIMIT));
-        assert!(args
-            .windows(2)
-            .any(|w| w[0] == "--memory-swap" && w[1] == MEMORY_LIMIT));
+            .any(|w| w[0] == "--memory-swap" && w[1] == limit));
         assert!(args.windows(2).any(|w| w[0] == "--pids-limit"));
+    }
+
+    #[test]
+    fn the_memory_limit_covers_the_data_directory_it_has_to_hold() {
+        // A tmpfs is page cache, and its pages are charged to the cgroup that
+        // faults them in. So a limit equal to the tmpfs size leaves the service
+        // nothing: `database.oltp` built a 324 MiB dataset under a 512 MiB
+        // limit with a 512 MiB tmpfs and was OOM-killed mid-phase.
+        //
+        // The point of this test is not the arithmetic, which is trivial. It
+        // is that the two constants are one budget, and that someone raising
+        // the tmpfs to hold a bigger dataset has to raise the ceiling with it.
+        assert!(
+            sandbox_memory_budget_bytes() > TMPFS_SIZE_BYTES,
+            "the memory ceiling does not exceed the tmpfs it must contain, so a full data \
+             directory leaves the service no memory at all"
+        );
+        assert_eq!(
+            sandbox_memory_budget_bytes(),
+            TMPFS_SIZE_BYTES + SERVICE_MEMORY_BYTES
+        );
+        // And the flag says bytes explicitly, so no unit suffix can be misread.
+        assert!(memory_limit().ends_with('b'), "{}", memory_limit());
     }
 
     #[test]
@@ -878,7 +2029,15 @@ mod tests {
             "PASSWORD=--privileged".to_string(),
             "X=a b --volume /:/host".to_string(),
         ];
-        let args = run_args(&TEST_IMAGE, TEST_REFERENCE, "n", &hostile);
+        let args = run_args(
+            &TEST_IMAGE,
+            TEST_REFERENCE,
+            "n",
+            &Launch {
+                env: &hostile,
+                ..Launch::default()
+            },
+        );
         for pair in &hostile {
             let at = args.iter().position(|arg| arg == pair).unwrap();
             assert_eq!(args[at - 1], "--env", "{pair} was not preceded by --env");
@@ -907,6 +2066,11 @@ mod tests {
             },
             service_port: 5432,
             data_dir: "/var/lib/x",
+            run_as: (999, 999),
+            ready_probe: &["pg_isready"],
+            download_bytes: 1_000_000,
+            data_on_tmpfs: true,
+            sysctls: &[],
             justification: "a fixture long enough to satisfy the justification check above",
         };
         assert!(!UNPINNED.is_pinned());
@@ -950,8 +2114,8 @@ mod tests {
         // comparable even though nothing in DARCBench changed - and a
         // compromised tag is a compromised benchmark (T-SUPPLY).
         //
-        // The table is empty today; this test is what stops the first entry
-        // from being `mariadb:11.4`.
+        // This is what stopped the first entry from being `postgres:17`, and
+        // it is what will stop the next one.
         for image in ALLOWED_IMAGES {
             if let Pin::Pinned(reference) = image.pin {
                 assert!(
@@ -986,7 +2150,13 @@ mod tests {
         // image is the allow-list. A caller cannot assemble one from a string,
         // which is what keeps configuration, an HTTP request or a command line
         // from reaching "run this image".
-        assert!(Image::from_allow_list("mariadb").is_none());
+        // `mysql` rather than `mariadb`, which this test used until MariaDB
+        // joined the list for `wordpress.*`. The example has to be a service
+        // somebody would plausibly reach for and that is deliberately absent -
+        // and MySQL is exactly that: `database.oltp` explains why the
+        // MySQL family is not measured, and nothing may route around it by
+        // naming the image.
+        assert!(Image::from_allow_list("mysql").is_none());
         assert!(Image::from_allow_list("postgres").is_some());
         assert!(Image::from_allow_list("../../etc").is_none());
         assert!(Image::from_allow_list("").is_none());

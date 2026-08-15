@@ -175,6 +175,14 @@ const PHASE_SECONDS: u64 = 20;
 /// [`crate::loadgen::Saturation::ScheduleSlip`].
 const LATENCY_LAG_TOLERANCE_MS: f64 = 5.0;
 
+/// How long fetching the image may take before it is given up on.
+///
+/// Ten minutes, which is generous and deliberately so: this is a one-off on a
+/// machine that has never run DARCBench, it happens before any clock starts,
+/// and the alternative to waiting is reporting the module as not measured on a
+/// slow link. PostgreSQL is 156 MB, which is minutes on a modest connection.
+const PULL_TIMEOUT: Duration = Duration::from_secs(600);
+
 /// How long any one `pgbench` invocation may take before it is killed.
 ///
 /// Generous against the phase length: the dataset build is the long pole and
@@ -199,6 +207,15 @@ pub(crate) struct BenchResult {
     pub(crate) schedule_lag_ms: Option<f64>,
     pub(crate) transactions: u64,
     pub(crate) failed: u64,
+    /// How many clients gave up part-way, as distinct from how many
+    /// transactions failed.
+    ///
+    /// They are different events and pgbench counts them separately: a failed
+    /// transaction is one the server refused, and an aborted client is one
+    /// that stopped issuing them at all. A phase that lost clients still
+    /// prints a plausible `tps` — computed over the whole requested window,
+    /// including the part after the clients were gone.
+    pub(crate) aborted_clients: u64,
 }
 
 /// Reads `pgbench`'s summary block.
@@ -237,6 +254,13 @@ pub(crate) fn parse_pgbench(output: &str) -> BenchResult {
                 .unwrap_or(0);
         } else if let Some(rest) = line.strip_prefix("number of failed transactions: ") {
             result.failed = leading_number(rest).unwrap_or(0.0) as u64;
+        } else if line.contains("aborted in command") {
+            // `pgbench: error: client 7 aborted in command 10 (SQL) of script
+            // 0; perhaps the backend died while processing`. One line per
+            // client, on stderr, and interleaved between threads - so the
+            // lines can be spliced mid-word and only the stable fragment is
+            // matched.
+            result.aborted_clients += 1;
         }
     }
     result
@@ -258,8 +282,17 @@ impl BenchResult {
     /// phase that did not run - and reporting a tps of zero for it would put a
     /// fabricated data point in a comparison. The same argument the checksum
     /// makes in the runtime modules.
+    ///
+    /// A phase that *lost clients* is refused for the harder version of the
+    /// same reason. It does not look empty — it looks like a result. pgbench
+    /// divides the transactions it completed by the window it was asked for,
+    /// so a run whose backends were killed ten seconds into twenty reports
+    /// roughly half the machine's real throughput as though it were the
+    /// measurement. That is worse than a zero, which at least announces
+    /// itself: this is a plausible number that is simply wrong, and the run
+    /// that produced it published exactly that before this check existed.
     pub(crate) fn is_credible(&self) -> bool {
-        self.transactions > 0 && self.tps > 0.0 && self.tps.is_finite()
+        self.transactions > 0 && self.tps > 0.0 && self.tps.is_finite() && self.aborted_clients == 0
     }
 
     /// The 95th percentile, estimated from the mean and standard deviation.
@@ -316,15 +349,29 @@ impl DatabaseOltp {
                 safety_class: SafetyClass::ProvisionsServices,
                 dependencies: vec![
                     "A container runtime (Docker or Podman) whose daemon is reachable".into(),
-                    "Roughly 700 MB of free memory for the sandboxed database".into(),
+                    // 1 GiB, and it really is resident: the data directory is a
+                    // tmpfs, so the dataset is in RAM rather than on a disk the
+                    // container merely has a limit against. An earlier "roughly
+                    // 700 MB" here was an estimate of the service alone and did
+                    // not count the data, which is the same mistake that had
+                    // the container OOM-killed mid-phase.
+                    "1 GiB of free memory for the sandboxed database, including its dataset, \
+                     which is held in a tmpfs rather than on disk"
+                        .into(),
                 ],
                 // The data directory is a tmpfs, so the database writes to RAM
                 // and nothing reaches a host filesystem.
                 max_bytes_written: 0,
-                // The image is pulled by the container runtime before the run,
-                // not by this module, and nothing crosses the network during
-                // the measurement: pgbench and the server share a namespace.
-                max_network_bytes: 0,
+                // The image, once, on a machine that does not already have it.
+                //
+                // This said `0` and the comment beside it said the runtime
+                // pulled the image "before the run" - an assumption nothing
+                // enforced. On a machine that has never run DARCBench, this
+                // module fetched 156 MB while preflight promised the operator
+                // no network at all. The fetch is now explicit and untimed, and
+                // this is what it costs. Nothing crosses the network during the
+                // measurement itself: pgbench and the server share a namespace.
+                max_network_bytes: 156_190_575,
                 cleanup: "The container is removed when the module ends, including on failure. \
                           Anything a crashed run leaves behind carries this agent's label and is \
                           removed at the start of the next run - which is the only cleanup \
@@ -341,6 +388,11 @@ impl DatabaseOltp {
                      phase that did not run."
                         .into(),
                     "An image that is not pinned to a digest is not run at all.".into(),
+                    "A phase that lost clients part-way through is withheld. pgbench still \
+                     reports a rate for one, computed over the whole window it was asked for \
+                     including the part after the clients were gone, so the figure looks \
+                     ordinary and is not a measurement of anything."
+                        .into(),
                 ],
                 limitations: vec![
                     "pgbench shares the container with the server, so its CPU is CPU the server \
@@ -410,8 +462,16 @@ impl DatabaseOltp {
             // Report the standard deviation, which is what makes an estimated
             // p95 possible without logging every transaction.
             "-r".into(),
-            "--progress".into(),
-            "0".into(),
+            // No `--progress`. Periodic progress lines are off by default, and
+            // asking for them off explicitly with `--progress 0` is not the way
+            // to say so: pgbench rejects it outright with
+            // `-P/--progress must be in range 1..2147483647`.
+            //
+            // That is what it did, on every phase of every run, and the module
+            // reported four withheld metrics and two warnings rather than four
+            // numbers. It could not have been found without a real database:
+            // the argument vector is *correct* by inspection, it just is not
+            // one pgbench accepts.
         ];
         if select_only {
             // `-S`: the select-only variant. Read-write is the default.
@@ -432,6 +492,24 @@ impl DatabaseOltp {
 impl BenchmarkModule for DatabaseOltp {
     fn manifest(&self) -> &ModuleManifest {
         &self.manifest
+    }
+
+    /// pgbench and the server both run in a container this process did not
+    /// fork, so none of their CPU can be attributed to this run.
+    fn workload_runs_outside_this_process(&self) -> bool {
+        true
+    }
+
+    /// The sandbox's ceiling, because a container's memory is the host's.
+    ///
+    /// Preflight sums this across the selected modules and shows the operator
+    /// the total before anything starts. A module that provisions a service
+    /// and declared zero here would be telling the operator that a gigabyte of
+    /// their machine was free to take - and the dataset lives in a tmpfs, so
+    /// this really is resident memory rather than a limit that is rarely
+    /// approached.
+    fn estimated_peak_memory_bytes(&self, _params: &ModuleParams) -> u64 {
+        crate::container::sandbox_memory_budget_bytes()
     }
 
     fn estimated_duration_s(&self, _params: &ModuleParams) -> u64 {
@@ -466,6 +544,13 @@ impl BenchmarkModule for DatabaseOltp {
 
         let runtime = Runtime::discover().map_err(not_measured)?;
 
+        // Before anything is timed and before the container is asked for. An
+        // implicit pull inside `docker run` would be an undeclared transfer and
+        // would land inside the measurement - see `ensure_image_present`.
+        let fetched = runtime
+            .ensure_image_present(image, PULL_TIMEOUT)
+            .map_err(not_measured)?;
+
         // Before starting, because a previous run that was killed leaves its
         // container behind and only the next run can clear it.
         let reaped = runtime.reap().map_err(not_measured)?;
@@ -482,7 +567,7 @@ impl BenchmarkModule for DatabaseOltp {
         let sandbox =
             Sandbox::launch(&runtime, image, &unique_suffix(), &env).map_err(not_measured)?;
 
-        let outcome = self.measure(&sandbox, reaped);
+        let outcome = self.measure(&sandbox, reaped, fetched);
         // The sandbox is dropped here whatever happened, and `Drop` removes
         // the container. On a panic it is not - the release profile aborts -
         // which is what `reap` above exists for.
@@ -494,7 +579,12 @@ impl BenchmarkModule for DatabaseOltp {
 impl DatabaseOltp {
     /// Everything after the container is up. Split out so the container's
     /// lifetime is visible in one place in [`BenchmarkModule::run`].
-    fn measure(&self, sandbox: &Sandbox, reaped: usize) -> Result<ModuleOutput, ModuleError> {
+    fn measure(
+        &self,
+        sandbox: &Sandbox,
+        reaped: usize,
+        fetched: bool,
+    ) -> Result<ModuleOutput, ModuleError> {
         let seconds = PHASE_SECONDS.to_string();
 
         let build = sandbox
@@ -538,13 +628,27 @@ impl DatabaseOltp {
             let args = self.phase_args(select_only, THROUGHPUT_CLIENTS, &seconds, None);
             let result = self.run_phase(sandbox, &args)?;
             if !result.is_credible() {
-                warnings.push(Warning {
-                    code: WarningCode::ValidationFailed,
-                    message: format!(
+                // Two different failures, and the operator acts on them
+                // differently, so they are not collapsed into one sentence.
+                let message = if result.aborted_clients > 0 {
+                    format!(
+                        "the {label} phase lost {} of its {THROUGHPUT_CLIENTS} clients part-way \
+                         through - the server stopped answering them - so its result is \
+                         withheld. pgbench still reported a rate, computed over the whole \
+                         requested window including the part with no clients left in it, which \
+                         is why this is refused rather than published with a caveat",
+                        result.aborted_clients
+                    )
+                } else {
+                    format!(
                         "the {label} phase processed no transactions, so it is not a slow machine \
                          - it is a phase that did not run, and reporting a zero for it would put \
                          a fabricated point in a comparison"
-                    ),
+                    )
+                };
+                warnings.push(Warning {
+                    code: WarningCode::ValidationFailed,
+                    message,
                     metric_key: Some(key.to_string()),
                 });
                 continue;
@@ -584,6 +688,23 @@ impl DatabaseOltp {
             let args = self.phase_args(select_only, LATENCY_CLIENTS, &seconds, Some(LATENCY_RATE));
             let result = self.run_phase(sandbox, &args)?;
             if !result.is_credible() {
+                // This used to be a bare `continue`, and the throughput loop
+                // above has always warned. The asymmetry cost four metrics
+                // once: a run where the server was OOM-killed part-way through
+                // published two throughput figures and said nothing whatever
+                // about the four latency ones. Absent and unexplained is the
+                // one outcome this codebase does not allow - see the
+                // `limitations` list on every module.
+                warnings.push(Warning {
+                    code: WarningCode::ValidationFailed,
+                    message: format!(
+                        "the {label} latency phase processed no transactions, so no latency is \
+                         reported for it. It is not a slow machine - it is a phase that did not \
+                         run, and the most likely reason is that the server was no longer \
+                         answering by the time it started"
+                    ),
+                    metric_key: Some(format!("{prefix}.latency_mean")),
+                });
                 continue;
             }
 
@@ -663,6 +784,27 @@ impl DatabaseOltp {
                 serde_json::Value::from(reaped as u64),
             );
         }
+        // Whether this run paid for the image, which is the difference between
+        // a run that used the network and one that did not. Always recorded,
+        // including when it is `false`: "no transfer happened" is a fact about
+        // this run, and a key that only appears sometimes is one a reader
+        // cannot rely on.
+        // The digest, not just the version. Two runs of the same server version
+        // from two different images are not the same measurement, and this key
+        // was declared in `comparability` and recorded nowhere.
+        context.insert(
+            "postgres_image".to_string(),
+            serde_json::Value::String(
+                Image::from_allow_list(IMAGE_KEY)
+                    .and_then(|image| image.reference().ok())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            ),
+        );
+        context.insert(
+            "image_fetched_during_this_run".to_string(),
+            serde_json::Value::Bool(fetched),
+        );
         for (key, value) in notes {
             context.insert(key, serde_json::Value::String(value));
         }
@@ -840,7 +982,10 @@ mod tests {
             SafetyClass::ProvisionsServices
         );
         assert_eq!(module.manifest().max_bytes_written, 0);
-        assert_eq!(module.manifest().max_network_bytes, 0);
+        // Not zero: the image has to reach the machine somehow, and a manifest
+        // that says a run uses no network while the runtime fetches 156 MB is
+        // a broken promise rather than a rounding error.
+        assert!(module.manifest().max_network_bytes >= 150_000_000);
     }
 
     #[test]
@@ -876,6 +1021,66 @@ mod tests {
             .phase_args(false, "8", "20", None)
             .iter()
             .any(|a| a == "-S"));
+    }
+
+    #[test]
+    fn a_phase_that_lost_its_clients_is_refused_rather_than_published() {
+        // Verbatim from a run where the container hit its memory ceiling
+        // part-way through the write phase. Note what pgbench still reports:
+        // a transaction count, zero *failed* transactions, and a tps computed
+        // over the full twenty seconds it was asked for. Nothing in the
+        // summary block says the measurement is void; the only evidence is on
+        // stderr, and the run that published 2589 tx/s from this had every
+        // number in the summary looking reasonable.
+        let output = "\
+pgbench: error: client 7 aborted in command 10 (SQL) of script 0; perhaps the backend died while processing
+pgbench: error: client 0 aborted in command 10 (SQL) of script 0; perhaps the backend died while processing
+number of transactions actually processed: 26178
+number of failed transactions: 0 (0.000%)
+latency average = 3.089 ms
+tps = 2589.225000 (without initial connection time)
+";
+        let result = parse_pgbench(output);
+        assert_eq!(result.transactions, 26178);
+        assert_eq!(result.failed, 0, "pgbench counts these separately");
+        assert_eq!(result.aborted_clients, 2);
+        assert!(
+            !result.is_credible(),
+            "a phase whose clients died reported a plausible rate and must still be refused"
+        );
+
+        // And the ordinary case is untouched: a clean phase stays credible.
+        let clean = parse_pgbench(
+            "number of transactions actually processed: 66559\n\
+             number of failed transactions: 0 (0.000%)\n\
+             tps = 3325.411547 (without initial connection time)\n",
+        );
+        assert_eq!(clean.aborted_clients, 0);
+        assert!(clean.is_credible());
+    }
+
+    #[test]
+    fn no_phase_asks_pgbench_for_a_progress_interval_it_refuses() {
+        // `--progress 0` reads as "no progress reports" and is not: pgbench
+        // exits with `-P/--progress must be in range 1..2147483647` before it
+        // runs a single transaction. Every phase of every run failed this way,
+        // and because each phase withholds rather than fabricates, the visible
+        // symptom was a module that returned no metrics at all.
+        //
+        // Off is the default, so the fix is the absence of the flag - which is
+        // a thing only a test can hold in place, since there is no longer any
+        // code to read.
+        for args in [
+            DatabaseOltp::new().phase_args(true, "8", "20", None),
+            DatabaseOltp::new().phase_args(false, "4", "20", Some("200")),
+        ] {
+            for forbidden in ["-P", "--progress"] {
+                assert!(
+                    !args.iter().any(|a| a == forbidden),
+                    "`{forbidden}` is back and pgbench will refuse the phase: {args:?}"
+                );
+            }
+        }
     }
 
     #[test]

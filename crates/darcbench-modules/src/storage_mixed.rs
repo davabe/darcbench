@@ -828,7 +828,10 @@ impl StorageMixed {
                 comparability: vec![
                     "module.version".to_string(),
                     "agent.build_target".to_string(),
-                    "storage.filesystem".to_string(),
+                    // Recorded by this module rather than read from the inventory: the
+                    // inventory lists devices, and what decides whether two storage results
+                    // mean the same thing is the filesystem the fixture was written *on*.
+                    "filesystem".to_string(),
                     "plan.fixture_bytes".to_string(),
                     "plan.direct_io".to_string(),
                 ],
@@ -1136,6 +1139,17 @@ impl BenchmarkModule for StorageMixed {
                 "mixed_read_share_pct": MIXED_READ_SHARE,
             }),
         );
+        // The single most important comparability fact this module has, and it
+        // was declared and never recorded. ROADMAP.md names the hazard - "storage
+        // behaviour varies across kernel versions, filesystems and whether
+        // O_DIRECT is honoured at all" - and says it is mitigated by recording
+        // the storage stack. The inventory records *devices*; what decides
+        // whether two of these results mean the same thing is the filesystem
+        // the fixture was written on, and nothing was recording that.
+        context.insert(
+            "filesystem".into(),
+            serde_json::Value::from(filesystem_of(scratch)),
+        );
         context.insert("calibration".into(), serde_json::Value::Object(calibration));
         context.insert(
             "steady_state_ratio".into(),
@@ -1148,6 +1162,55 @@ impl BenchmarkModule for StorageMixed {
             context,
         })
     }
+}
+
+/// The filesystem type a path is on, from `/proc/self/mountinfo`.
+///
+/// Read rather than asked, because asking means `statfs` and that means either
+/// `libc` or `unsafe`, and this workspace forbids the second and has avoided
+/// the first. `mountinfo` names the type directly and needs no lookup table
+/// from a magic number.
+///
+/// The answer is the mount point with the **longest** prefix of the path, which
+/// is what makes a scratch directory on its own mount report that mount rather
+/// than `/`.
+///
+/// `"unknown"` when it cannot be determined, never a guess. A wrong filesystem
+/// in a comparability key is worse than an absent one: it would let two results
+/// from different stacks be compared as though they matched.
+fn filesystem_of(path: &std::path::Path) -> String {
+    let Ok(mountinfo) = std::fs::read_to_string("/proc/self/mountinfo") else {
+        return "unknown".to_string();
+    };
+    let path = path.to_string_lossy();
+    let mut best: Option<(usize, String)> = None;
+    for line in mountinfo.lines() {
+        // `36 35 98:0 /mnt1 /mnt2 rw,noatime - ext3 /dev/root rw,errors=continue`
+        // The fields before ` - ` are variable in number; the filesystem type is
+        // the first field after it, and the mount point is field five before it.
+        let Some((before, after)) = line.split_once(" - ") else {
+            continue;
+        };
+        let mount_point = before.split_whitespace().nth(4).unwrap_or_default();
+        let fs_type = after.split_whitespace().next().unwrap_or_default();
+        if mount_point.is_empty() || fs_type.is_empty() {
+            continue;
+        }
+        // A prefix match on the string is not enough: `/var` is a prefix of
+        // `/variable` and is not its mount point.
+        let is_parent = path == mount_point
+            || (path.starts_with(mount_point)
+                && (mount_point == "/" || path.as_bytes().get(mount_point.len()) == Some(&b'/')));
+        if is_parent
+            && best
+                .as_ref()
+                .is_none_or(|(len, _)| mount_point.len() > *len)
+        {
+            best = Some((mount_point.len(), fs_type.to_string()));
+        }
+    }
+    best.map(|(_, fs)| fs)
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 #[cfg(test)]

@@ -1,0 +1,149 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "database.cache",
+  "version": "1.0.0",
+  "title": "In-memory cache",
+  "purpose": "Measure key-value throughput against a Valkey instance this agent creates in a container and destroys when the module ends - never against a cache already on this machine.",
+  "category": "database",
+  "safety_class": "provisions_services",
+  "supported_architectures": ["x86_64", "aarch64"],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "database_cache::DatabaseCache",
+    "note": "The server and both measurement tools come from the pinned image, run through container::Sandbox::exec with fixed argument vectors. No RESP client exists in this workspace and nothing on the host is involved."
+  },
+  "dependencies": [
+    "A container runtime (Docker or Podman) whose daemon is reachable",
+    "1 GiB of free memory, which is the sandbox's ceiling rather than what this workload uses"
+  ],
+  "max_bytes_written": 0,
+  "max_network_bytes": 17456505,
+  "max_network_bytes_note": "The Valkey image, once, on a machine that does not already have it. The fetch is explicit and happens before anything is timed; nothing crosses the network during the measurement itself.",
+  "required_capabilities": [],
+  "safety": {
+    "target": "a Valkey container this module starts, published on 127.0.0.1 on a port the runtime assigns",
+    "never": [
+      "a cache already running on this machine",
+      "an operator-supplied host, port or socket",
+      "any interface other than loopback",
+      "an image that is not pinned to a digest"
+    ],
+    "note": "docs/THREAT-MODEL.md (T-DB) applies here exactly as it does to database.oltp: the module creates and destroys its own instance or reports itself not measured. There is no fallback to a server on the host and no configuration that could introduce one."
+  },
+  "sandbox": {
+    "image": "valkey/valkey@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec",
+    "resolved_from": "valkey/valkey:8-alpine, against Docker Hub on 2026-08-14",
+    "user": "999:1000, the image's own valkey account. The uid and gid differ, which is why the allow-list carries a pair per image rather than one number reused.",
+    "capabilities": "all dropped, no-new-privileges set, no host path mounted, no device passed",
+    "data_directory": "/data on a 512 MiB tmpfs owned by the service account, mode 0700",
+    "memory": "1 GiB, the isolation tier's ceiling rather than this workload's need",
+    "readiness": "redis-cli -h 127.0.0.1 ping, run inside the container. It exits 1 on a refused connection, which is what makes it a probe rather than a command that runs.",
+    "lifetime": "removed when the module returns, on every path including failure. Anything a killed run leaves behind carries this agent's label and is reaped at the start of the next one."
+  },
+  "preparation": "None. The server starts empty and redis-benchmark populates the key space as it measures, which is the workload rather than a setup step.",
+  "calibration": "Fixed request counts rather than a duration target, because redis-benchmark reports a rate over a request count and a duration-calibrated run would measure a different number of keys on every machine.",
+  "warmup": "None. Each shape's first requests populate the key space it then reads, and the rate reported is over the whole command; on a 10,000-key space at 100,000 requests the populating fraction is small and identical on every machine.",
+  "workloads": [
+    {
+      "key": "get.throughput",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "GET across a 10,000-key space, 50 clients, 64-byte values",
+      "represents": "The read a cache exists to serve - a page fragment, a session, a query result"
+    },
+    {
+      "key": "set.throughput",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "SET over the same space and value size",
+      "represents": "Populating the cache, and every write-through"
+    },
+    {
+      "key": "incr.throughput",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "INCR, a read-modify-write executed server-side",
+      "represents": "Counters and rate limiters: the shape an application cannot do client-side without a race"
+    },
+    {
+      "key": "pipelined.throughput",
+      "unit": "ops/s",
+      "direction": "higher_is_better",
+      "description": "GET at pipeline depth 16",
+      "represents": "What the machine does once the per-command round trip is amortised away - the difference between `buy a faster machine` and `batch your calls`"
+    },
+    {
+      "key": "roundtrip.unloaded_mean",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Mean round trip on an otherwise idle server",
+      "represents": "The floor under every cache hit, paid once per call however fast the server is"
+    },
+    {
+      "key": "roundtrip.unloaded_max",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "The worst round trip observed while idle",
+      "represents": "Scheduler and allocator jitter - one observation, not a distribution"
+    }
+  ],
+  "metrics": [
+    "get.throughput",
+    "set.throughput",
+    "incr.throughput",
+    "pipelined.throughput",
+    "roundtrip.unloaded_mean",
+    "roundtrip.unloaded_max"
+  ],
+  "derived_metrics": [],
+  "repetitions": {
+    "note": "Fixed at 100,000 requests per command regardless of profile, for the same reason database.oltp fixes its phase duration: a profile-dependent request count would make two runs of the same machine incomparable."
+  },
+  "validation": [
+    "A command that reported no operations per second is withheld rather than published as a zero, which would read as a server that could not perform it at all.",
+    "The unloaded round-trip probe is withheld unless it collected samples; a mean of zero from a parse that found nothing would read as an extraordinarily fast machine.",
+    "An image that is not pinned to a digest is not run at all."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no container runtime, or a runtime whose daemon does not answer",
+    "the container exits during startup, in which case its own log is reported"
+  ],
+  "cleanup": "The container is removed when the module ends, including on failure. Anything a crashed run leaves behind carries this agent's label and is removed at the start of the next run.",
+  "stability_cv_bound": 0.15,
+  "comparability": [
+    "valkey_image",
+    "valkey_version",
+    "clients",
+    "value_bytes",
+    "keyspace",
+    "appendonly",
+    "save",
+    "io_threads",
+    "data_directory_is_tmpfs"
+  ],
+  "limitations": [
+    "There is no latency-under-load metric. redis-benchmark is closed-loop and has no rate limiter, so its p50/p95/p99 columns are percentiles of an experiment where offered load fell whenever the server slowed. They are parsed by nothing here and published nowhere.",
+    "`roundtrip.unloaded_*` is measured on an otherwise idle server. It is a floor under every cache hit, not a distribution, and the metric key says `unloaded` so it cannot be read as one.",
+    "redis-benchmark shares the container with the server, so its CPU is CPU the server did not get. Every figure here is a floor.",
+    "The data directory is a tmpfs. An RDB snapshot is still written, but to RAM, so these figures describe the server and the CPU rather than the disk.",
+    "Valkey serves commands from a single thread, so these figures track per-core speed and barely move with core count. What core count does change is whether the benchmark client starves the server, which is why a figure from a two-core machine is a floor twice over.",
+    "Each metric is one command and one figure, so no coefficient of variation is computed and stability_cv_bound is not enforced against these."
+  ],
+  "scoring": {
+    "category": "database",
+    "facets": {},
+    "metric_weight": {
+      "get.throughput": 1.5,
+      "roundtrip.unloaded_mean": 1.25,
+      "set.throughput": 1.0,
+      "pipelined.throughput": 1.0,
+      "incr.throughput": 0.75,
+      "roundtrip.unloaded_max": 0.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "GET carries the most weight because it is what a cache is for. The unloaded round trip is next because an application that reaches its cache twenty times to build a page pays it twenty times, and no amount of throughput headroom reduces it. The maximum round trip carries the least: it is a single observation, and a single outlier is exactly what it is made of. Reference anchors are declared targets, not measurements."
+  },
+  "licence": "Apache-2.0"
+}

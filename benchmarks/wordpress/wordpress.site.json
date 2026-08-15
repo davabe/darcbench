@@ -1,0 +1,153 @@
+{
+  "schema": "darcbench.module/1",
+  "id": "wordpress.site",
+  "version": "1.0.0",
+  "title": "WordPress site",
+  "purpose": "Measure what a WordPress page costs on this machine - cold, warm, an archive and the admin dashboard - against a WordPress and MariaDB this agent creates in containers and destroys when the module ends.",
+  "category": "web",
+  "safety_class": "provisions_services",
+  "supported_architectures": ["x86_64", "aarch64"],
+  "implementation": {
+    "kind": "native",
+    "crate": "darcbench-modules",
+    "entry": "wordpress_site::WordpressSite",
+    "note": "The only module that runs somebody else's application. Everywhere else DARCBench supplies the workload, because a run against the operator's software measures their configuration; here the question is how WordPress runs on this machine and there is no proxy for WordPress."
+  },
+  "dependencies": [
+    "A container runtime (Docker or Podman) whose daemon is reachable",
+    "2 GiB of free memory: two sandboxed services, each with the tier's ceiling",
+    "About 350 MB in the container runtime's storage for the WordPress volume"
+  ],
+  "max_bytes_written": 367001600,
+  "max_network_bytes": 441613439,
+  "max_network_bytes_note": "Three images - WordPress, MariaDB and WP-CLI - once, on a machine that does not already have them. Fetched explicitly before any clock starts. Nothing crosses the network during a measurement: the containers share a private network and WordPress itself is refused outbound HTTP by WP_HTTP_BLOCK_EXTERNAL.",
+  "required_capabilities": [],
+  "safety": {
+    "target": "a WordPress and a MariaDB this module starts, on a private per-run network, with only the web server published and only on 127.0.0.1",
+    "never": [
+      "a WordPress or a database already on this machine",
+      "an operator-supplied host, URL or credential",
+      "any interface other than loopback",
+      "a plugin or theme downloaded at run time",
+      "an image that is not pinned to a digest"
+    ],
+    "note": "docs/THREAT-MODEL.md T-DB and T-AMPLIFY both apply. The module has no configuration for an existing site and no code path that could reach one. WordPress is additionally prevented from making outbound HTTP requests of its own by WP_HTTP_BLOCK_EXTERNAL, so a core or plugin update check cannot land inside a measured request."
+  },
+  "sandbox": {
+    "wordpress_image": "wordpress@sha256:5d2c212561c4b5442ebc4d98933a9cbadcf3dee8888ed3fd9ed44667c27cc905",
+    "mariadb_image": "mariadb@sha256:d9f7eb2637296652f24b484afd5d246f759f49f5babcadc6a9e344c9acb75fbf",
+    "cli_image": "wordpress@sha256:2b5e9d4d3e51909dca1aaa4732e9f5e5bf0377c2114dbd8ff39f060bff202586",
+    "resolved_from": "wordpress:6-php8.3-apache, mariadb:11 and wordpress:cli-php8.3, against Docker Hub on 2026-08-15",
+    "network": "a private network created for the run and removed with it, so the two containers can find each other by name. Not --internal: an internal network has no port publishing, and the outbound block moved to WordPress's own WP_HTTP_BLOCK_EXTERNAL where it is actually enforceable.",
+    "user": "33:33 (www-data) for WordPress and WP-CLI, 999:999 for MariaDB. Neither container is ever root.",
+    "capabilities": "all dropped, no-new-privileges set, no host path mounted, no device passed",
+    "port_80_without_root": "net.ipv4.ip_unprivileged_port_start=0, a namespaced sysctl, rather than --cap-add NET_BIND_SERVICE. The same trade the PostgreSQL entry makes: remove the need for the privilege instead of granting it.",
+    "wordpress_files": "a container volume in the daemon's storage, on a host filesystem, and the one sandbox here that is not a tmpfs. WP-CLI has to see the same files Apache is serving and a tmpfs is visible to exactly one container. Removed with the container.",
+    "database_files": "a tmpfs. Nothing MariaDB writes reaches a host disk or outlives the run."
+  },
+  "preparation": "MariaDB starts and is waited on with mariadb-admin ping. WordPress starts and is waited on with an in-container PHP connect to port 80, which the image's entrypoint only reaches after it has unpacked WordPress and written wp-config.php. wp core install runs, then the fixture is inserted. None of it is timed.",
+  "fixture": {
+    "source": "darcbench_modules::wordpress_fixture, checksum-pinned",
+    "size": "standard - 300 posts, 12 pages, 772 comments",
+    "import": "a generated PHP script piped to `wp eval-file -`, calling wp_insert_post and wp_insert_comment. Those are the functions the WordPress Importer itself calls, so WordPress does its own sanitising, slug de-duplication and comment counting.",
+    "why_not_wp_import": "the WordPress Importer is a plugin, not in any image, and would have to be downloaded from wordpress.org at run time - an unpinned dependency the image allow-list exists to refuse, and one whose version could change what an import does. Per-item `wp post create` would be three hundred interpreter start-ups; direct SQL would put this workspace in the business of knowing WordPress's schema.",
+    "verification": "the script reports back how many posts and comments it inserted and the fixture's own checksum, and all three must match before anything is timed."
+  },
+  "calibration": "None. Every figure is the wall time of a fixed HTTP request against a fixed corpus.",
+  "warmup": "One pass of 6 untimed requests over every timed path before any of them is timed, and 6 more immediately before each. The global pass is a correction rather than an optimisation: warming each path only immediately before timing it measured origin.warm while the stack was still climbing out of the cold start, at 94 ms and 64% variation against an archive - a strictly heavier page - at 43 ms and 5.5%.",
+  "workloads": [
+    {
+      "key": "origin.cold",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "The first request the site ever serves",
+      "represents": "What the first visitor after a deploy or a restart waits through: nothing warm anywhere"
+    },
+    {
+      "key": "origin.warm",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "The homepage in steady state, median of 9",
+      "represents": "What almost every visitor actually gets - the number that decides how the site feels"
+    },
+    {
+      "key": "database.archive",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "A category archive: many posts, many terms, many queries in one render",
+      "represents": "The query-heavy page every content site has, and the one that degrades first as a site grows"
+    },
+    {
+      "key": "origin.capacity",
+      "unit": "req/s",
+      "direction": "higher_is_better",
+      "description": "Homepage renders sustained by 10 seconds of closed-loop load, run last",
+      "represents": "How many concurrent visitors the machine actually serves - the half of the question a latency figure cannot answer"
+    },
+    {
+      "key": "admin.dashboard",
+      "unit": "ms",
+      "direction": "lower_is_better",
+      "description": "Authenticated wp-admin, median of 9",
+      "represents": "The page the site's owner waits on all day, and the first thing they complain about"
+    }
+  ],
+  "metrics": ["origin.cold", "origin.warm", "database.archive", "admin.dashboard", "origin.capacity"],
+  "derived_metrics": [],
+  "repetitions": {
+    "note": "Nine timed requests per steady-state metric, median taken. origin.cold is one observation by definition: a site is only cold once, and repeating it would need the whole stack rebuilt. It is published with no distribution rather than with a fabricated one."
+  },
+  "validation": [
+    "The install is verified before anything is timed, by evidence rather than by an exit code: the homepage must be a page of plausible size containing a title the fixture generated. A WordPress serving a setup screen would produce fast, meaningless numbers.",
+    "The import must insert exactly the number of posts and comments the fixture contains, and report the fixture's own checksum back. A partial import is a different site.",
+    "The admin measurement must be authenticated. An unauthenticated wp-admin request is a redirect with an empty body, which would be the fastest page on the site and a measurement of nothing.",
+    "A metric needs a majority of its requests to have succeeded, and every response must be a 200 of plausible size.",
+    "Any metric whose coefficient of variation exceeds the stability bound raises a warning and degrades the result."
+  ],
+  "abort_conditions": [
+    "operator cancellation",
+    "no container runtime, or a runtime whose daemon does not answer",
+    "any of the three images cannot be fetched",
+    "WordPress cannot be installed, or the fixture cannot be imported",
+    "the homepage is not a rendered page containing the fixture"
+  ],
+  "cleanup": "Both containers, the WordPress volume and the run's private network are removed when the module ends, including on failure. Anything a crashed run leaves behind carries this agent's label and is removed at the start of the next run - containers first, then the network they were attached to.",
+  "stability_cv_bound": 0.2,
+  "comparability": [
+    "wordpress_image",
+    "wordpress_version",
+    "php_version",
+    "mariadb_image",
+    "mariadb_version",
+    "fixture_version",
+    "fixture_checksum",
+    "object_cache",
+    "page_cache",
+    "opcache",
+    "theme"
+  ],
+  "limitations": [
+    "NO page cache and NO object cache are installed, and every figure here is what WordPress costs when it actually renders. docs/BENCHMARK-METHODOLOGY.md requires that disclosure because a cached and an uncached number differ by two orders of magnitude and both are honest until somebody puts them in one table.",
+    "origin.cold and origin.warm are NOT a cached-versus-uncached pair. What differs between them is PHP's opcode cache and the database's buffer pool; both are pages WordPress built from scratch.",
+    "One stack only: Apache with PHP 8.3 against MariaDB, all pinned by digest. A comparison across a different PHP version, web server or database is not one these numbers support, which is why each is declared in comparability.",
+    "The theme is whichever one the pinned WordPress ships as its default. A theme is a large part of what a render costs, so this measures WordPress's own theme rather than the operator's - the same choice web.static makes about serving its own origin rather than the operator's nginx.",
+    "The measuring process shares the machine with the stack it measures, so every figure is a floor. It is a much smaller share than in the load-driven modules - this issues one request at a time and spends the wait blocked - but it is not zero.",
+    "WordPress is served over plaintext HTTP on loopback. TLS termination is a real cost of running a site and is measured by web.static, which does it without a CMS in the way.",
+    "origin.capacity is closed-loop and deliberately so: workers looping flat out ask the machine for everything it will give, which is the capacity question, and the phase produces no latency distribution for coordinated omission to distort. It runs last, after every latency metric, so its saturation cannot reach them.",
+    "origin.capacity is a floor twice over. The generator shares the machine with the stack, and on a small host it takes a share of the same cores Apache needs - so the figure understates a machine with threads to spare by less than it understates one without."
+  ],
+  "scoring": {
+    "category": "web",
+    "facets": {},
+    "metric_weight": {
+      "origin.warm": 1.5,
+      "origin.capacity": 1.25,
+      "database.archive": 1.0,
+      "admin.dashboard": 1.0,
+      "origin.cold": 0.5
+    },
+    "reference_profile": "DARC-REF-1",
+    "note": "All four score into Web, including the one whose key says database: every one is a page render measured over HTTP, and the Database category already measures a database directly through database.oltp. Putting a WordPress page there would let a slow PHP drag down a score that is supposed to be about the database, and would count the same MariaDB twice. origin.warm carries the module because it is what almost every visitor gets; origin.cold carries least because it is one observation and is paid once per deploy rather than once per visitor. Reference anchors are declared targets, not measurements."
+  },
+  "licence": "Apache-2.0"
+}

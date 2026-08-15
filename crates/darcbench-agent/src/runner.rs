@@ -380,6 +380,19 @@ impl Watchdog {
         if !self.external_load_enforced {
             return None;
         }
+        // Suspended for a module whose workload runs in a container. Its CPU
+        // cannot be attributed to this process, so what the subtraction leaves
+        // is the benchmark's own work in the "somebody else" column - and the
+        // ceiling fires on an idle machine. The counters are reset rather than
+        // merely skipped, so a stretch that spanned the suspension does not
+        // resume mid-tally and announce a contention the guard did not
+        // actually observe continuously.
+        if handle.load_ceiling_suspended() {
+            self.consecutive_contended = 0;
+            self.consecutive_heavily_contended = 0;
+            self.contention_reported = false;
+            return None;
+        }
         let external = snapshot.cpu_external_busy_pct;
 
         if external >= EXTERNAL_LOAD_ABORT_PCT {
@@ -493,6 +506,15 @@ pub(crate) struct RunHandle {
     contention: RwLock<Option<Warning>>,
     /// Guards that could not be armed on this host, recorded into the bundle.
     guards_not_enforced: RwLock<Vec<String>>,
+    /// True while a module whose workload runs outside this process is in
+    /// flight, during which the load ceiling has no valid evidence to fire on.
+    ///
+    /// Set by the module loop and read by the telemetry task, so it is atomic
+    /// rather than a lock: the sampler must never block on it.
+    load_ceiling_suspended: AtomicBool,
+    /// True once any module has suspended the ceiling, so the bundle can
+    /// disclose it even though the flag itself is cleared by then.
+    load_ceiling_was_suspended: AtomicBool,
 }
 
 impl std::fmt::Debug for RunHandle {
@@ -536,7 +558,54 @@ impl RunHandle {
             stopped_because: RwLock::new(None),
             contention: RwLock::new(None),
             guards_not_enforced: RwLock::new(Vec::new()),
+            load_ceiling_suspended: AtomicBool::new(false),
+            load_ceiling_was_suspended: AtomicBool::new(false),
         })
+    }
+
+    /// Suspends or resumes the runtime load ceiling for the module in flight.
+    ///
+    /// See `BenchmarkModule::workload_runs_outside_this_process`. The thermal
+    /// guard and the hard runtime ceiling are untouched: both read the machine
+    /// directly and neither depends on being able to attribute CPU to this
+    /// process.
+    fn set_load_ceiling_suspended(&self, suspended: bool) {
+        self.load_ceiling_suspended
+            .store(suspended, Ordering::SeqCst);
+        if suspended {
+            self.load_ceiling_was_suspended
+                .store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn load_ceiling_suspended(&self) -> bool {
+        self.load_ceiling_suspended.load(Ordering::SeqCst)
+    }
+
+    /// Guards this run did not apply, for the bundle.
+    ///
+    /// The host-level ones are decided before the first sample; the suspension
+    /// below is decided per module, so it is added here rather than there. It
+    /// is stated even though the affected modules completed normally: "the
+    /// ceiling was not enforced" and "the ceiling was enforced and found
+    /// nothing" are different claims, and only one of them is true.
+    fn guards_not_enforced(&self) -> Vec<String> {
+        let mut guards = self
+            .guards_not_enforced
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        if self.load_ceiling_was_suspended.load(Ordering::SeqCst) {
+            guards.push(
+                "The runtime load ceiling was suspended while the container-based modules ran. \
+                 Their workload executes in a container this process did not fork, so its CPU \
+                 cannot be told apart from a competing tenant's, and enforcing the ceiling would \
+                 have degraded every such module on an idle machine. Nothing here reports on \
+                 whether those measurements had the CPU to themselves."
+                    .to_string(),
+            );
+        }
+        guards
     }
 
     /// Records that external work competed with the measurement in flight.
@@ -1112,6 +1181,11 @@ impl RunManager {
             // the previous one, which has already collected it.
             let _ = handle.take_contention();
 
+            // Before the workload starts, not after: the container is up and
+            // busy within a second of the module beginning, and the sampler
+            // ticks at 1 Hz.
+            handle.set_load_ceiling_suspended(module.workload_runs_outside_this_process());
+
             let started_at = chrono::Utc::now();
             let module_start = Instant::now();
             let reporter = RunReporter {
@@ -1131,6 +1205,10 @@ impl RunManager {
 
             let duration_ms = module_start.elapsed().as_secs_f64() * 1000.0;
             let finished_at = chrono::Utc::now();
+            // Resumed for whatever runs next, and before the contention is
+            // taken: a sample landing between these two lines belongs to the
+            // module that just ended, whose evidence was not admissible.
+            handle.set_load_ceiling_suspended(false);
             // The load ceiling's verdict on the window that just closed. Taken
             // once, so it lands on exactly one result.
             let contention = handle.take_contention();
@@ -1373,8 +1451,27 @@ impl RunManager {
         let events_digest = self.events_digest(handle);
         let event_count = handle.last_seq() + 1;
 
+        // Checked here rather than trusted, because a manifest's comparability
+        // list is a claim about the bundle and this is where the bundle
+        // exists. See `RunRecord::comparability_not_recorded` for what an
+        // audit of a live bundle found the first time anyone looked.
+        let meta = BundleMeta::new(AGENT_VERSION);
+        let environment_json = serde_json::to_value(&inventory).unwrap_or(serde_json::Value::Null);
+        let registry = self.registry.clone();
+        let comparability_not_recorded = darcbench_report::bundle::comparability_not_recorded(
+            &results,
+            &meta,
+            &environment_json,
+            &|id| {
+                registry
+                    .get(id)
+                    .map(|module| module.manifest().comparability.clone())
+                    .unwrap_or_default()
+            },
+        );
+
         let mut bundle = Bundle {
-            meta: BundleMeta::new(AGENT_VERSION),
+            meta,
             run: RunRecord {
                 run_id: handle.id.clone(),
                 profile: handle.profile,
@@ -1386,11 +1483,8 @@ impl RunManager {
                 environment_digest,
                 events_digest,
                 event_count,
-                guards_not_enforced: handle
-                    .guards_not_enforced
-                    .read()
-                    .map(|g| g.clone())
-                    .unwrap_or_default(),
+                guards_not_enforced: handle.guards_not_enforced(),
+                comparability_not_recorded,
                 stopped_because: handle
                     .stopped_because
                     .read()
@@ -2021,6 +2115,52 @@ mod tests {
             watchdog.check(&handle, &heavy);
         }
         assert!(handle.take_contention().is_some());
+    }
+
+    /// A container's CPU is not this process's, so the ceiling has no evidence
+    /// while a container-based module runs.
+    #[test]
+    fn the_load_ceiling_is_suspended_for_a_workload_it_cannot_attribute() {
+        // The first `darcbench run` over the database modules reported
+        // `database.oltp` degraded on an idle host, saying that "work other
+        // than this benchmark used 100% of the machine's CPU" - the work being
+        // pgbench, inside the container the module had just started. The
+        // subtraction in `cpu_external_busy_pct` can only remove this
+        // process's own consumption, and a container is not this process's
+        // child at any remove.
+        let handle = watchdog_handle();
+        let mut watchdog = Watchdog::for_scope(Scope::BareMetal);
+        let heavy = external(100.0);
+
+        handle.set_load_ceiling_suspended(true);
+        for _ in 0..(EXTERNAL_LOAD_ABORT_SAMPLES * 2) {
+            assert!(
+                watchdog.check(&handle, &heavy).is_none(),
+                "the ceiling fired on the benchmark's own container"
+            );
+        }
+        assert!(handle.take_contention().is_none());
+
+        // And the disclosure survives the suspension being lifted, because the
+        // bundle is written after every module has finished.
+        handle.set_load_ceiling_suspended(false);
+        assert!(
+            handle
+                .guards_not_enforced()
+                .iter()
+                .any(|g| g.contains("suspended")),
+            "a ceiling that was not enforced must say so: {:?}",
+            handle.guards_not_enforced()
+        );
+
+        // The suspension is not a permanent disarm. Once the container module
+        // is done the guard works again, and it does so from a clean tally
+        // rather than resuming mid-count on samples it was not allowed to
+        // judge.
+        for _ in 0..(EXTERNAL_LOAD_WARN_SAMPLES - 1) {
+            assert!(watchdog.check(&handle, &heavy).is_none());
+        }
+        assert!(watchdog.check(&handle, &heavy).is_some());
     }
 
     /// A guard that was never armed and a guard that never fired produce the

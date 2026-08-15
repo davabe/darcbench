@@ -367,6 +367,39 @@ pub fn run(
     args: &[&str],
     timeout: Duration,
 ) -> Result<Output, ExecError> {
+    run_with_stdin(interpreter, args, None, timeout)
+}
+
+/// [`run`], with bytes written to the child's standard input.
+///
+/// # Why this exists, and why it is safer than the obvious alternative
+///
+/// `wordpress.*` has to get a 1.6 MB fixture into a container. There are three
+/// ways to do that and two of them are worse.
+///
+/// A **bind mount** is forbidden outright: `no_host_path_can_reach_the_
+/// argument_vector` is the isolation, and it is not negotiable for a
+/// convenience.
+///
+/// A **`docker cp`** would put a host path into an argument vector - the thing
+/// `Runtime::build` is already a grudging exception to - and the exception
+/// would be much weaker here, because a build context is copied *into an image*
+/// while `cp` writes into a running container's filesystem.
+///
+/// A **pipe** puts nothing in the vector at all. The data never has a name the
+/// runtime can see, no path is constructed, and the container reads it the way
+/// it would read any stream. It is strictly the smallest of the three.
+///
+/// The write happens on its own thread for the same reason the reads do: a
+/// child that has not started reading yet, or that never will, must not be able
+/// to block this process in `write()` past the timeout. The pipe is closed when
+/// the write finishes, so a child waiting on EOF gets one.
+pub fn run_with_stdin(
+    interpreter: &Interpreter,
+    args: &[&str],
+    input: Option<&[u8]>,
+    timeout: Duration,
+) -> Result<Output, ExecError> {
     let path = interpreter.path.display().to_string();
     let started = Instant::now();
 
@@ -379,7 +412,11 @@ pub fn run(
         // root-owned, and because nothing here should be able to reach a
         // relative path at all.
         .current_dir("/")
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -387,6 +424,27 @@ pub fn run(
             path: path.clone(),
             source,
         })?;
+
+    // Before the readers, because a child that fills its output pipe while
+    // waiting for input would otherwise deadlock against a writer that has not
+    // started. Detached rather than joined: if the child never reads, the
+    // thread dies with the pipe when the child is killed, and the timeout below
+    // is what bounds this function either way.
+    if let Some(bytes) = input {
+        if let Some(mut pipe) = child.stdin.take() {
+            let owned = bytes.to_vec();
+            std::thread::spawn(move || {
+                use std::io::Write;
+                // Both errors are expected and neither is actionable: a child
+                // that exited early gives `EPIPE`, and one that never read
+                // gives nothing. The failure surfaces as the command's own
+                // non-zero status, which the caller already checks.
+                let _ = pipe.write_all(&owned);
+                let _ = pipe.flush();
+                // Dropped here, which is the EOF the child is waiting for.
+            });
+        }
+    }
 
     let stdout = drain(child.stdout.take());
     let stderr = drain(child.stderr.take());

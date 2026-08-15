@@ -61,6 +61,21 @@ impl Registry {
         let node_runtime: Arc<dyn BenchmarkModule> =
             Arc::new(crate::node_runtime::NodeRuntime::new());
         modules.insert(node_runtime.manifest().id.clone(), node_runtime);
+        let database_oltp: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::database_oltp::DatabaseOltp::new());
+        modules.insert(database_oltp.manifest().id.clone(), database_oltp);
+        let database_cache: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::database_cache::DatabaseCache::new());
+        modules.insert(database_cache.manifest().id.clone(), database_cache);
+        let wordpress_site: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::wordpress_site::WordpressSite::new());
+        modules.insert(wordpress_site.manifest().id.clone(), wordpress_site);
+        let deployment_container: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::deployment_container::DeploymentContainer::new());
+        modules.insert(
+            deployment_container.manifest().id.clone(),
+            deployment_container,
+        );
         Self { modules }
     }
 
@@ -193,6 +208,34 @@ impl Registry {
                 has("web.static"),
                 has("php.runtime"),
                 has("node.runtime"),
+                // The database modules are in `deep` alone, and the argument is
+                // `php.runtime`'s exactly: they need a container runtime with a
+                // reachable daemon, most machines in this market have neither,
+                // and a standard run returning `Partial` on every one of them
+                // would be reporting the profile's assumptions as a fault of
+                // the machine.
+                //
+                // They also run last. Between them they start two containers,
+                // pull nothing but hold a gigabyte each while running, and are
+                // the only modules whose failure depends on a daemon rather
+                // than on this process - so a machine that cannot do it has
+                // still produced every other result by the time that shows up.
+                // Same ordering rule as `web.static`, one tier further out.
+                has("database.oltp"),
+                has("database.cache"),
+                // After the database modules and before the deploy one. It is
+                // the heaviest thing in the suite - two containers, three
+                // images, a WordPress install and three hundred posts inserted
+                // one at a time - so a machine that cannot finish it has still
+                // produced everything cheaper.
+                has("wordpress.site"),
+                // Last of all, and the only module that writes to a host
+                // filesystem it cannot put on a tmpfs: a build goes into the
+                // daemon's storage, because the storage driver is configured
+                // daemon-wide and changing it would be T-CONFIG. Running it
+                // after everything else means a machine that turns out not to
+                // have the disk for it has still produced every other result.
+                has("deployment.container"),
             ]
             .into_iter()
             .flatten()

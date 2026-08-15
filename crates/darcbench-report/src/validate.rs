@@ -554,6 +554,7 @@ mod tests {
                 event_count: 10,
                 stopped_because: None,
                 guards_not_enforced: vec![],
+                comparability_not_recorded: vec![],
             },
             environment: inventory,
             modules: vec![],
