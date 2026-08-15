@@ -546,7 +546,7 @@ and the test drives a synthetic target whose latency it dictates.
 | ✅ `database.cache` — Valkey; throughput and unloaded round-trip, registered and scored. *No latency-under-load metric* | S | 1 ew |
 | ✅ WordPress fixture generator (deterministic content) — WXR, checksum-pinned | M | 2 ew |
 | `wordpress.*` — Origin, Cached, Database, Admin scores | L | 3 ew |
-| 🚧 `deployment.container` — build (cached and uncached), image write-out and extraction. *Startup and health blocked on a pinned runnable base image* | M | 2 ew |
+| ✅ `deployment.container` — build (cached and uncached), image write-out and extraction, startup and health. Registered and scored | M | 2 ew |
 
 **Delivered so far:** the **container isolation tier**,
 `darcbench-modules::container`. It is what makes "never touch a production
@@ -717,12 +717,37 @@ under container scope and that `network.transfer` makes about packet loss: a
 guard that fires on the wrong evidence is worse than one that declares itself
 absent.
 
-**The pattern across all six is worth naming**, because it is the argument for
-the development-host document existing at all. Not one was a logic error. Every
-one was a correct-looking piece of code meeting a fact about the world that no
-amount of reading it would have supplied: what an entrypoint does with root,
-when a userland proxy starts listening, where tmpfs pages are charged, what a
-tool prints to a pipe, and which processes a `/proc` file counts.
+**A seventh, found by deleting an image.** All three container modules declared
+`max_network_bytes: 0`, and `database.oltp`'s comment even stated the
+assumption — "the image is pulled by the container runtime before the run" —
+with nothing making it true. `docker run` on an absent image pulls it. So on
+any machine that had never run DARCBench, that module fetched **156 MB** while
+preflight told the operator the run used no network at all.
+
+And the pull landed *inside* a measurement. With the base image removed,
+`deployment.container`'s startup figure came back with a **147% coefficient of
+variation**: six repetitions of a container start and one of a container start
+plus a download. The freshly-added variance sweep caught it, which is the sweep
+working — but a metric that needs a warning to be interpretable is one measured
+wrong.
+
+The fetch is now explicit, before any clock starts, and reported in the bundle
+as `image_fetched_during_this_run`. Each allow-list entry carries what it costs
+to download, and the three manifests declare it. With the image absent the
+coefficient of variation is 3.8% instead of 147%.
+
+This one is worth separating from the other six because it was found a
+different way. The first six came from running code that had never run; this
+came from running code that had already worked, on a machine deliberately put
+back into the state a new one would be in. **A benchmark that has only ever
+been run twice on the same host has not been run on a second host.**
+
+**The pattern across the first six is worth naming**, because it is the argument
+for the development-host document existing at all. Not one was a logic error.
+Every one was a correct-looking piece of code meeting a fact about the world
+that no amount of reading it would have supplied: what an entrypoint does with
+root, when a userland proxy starts listening, where tmpfs pages are charged,
+what a tool prints to a pipe, and which processes a `/proc` file counts.
 
 Then **`database.oltp@1.0.0`** — six metrics: select-only and read-write
 throughput, and the mean and an estimated 95th-percentile latency for each.
@@ -887,11 +912,37 @@ bounded ceiling. What an operator wants here is the machine's own contribution:
 reading a build context, writing layers, committing them to the storage driver,
 reading them back.
 
-**Startup and health are in the deliverable and are not delivered.** Both need
-an image with something runnable in it, which means a base image, which means a
-pinned digest — the same block. They are declared in the manifest's limitations
-rather than approximated, because a startup time measured by starting a
-container that immediately fails would be a number with a name and no meaning.
+**Startup and health are now delivered**, on a pinned BusyBox base: 877 KB, one
+static multi-call binary, no init system. That is not a retreat from the
+paragraph above but the same argument applied to a different question. The
+build must not start `FROM` a real base image because that would measure a
+registry; the startup measurement must start from *something*, and the right
+something contributes as little of its own as a running container can. The
+build stays `FROM scratch` regardless — a base image being available is not a
+reason to put one in the build.
+
+`startup.cold` is a foreground `run … true`: create, start, exec, exit, remove,
+timed as a wall clock rather than by polling. `health.to_serving` runs
+BusyBox's `httpd` and times until an **HTTP status line** comes back. Not a TCP
+connect, for the reason the isolation tier learned the hard way: the runtime's
+userland proxy accepts as soon as the container exists. The response is a 404,
+because the document root is an empty tmpfs — filling it would need a host path
+inside a container and this tier does not have one — and a 404 from a running
+server is a response.
+
+These two are also the module's only metrics with a distribution behind them,
+and the contrast is deliberate. A build takes seconds, so one observation is
+dominated by the work; a container start takes a few hundred milliseconds,
+which is the same order as whatever else the daemon happened to be doing, so a
+single sample is mostly noise. Seven and five repetitions respectively, with a
+real coefficient of variation.
+
+Which immediately falsified something. The manifest had declared a
+`stability_cv_bound` since the module was written and nothing checked it —
+harmless while every metric was a single observation with no coefficient of
+variation to exceed anything, and an unkept promise the moment a distribution
+existed. The variance sweep `network.transfer` arrived at the hard way is now
+here too, over the metric list rather than inside one construction path.
 
 **This is the one module that writes to a host filesystem it cannot put on a
 tmpfs.** The storage driver is configured daemon-wide and is not this program's

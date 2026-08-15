@@ -31,7 +31,65 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
   than from an estimate of it, and the reasoning records which direction each
   extrapolation goes and why.
 
+**`deployment.container` is registered, and the Deployment category scores** —
+startup and health delivered
+- Its five build and image metrics had never run: they needed a daemon, not a
+  base image, and there was no daemon. They ran clean, and `docker load` was
+  checked by hand to confirm it re-extracts rather than recognising layers the
+  build cache still holds — the `rmi` before it is doing its job.
+- **`startup.cold` and `health.to_serving`** close the deliverable. The base is
+  a pinned BusyBox: 877 KB, one static multi-call binary, no init system. That
+  is not a retreat from the module's `FROM scratch` rule but the same argument
+  applied to a different question — the build must not start from a real base
+  image because that would measure a registry, and the startup measurement must
+  start from *something*, so the right something contributes as little of its
+  own as a running container can. The build is unchanged.
+- `startup.cold` is a foreground run to completion, timed as a wall clock
+  rather than by polling. `health.to_serving` times until an **HTTP status
+  line** comes back, not until a TCP connect succeeds — the runtime's userland
+  proxy accepts as soon as the container exists, which is the trap the
+  isolation tier already learned once. The answer is a 404, because the
+  document root is an empty tmpfs and filling it would need a host path inside
+  a container.
+- They are the module's only metrics with a distribution behind them, and the
+  contrast is deliberate: a build takes seconds and is dominated by the work, a
+  container start takes a few hundred milliseconds and a single sample is
+  mostly whatever the daemon was doing.
+- Which falsified something immediately. The manifest had declared a
+  `stability_cv_bound` since the module was written and nothing checked it —
+  harmless while every metric was a single observation, an unkept promise the
+  moment a distribution existed. The variance sweep is now here too, over the
+  metric list rather than inside one construction path.
+- A second argument vector joins `run_args`: `ephemeral_run_args`, for a
+  foreground one-shot container. Strictly more contained than the first —
+  nothing published, nothing mounted, and `--network none` — and read by the
+  same whole-vector tests, because a second vector is a second chance to get
+  the isolation wrong.
+
 ### Fixed
+
+**An undeclared 156 MB download, inside a measurement.** All three container
+modules declared `max_network_bytes: 0`, and `database.oltp`'s comment stated
+the assumption outright — "the image is pulled by the container runtime before
+the run" — with nothing making it true.
+- `docker run` on an absent image pulls it. So on any machine that had never run
+  DARCBench, that module fetched 156 MB while preflight told the operator the
+  run used no network at all. On a metered VPS that is somebody's money.
+- And the pull landed inside the measurement. With the base image removed,
+  `deployment.container`'s startup figure came back at a **147% coefficient of
+  variation**: six repetitions of a container start and one of a container start
+  plus a download. The variance sweep above caught it, which is the sweep
+  working — but a metric that needs a warning to be interpretable is one
+  measured wrong.
+- `Runtime::ensure_image_present` now fetches explicitly, before any clock
+  starts, and the bundle records `image_fetched_during_this_run`. Each
+  allow-list entry carries its download size and the three manifests declare it.
+  With the image absent the coefficient of variation is 3.8% instead of 147%.
+- **Worth separating from the defects below**, because it was found a different
+  way: those came from running code that had never run, this came from running
+  code that already worked on a host deliberately put back into the state a new
+  machine would be in. A benchmark that has only ever been run twice on the same
+  host has not been run on a second host.
 
 **Five defects that only a real container daemon could find.** `Sandbox::launch`
 had never run. `docs/DEVELOPMENT-HOST.md` said to expect that step to find

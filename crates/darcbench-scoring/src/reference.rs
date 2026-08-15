@@ -646,6 +646,74 @@ pub fn provisional_reference() -> ReferenceProfile {
         latency_point(1.0, 0.5, CategoryKey::Database, None),
     );
 
+    // --- deployment.container -------------------------------------------------
+    //
+    // The Deployment category's first and only module, and the category with
+    // the smallest weight in a standard total - 4%. That is right: it is the
+    // one category measuring what a *developer* feels rather than what a
+    // visitor does, and it rises to 10% in the workload profile where a deploy
+    // pipeline is the point.
+    //
+    // These anchors are the least transferable in this file, and it is worth
+    // saying why rather than leaving it to be discovered. Every figure here is
+    // a measurement of the container *daemon* as much as of the machine: the
+    // storage driver decides what a layer commit costs, and overlay2 on ext4
+    // against the same silicon with a copy-on-write-whole-file driver differ by
+    // more than any two CPUs in this market do. DARC-REF-1's specification
+    // names a filesystem, which helps, but it does not name a storage driver.
+    //
+    // So these assume the common configuration - overlay2 on ext4 - and a
+    // comparison across machines that differ in it is not one the numbers
+    // support. The module records the runtime it used; the comparison layer can
+    // refuse on that.
+    //
+    // Observed on 2026-08-14: 2.0 s uncached, 0.19 s cached, 10x speedup,
+    // ~43 MiB/s each way, 316 ms to start a container and 418 ms to get an
+    // answer out of one. The build anchors assume DARC-REF-1's two NVMe drives
+    // in RAID 1 beat that VM's single virtual disk on the layer commits, which
+    // are the write-bound part.
+    points.insert(
+        "deployment.container/build.uncached".into(),
+        latency_point(1.5, 1.5, CategoryKey::Deployment, None),
+    );
+    // The one an operator lives with. A cold build happens when the cache is
+    // lost; a warm one happens on every push.
+    points.insert(
+        "deployment.container/build.cached".into(),
+        latency_point(0.15, 1.25, CategoryKey::Deployment, None),
+    );
+    // Deliberately the lowest weight of the five, despite being the module's
+    // most quotable number. A ratio is not a speed: a machine with a *slow*
+    // uncached build earns a big speedup for having had further to fall, so
+    // scoring it heavily would reward the wrong thing. It is here because it
+    // answers a real question - is the cache working on this host - and not
+    // because it ranks machines.
+    points.insert(
+        "deployment.container/cache.speedup".into(),
+        point(10.0, 0.5, CategoryKey::Deployment, None),
+    );
+    points.insert(
+        "deployment.container/image.save".into(),
+        point(120.0, 0.75, CategoryKey::Deployment, None),
+    );
+    points.insert(
+        "deployment.container/image.load".into(),
+        point(120.0, 0.75, CategoryKey::Deployment, None),
+    );
+    // Container start is nearly all kernel and daemon work - namespaces,
+    // cgroups, an overlay mount - and barely uses more than one core, so it
+    // tracks single-thread speed and syscall cost rather than core count. The
+    // observing machine had a fast core, so these anchors sit close to what it
+    // measured rather than well below.
+    points.insert(
+        "deployment.container/startup.cold".into(),
+        latency_point(300.0, 1.0, CategoryKey::Deployment, None),
+    );
+    points.insert(
+        "deployment.container/health.to_serving".into(),
+        latency_point(400.0, 1.0, CategoryKey::Deployment, None),
+    );
+
     ReferenceProfile {
         name: "DARC-REF-1".into(),
         calibrated: false,
@@ -890,7 +958,7 @@ mod tests {
         // so they could not run, so anchoring them would have been anchoring an
         // idea. They were added when the digests were pinned and both modules
         // had produced metrics on real hardware.
-        const IMPLEMENTED: [&str; 9] = [
+        const IMPLEMENTED: [&str; 10] = [
             "cpu.mixed/",
             "memory.bandwidth/",
             "storage.mixed/",
@@ -900,6 +968,7 @@ mod tests {
             "node.runtime/",
             "database.oltp/",
             "database.cache/",
+            "deployment.container/",
         ];
         let r = provisional_reference();
         for key in r.points.keys() {
@@ -949,6 +1018,13 @@ mod tests {
             "database.oltp/write.latency_estimated_p95",
             "database.cache/roundtrip.unloaded_mean",
             "database.cache/roundtrip.unloaded_max",
+            // Deployment. Two builds and two container starts, all four of
+            // which are durations - and none of whose keys contain the word a
+            // heuristic would look for.
+            "deployment.container/build.uncached",
+            "deployment.container/build.cached",
+            "deployment.container/startup.cold",
+            "deployment.container/health.to_serving",
         ];
 
         let declared: std::collections::BTreeSet<&str> = LOWER_IS_BETTER.iter().copied().collect();

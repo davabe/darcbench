@@ -9,13 +9,12 @@ access to a registry, and the machine it was written on had neither.
 
 **That block is cleared.** On 2026-08-14 the work moved to a host with Docker
 29.1.3 and registry access. The digests are pinned, `Sandbox::launch` has run,
-both database modules are registered and scored, and the five defects that
-first contact found are fixed — see [ROADMAP.md](ROADMAP.md), *What the first
-real daemon changed*.
+all three container modules are registered and scored, and the seven defects
+that first contact found are fixed — see [ROADMAP.md](ROADMAP.md), *What the
+first real daemon changed*.
 
-What remains needing a daemon is `wordpress.*` and the second half of
-`deployment.container`. This document is still addressed to whoever picks that
-up.
+What remains needing a daemon is `wordpress.*`. This document is still
+addressed to whoever picks that up.
 
 ---
 
@@ -90,7 +89,7 @@ Phase 4:
 | `database.cache` | ✅ **Registered, anchored, manifested.** Six metrics on real hardware | — |
 | WordPress fixture generator | ✅ Complete and verified. Pure, deterministic, checksum-pinned | — |
 | `wordpress.*` | Not written | Pinned WordPress + MariaDB images |
-| `deployment.container` | Build, cache and image save/load delivered. Startup and health are not | A pinned *runnable* base image |
+| `deployment.container` | ✅ **Registered, anchored, manifested.** Seven metrics, including startup and health against a pinned BusyBox | — |
 
 Read [ROADMAP.md](ROADMAP.md) Phase 4 for the reasoning behind each. Everything
 marked "not delivered" is declared in the relevant module's `limitations`, not
@@ -122,7 +121,7 @@ Two tests guard the table and one more was added:
 pending, and `every_allowed_image_runs_as_a_service_account` refuses an entry
 that would run as root.
 
-### Step 2 — Run the containers · ✅ done, and it found five defects
+### Step 2 — Run the containers · ✅ done, and it found seven defects
 
 This was the step nobody had done, and the advice above it was right: **treat a
 clean first run as suspicious rather than as success.** It was not clean.
@@ -147,6 +146,19 @@ a competing tenant and degraded it on an idle machine. A container is not this
 process's child at any remove, so its CPU can never be subtracted. Any module
 whose work runs outside this process must return `true` from
 `workload_runs_outside_this_process`.
+
+A seventh appeared only after deleting an image that had been pulled by hand.
+`docker run` fetches an absent image, so all three modules were doing an
+undeclared 156 MB / 17 MB / 1 MB transfer *inside* a measurement -
+`deployment.container`'s startup metric came back at 147% variance because one
+repetition of seven included a download. `Runtime::ensure_image_present` now
+does it explicitly and untimed, and each allow-list entry declares what it
+costs.
+
+**That last one is the one to internalise.** The first six came from running
+code that had never run. The seventh came from running code that already
+worked, on a host deliberately put back into the state a new machine would be
+in. Delete the images before you believe a container module.
 
 The by-hand checks in this section were all performed and all pass:
 
@@ -193,11 +205,11 @@ Two things to get right, both of which the roadmap already argues:
   criterion, in as many words. A WordPress that returned a setup screen for
   every request would produce fast, meaningless numbers.
 
-### Step 5 — `deployment.container`'s missing half
+### Step 5 — `deployment.container`'s missing half · ✅ done
 
-With a pinned runnable base image, startup and health become measurable. Note
-that this changes what the build measures — see the module docs for why the
-build itself must stay `FROM scratch` even after a base image is available.
+`startup.cold` and `health.to_serving` now run against a pinned BusyBox. The
+build did **not** change and must not: see the module docs for why it stays
+`FROM scratch` even now that a base image is available.
 
 ---
 
@@ -351,6 +363,10 @@ The next session, for `wordpress.*`:
 [ ] tmpfs and memory ceiling revisited: they are ONE budget (see §3, step 2)
 [ ] workload_runs_outside_this_process returns true, or the load ceiling will
     degrade the module on an idle machine
+[ ] download_bytes set on each allow-list entry, and max_network_bytes in the
+    manifest matches - the image WILL be fetched on a machine that lacks it
+[ ] docker rmi the images and run again: an implicit pull inside a measurement
+    is invisible on the host that pulled them by hand
 [ ] The module driven with examples/probe.rs before it is registered
 [ ] AND driven again through `darcbench run --modules`, which is where the
     sixth defect appeared and the probe could not have

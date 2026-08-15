@@ -67,6 +67,12 @@ impl Registry {
         let database_cache: Arc<dyn BenchmarkModule> =
             Arc::new(crate::database_cache::DatabaseCache::new());
         modules.insert(database_cache.manifest().id.clone(), database_cache);
+        let deployment_container: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::deployment_container::DeploymentContainer::new());
+        modules.insert(
+            deployment_container.manifest().id.clone(),
+            deployment_container,
+        );
         Self { modules }
     }
 
@@ -214,6 +220,13 @@ impl Registry {
                 // Same ordering rule as `web.static`, one tier further out.
                 has("database.oltp"),
                 has("database.cache"),
+                // Last of all, and the only module that writes to a host
+                // filesystem it cannot put on a tmpfs: a build goes into the
+                // daemon's storage, because the storage driver is configured
+                // daemon-wide and changing it would be T-CONFIG. Running it
+                // after everything else means a machine that turns out not to
+                // have the disk for it has still produced every other result.
+                has("deployment.container"),
             ]
             .into_iter()
             .flatten()
