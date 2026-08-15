@@ -13,8 +13,9 @@ all three container modules are registered and scored, and the seven defects
 that first contact found are fixed — see [ROADMAP.md](ROADMAP.md), *What the
 first real daemon changed*.
 
-What remains needing a daemon is `wordpress.*`. This document is still
-addressed to whoever picks that up.
+**Phase 4 is complete.** Every deliverable in it now runs, is registered and is
+scored. What this document is for from here is adding the *next* image or the
+next container-based module, and the reasoning in §3 is what governs that.
 
 ---
 
@@ -88,7 +89,7 @@ Phase 4:
 | `database.oltp` | ✅ **Registered, anchored, manifested.** Six metrics on real hardware | — |
 | `database.cache` | ✅ **Registered, anchored, manifested.** Six metrics on real hardware | — |
 | WordPress fixture generator | ✅ Complete and verified. Pure, deterministic, checksum-pinned | — |
-| `wordpress.*` | Not written | Pinned WordPress + MariaDB images |
+| `wordpress.site` | ✅ **Registered, anchored, manifested.** Four metrics against a pinned WordPress + MariaDB stack, with cache disclosure | — |
 | `deployment.container` | ✅ **Registered, anchored, manifested.** Seven metrics, including startup and health against a pinned BusyBox | — |
 
 Read [ROADMAP.md](ROADMAP.md) Phase 4 for the reasoning behind each. Everything
@@ -185,25 +186,54 @@ machine. They run last within `deep`, after `web.static`, because their failure
 depends on a daemon rather than on this process.
 
 
-### Step 4 — `wordpress.*`
+### Step 4 — `wordpress.*` · ✅ done
 
-Now it can be written against a base that is known to work.
+Delivered as `wordpress.site`. Four things it settled that the next
+container-based module will meet too:
 
-The fixture already exists and is done:
-`darcbench_modules::wordpress_fixture::Fixture::generate(FixtureSize::Standard)`
-produces WXR with a checksum pinned by a test. What is missing is the module
-that stands up WordPress + MariaDB, imports it with `wp import`, and measures
-Origin, Cached, Database and Admin.
+**Two containers need a network, and it must not be `--internal`.** An internal
+network has no port publishing, so the web server is unreachable from the
+process measuring it. Block outbound at the application instead - WordPress has
+`WP_HTTP_BLOCK_EXTERNAL`.
 
-Two things to get right, both of which the roadmap already argues:
+**A port below 1024 without root is a sysctl, not a capability.**
+`net.ipv4.ip_unprivileged_port_start=0` is namespaced and grants nothing.
 
-- **Cache disclosure is the whole point.** `docs/BENCHMARK-METHODOLOGY.md`:
-  *"WordPress performance without a cache disclosure is meaningless."* The
-  Cached and Origin numbers must be separate metrics, and which object cache
-  and page cache were active must be in `comparability`.
-- **Verify the installation before recording anything.** That is Phase 4's exit
-  criterion, in as many words. A WordPress that returned a setup screen for
-  every request would produce fast, meaningless numbers.
+**Two containers sharing files needs `--volumes-from`, not a tmpfs.** A tmpfs is
+visible to exactly one container. The WordPress entry is the only one in the
+allow-list with `data_on_tmpfs: false` for that reason, and it discloses that
+its files are in the daemon's storage.
+
+**Getting data into a container is a pipe.** `runtime_exec::run_with_stdin` and
+`Ephemeral::stdin` exist so a 1.6 MB fixture reaches WP-CLI without a host path
+ever entering an argument vector. `docker cp` would have been the obvious route
+and is strictly worse.
+
+`wp import` was **not** used, and the reasoning is in `Fixture::to_php_import`:
+the WordPress Importer is a plugin that would have to be downloaded from
+wordpress.org at run time.
+
+Both things the roadmap insisted on were done and both mattered:
+
+- **Cache disclosure.** No page cache and no object cache are installed, the
+  bundle says so, and `origin.cold`/`origin.warm` are explicitly named as *not*
+  a cached-versus-uncached pair - because that is the obvious misreading and it
+  would be off by two orders of magnitude.
+- **The installation is verified before anything is timed**, by evidence rather
+  than an exit code: the homepage has to be a page, of plausible size,
+  containing a title the fixture generated.
+
+**Two defects it found in itself, both by being run rather than read:**
+
+`php_version` and `opcache` were asked of the WP-CLI container - a *different
+image* - so PHP was reported as 8.3.33 where Apache ran 8.3.31, and opcache as
+`disabled` because `opcache.enable_cli` is 0 while `opcache.enable` is 1. Both
+are comparability keys. **Ask the container that served the request.**
+
+`origin.warm` was measured immediately after the deliberate cold start and was
+not warm: 94 ms at 64% variation, against a heavier page seconds later at 43 ms
+and 5.5%. One warm-up pass over every path before timing any of them fixed it
+to 42 ms at 10.7%. **Warm everything, then time everything.**
 
 ### Step 5 — `deployment.container`'s missing half · ✅ done
 

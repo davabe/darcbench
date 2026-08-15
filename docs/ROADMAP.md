@@ -545,7 +545,7 @@ and the test drives a synthetic target whose latency it dictates.
 | ✅ `database.oltp` — PostgreSQL, read-only and read-write, durability disclosed, registered and scored. *MariaDB/MySQL not delivered* | L | 4 ew |
 | ✅ `database.cache` — Valkey; throughput and unloaded round-trip, registered and scored. *No latency-under-load metric* | S | 1 ew |
 | ✅ WordPress fixture generator (deterministic content) — WXR, checksum-pinned | M | 2 ew |
-| `wordpress.*` — Origin, Cached, Database, Admin scores | L | 3 ew |
+| ✅ `wordpress.site` — cold, warm, archive and admin, on a pinned WordPress + MariaDB stack, with cache disclosure. Registered and scored | L | 3 ew |
 | ✅ `deployment.container` — build (cached and uncached), image write-out and extraction, startup and health. Registered and scored | M | 2 ew |
 
 **Delivered so far:** the **container isolation tier**,
@@ -893,6 +893,80 @@ posts have **no comments at all**, because a corpus where every post is
 commented hides the case an operator actually has. And dates are derived from an
 index rather than the clock — the wall clock is the one input that would make
 every run's fixture different and every checksum useless.
+
+Then **`wordpress.site@1.0.0`** — four metrics, and the module this whole
+product is aimed at. `docs/MARKET-RESEARCH.md` names WordPress hosting as the
+segment; every other module measures a *component* of that, and this one
+measures the thing an operator is actually buying. A cold first request, a warm
+homepage, a query-heavy category archive, and the authenticated admin
+dashboard, against a WordPress and MariaDB the agent starts and destroys.
+
+**It is the only module that runs somebody else's application**, and it is a
+deliberate exception rather than a drift. Everywhere else DARCBench supplies
+the workload, because a run against the operator's software measures their
+configuration. Here the question *is* "how will WordPress run on this machine",
+and there is no proxy for WordPress that answers it.
+
+**Cache disclosure is the deliverable, not a footnote.** The methodology is
+blunt: *"WordPress performance without a cache disclosure is meaningless."* So
+the module installs no page cache and no object cache, says so in the bundle,
+and names its metrics so they cannot be misread — `origin.cold` and
+`origin.warm` are explicitly **not** a cached-versus-uncached pair. What differs
+between them is PHP's opcode cache and the database's buffer pool; both are
+pages WordPress built from scratch. Installing a page cache would need a plugin
+downloaded from wordpress.org at run time, which is the unpinned dependency the
+image allow-list exists to refuse.
+
+**The fixture goes in through WordPress's own API**, and choosing that took
+rejecting three alternatives. `wp import` needs the WordPress Importer, which is
+a plugin and therefore a run-time download. Per-item `wp post create` is three
+hundred interpreter start-ups. Direct SQL would put this workspace in the
+business of knowing WordPress's schema — term relationships, comment counts,
+slug uniqueness — and getting one wrong renders a site that is not the fixture.
+So: one generated PHP script, piped to `wp eval-file -`, calling
+`wp_insert_post` and `wp_insert_comment`. Those are the functions the importer
+itself calls, and WordPress does its own sanitising.
+
+The whole corpus travels as **one JSON document inside one PHP single-quoted
+string**, so there is exactly one escaping problem rather than one per field —
+and the script reports back how many posts and comments it inserted plus the
+fixture's own checksum, all three of which must match before anything is timed.
+
+**Two containers is new**, and the tier grew a private per-run network for it.
+That network is deliberately *not* `--internal`: an internal network has no port
+publishing, so the web server was unreachable from the process meant to measure
+it. The outbound block moved up to `WP_HTTP_BLOCK_EXTERNAL`, WordPress's own
+switch, which is a better control anyway — it stops the update check that would
+actually have happened rather than stopping packets and hoping.
+
+**Port 80 without root** is `net.ipv4.ip_unprivileged_port_start=0`, a
+namespaced sysctl, rather than `--cap-add NET_BIND_SERVICE`. The same trade the
+PostgreSQL entry makes: remove the need for the privilege instead of granting
+it.
+
+Two defects this found in itself, both by being run:
+
+**Two comparability keys were false.** `php_version` and `opcache` were asked of
+the WP-CLI container, which is a *different image* — so PHP came back 8.3.33
+where Apache was running 8.3.31, and opcache came back `disabled` because
+`opcache.enable_cli` is 0 while `opcache.enable`, the one governing every
+measured request, is 1. Both are keys the comparison layer decides on. A
+comparison refused or allowed on a false fact is worse than one with no fact.
+They are now asked of the container that served the requests.
+
+**`origin.warm` was not warm.** Warming each path immediately before timing it
+meant the first steady-state metric was measured while the stack was still
+climbing out of the cold start that had just been measured deliberately: 94 ms
+at 64% variation, against an archive — a strictly heavier page, timed seconds
+later — at 43 ms and 5.5%. A warm page slower and six times noisier than a heavy
+one is a finding about the order, not the machine. One warm-up pass over every
+path now precedes any timing: 42 ms at 10.7%, and correctly faster than the
+archive.
+
+**Capacity is not measured.** This is single-request latency. How many
+concurrent visitors the machine sustains is a different question, and answering
+it means pointing the open-model load generator at a stack that takes minutes to
+build — worth doing, and not this deliverable.
 
 Then **`deployment.container@1.0.0`** — five metrics: a cold-cache build, the
 same build warm, what the layer cache is worth as a ratio, and the rates for

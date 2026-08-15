@@ -31,6 +31,51 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
   than from an estimate of it, and the reasoning records which direction each
   extrapolation goes and why.
 
+**`wordpress.site` — the module this product is aimed at**, and the last
+unwritten Phase 4 deliverable
+- Four metrics against a WordPress and MariaDB the agent starts and destroys: a
+  cold first request, a warm homepage, a query-heavy category archive, and the
+  authenticated admin dashboard. `docs/MARKET-RESEARCH.md` names WordPress
+  hosting as the segment; every other module measures a *component* of that.
+- **It is the only module that runs somebody else's application**, and that is
+  an exception rather than a drift. Everywhere else DARCBench supplies the
+  workload, because a run against the operator's software measures their
+  configuration. Here the question *is* "how will WordPress run on this
+  machine", and there is no proxy for WordPress that answers it.
+- **Cache disclosure is the deliverable.** The methodology is blunt —
+  *"WordPress performance without a cache disclosure is meaningless"* — so no
+  page cache and no object cache are installed, the bundle says so, and
+  `origin.cold`/`origin.warm` are named as explicitly **not** a
+  cached-versus-uncached pair. What differs between them is PHP's opcode cache
+  and the database's buffer pool; both are pages WordPress built from scratch.
+- **The fixture goes in through WordPress's own API.** `wp import` needs the
+  WordPress Importer, which is a plugin and therefore an unpinned download from
+  wordpress.org at run time — the supply-chain dependency the image allow-list
+  exists to refuse. Per-item `wp post create` would be three hundred interpreter
+  start-ups; direct SQL would put this workspace in the business of knowing
+  WordPress's schema. So: one generated PHP script piped to `wp eval-file -`,
+  calling `wp_insert_post` and `wp_insert_comment` — the functions the importer
+  itself calls. The corpus travels as one JSON document inside one PHP
+  single-quoted string, so there is exactly one escaping problem rather than one
+  per field, and the script reports back its counts and the fixture checksum,
+  all of which must match before anything is timed.
+- **Two containers is new**, and the tier grew a private per-run network,
+  `--volumes-from` sharing, `--sysctl` support and stdin piping for it. Port 80
+  without root is `net.ipv4.ip_unprivileged_port_start=0` rather than
+  `--cap-add NET_BIND_SERVICE` — the same trade the PostgreSQL entry makes.
+- Two defects it found in itself, both by being run: `php_version` and `opcache`
+  were asked of the WP-CLI container, a *different image*, so PHP was reported
+  as 8.3.33 where Apache ran 8.3.31 and opcache as `disabled` because
+  `opcache.enable_cli` is 0 while `opcache.enable` is 1 — both comparability
+  keys, and a comparison decided on a false fact is worse than one with no fact.
+  And `origin.warm` was measured while the stack was still climbing out of the
+  cold start, at 94 ms and 64% variation against a heavier page at 43 ms and
+  5.5%; one warm-up pass over every path before timing any of them brought it to
+  42 ms at 10.7%.
+- **Capacity is not measured.** This is single-request latency; how many
+  concurrent visitors the machine sustains needs the open-model load generator
+  pointed at a stack that takes minutes to build.
+
 **`deployment.container` is registered, and the Deployment category scores** —
 startup and health delivered
 - Its five build and image metrics had never run: they needed a daemon, not a
