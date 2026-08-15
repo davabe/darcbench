@@ -744,6 +744,20 @@ pub fn provisional_reference() -> ReferenceProfile {
         latency_point(40.0, 1.5, CategoryKey::Web, None),
     );
     points.insert(
+        // How many renders the machine sustains, which is the other half of
+        // the question a hosting buyer is asking and the half a latency figure
+        // cannot answer. Unlike the three latency anchors, this one *does*
+        // scale with core count: independent requests are independent work.
+        //
+        // The observing machine served 26.9/s on two vCPUs with the generator,
+        // Apache and MariaDB all sharing them. DARC-REF-1's sixteen threads
+        // give the generator room and leave far more for Apache, so this is
+        // extrapolated by rather less than eight and rather more than two -
+        // MariaDB is one server and does not multiply.
+        "wordpress.site/origin.capacity".into(),
+        point(180.0, 1.25, CategoryKey::Web, None),
+    );
+    points.insert(
         "wordpress.site/database.archive".into(),
         latency_point(45.0, 1.0, CategoryKey::Web, None),
     );

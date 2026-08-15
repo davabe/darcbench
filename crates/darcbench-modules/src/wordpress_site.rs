@@ -8,6 +8,7 @@
 //! | `origin.warm` | ms | Steady-state page render - what almost every visitor actually gets |
 //! | `database.archive` | ms | A category archive: many posts, many terms, many queries in one render |
 //! | `admin.dashboard` | ms | Authenticated `wp-admin` - the page the site's owner waits on all day |
+//! | `origin.capacity` | req/s | How many renders the machine sustains - the half a latency figure cannot answer |
 //!
 //! # This is the module the product exists for
 //!
@@ -159,6 +160,21 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 /// How long fetching the three images may take.
 const PULL_TIMEOUT: Duration = Duration::from_secs(1800);
 
+/// Workers for the capacity phase, clamped.
+///
+/// One per logical CPU. Fewer would leave the machine idle and measure the
+/// generator; many more would measure Apache's process pool refusing
+/// connections, which is a configuration rather than a capability.
+const CAPACITY_WORKERS: (usize, usize) = (2, 32);
+
+/// How long the capacity phase saturates the machine.
+///
+/// Ten seconds. A WordPress render is tens of milliseconds, so this is
+/// hundreds of requests - enough that the rate is a rate rather than a sample,
+/// and short enough that the suite's heaviest module does not also become its
+/// longest.
+const CAPACITY_SECONDS: u64 = 10;
+
 /// Smallest response that could be a rendered WordPress page.
 ///
 /// WordPress's own setup screen and its error pages are a few kilobytes; a
@@ -306,6 +322,40 @@ fn fetch_text(address: SocketAddr, path: &str, cookies: &[String]) -> Option<Str
     Some(String::from_utf8_lossy(&raw).into_owned())
 }
 
+/// The site, as something the shared load generator can drive.
+///
+/// One connection per request rather than one held per worker, which
+/// `LoadTarget` would allow. That is the honest shape here: this measures how
+/// many *page renders* the machine sustains, and a WordPress render is three
+/// orders of magnitude more expensive than the connection in front of it. A
+/// pooled connection would shave a rounding error off a number dominated by
+/// PHP and MariaDB.
+struct SiteUnderLoad {
+    address: SocketAddr,
+}
+
+impl crate::loadgen::LoadTarget for SiteUnderLoad {
+    fn request(&self, _worker: usize) -> Result<u64, String> {
+        // A failure has to be an error rather than a fast success, for the same
+        // reason the latency phases refuse anything that is not a 200 of
+        // plausible size: an error page and a redirect are the two fastest
+        // things a WordPress can return, and counting them would report a
+        // machine as fastest at the moment it broke.
+        match request(self.address, "GET", "/", &[], None) {
+            Some(response)
+                if response.status == 200 && response.body_bytes >= PLAUSIBLE_PAGE_BYTES =>
+            {
+                Ok(response.body_bytes as u64)
+            }
+            Some(response) => Err(format!(
+                "HTTP {} of {} bytes",
+                response.status, response.body_bytes
+            )),
+            None => Err("no response".to_string()),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The module
 // ---------------------------------------------------------------------------
@@ -407,6 +457,17 @@ impl WordpressSite {
                     "WordPress is served over plaintext HTTP on loopback. TLS termination is a \
                      real cost of running a site and is measured by web.static, which does it \
                      without a CMS in the way."
+                        .into(),
+                    "origin.capacity is closed-loop and deliberately so: workers looping flat out \
+                     ask the machine for everything it will give, which is the capacity question, \
+                     and the phase produces no latency distribution for coordinated omission to \
+                     distort. It runs last, after every latency metric, so its saturation cannot \
+                     reach them."
+                        .into(),
+                    "origin.capacity is a floor twice over. The generator shares the machine with \
+                     the stack it drives, so on a small host it takes a share of the same cores \
+                     Apache needs - which understates a machine with threads to spare by less \
+                     than it understates one without."
                         .into(),
                 ],
                 comparability: vec![
@@ -883,6 +944,56 @@ impl WordpressSite {
             }),
         }
 
+        // --- capacity ---------------------------------------------------------
+        //
+        // **Last, and that placement is the measurement's own precondition.**
+        // This phase drives the machine to saturation; anything timed after it
+        // would be timed against a machine still working through the queue it
+        // left. The three latency metrics above are all taken first, on a
+        // quiet stack, which is what makes them latency figures rather than
+        // latency-under-some-load figures nobody declared.
+        //
+        // Closed-loop on purpose, and it is not a contradiction of everything
+        // this codebase says about coordinated omission: workers looping flat
+        // out ask the machine for everything it will give and report what it
+        // gave. That is exactly the capacity question, and the phase produces
+        // no latency distribution for the omission to distort. See
+        // `loadgen::measure_capacity`.
+        if reporter.is_cancelled() {
+            return Err(ModuleError::Cancelled);
+        }
+        let workers = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(CAPACITY_WORKERS.0)
+            .clamp(CAPACITY_WORKERS.0, CAPACITY_WORKERS.1);
+        let capacity = crate::loadgen::measure_capacity(
+            &SiteUnderLoad { address },
+            workers,
+            Duration::from_secs(CAPACITY_SECONDS),
+        );
+        if capacity > 0.0 {
+            metrics.push(Metric {
+                key: "origin.capacity".into(),
+                label: "Homepage renders sustained".into(),
+                unit: "req/s".into(),
+                value: capacity,
+                direction: Direction::HigherIsBetter,
+                summary: single(capacity),
+                samples: Vec::new(),
+                outliers: Vec::new(),
+            });
+        } else {
+            warnings.push(Warning {
+                code: WarningCode::ValidationFailed,
+                message: "the capacity phase served no successful request, so no rate is \
+                          reported. A rate of zero would read as a machine that cannot serve \
+                          WordPress at all, which is a claim this phase is not entitled to make \
+                          on its own."
+                    .into(),
+                metric_key: Some("origin.capacity".into()),
+            });
+        }
+
         // The variance sweep, over the metric list rather than inside one
         // construction path - the shape `network.transfer` arrived at after
         // making the same promise true for some of its metrics and false for
@@ -909,7 +1020,7 @@ impl WordpressSite {
         }
 
         let context = self.disclosure(
-            runtime, images, run_id, network, env, web, imported, reaped, fetched,
+            runtime, images, run_id, network, env, web, imported, reaped, fetched, workers,
         );
         Ok(ModuleOutput {
             metrics,
@@ -1004,6 +1115,7 @@ impl WordpressSite {
         imported: Imported,
         reaped: usize,
         fetched: bool,
+        workers: usize,
     ) -> serde_json::Map<String, serde_json::Value> {
         // **Asked of the container that served the requests, not of WP-CLI.**
         // The first version of this asked WP-CLI for both, and both answers
@@ -1112,6 +1224,13 @@ impl WordpressSite {
                 "blocked. WP_HTTP_BLOCK_EXTERNAL is defined, so WordPress makes no request to \
                  api.wordpress.org or anywhere else during a measurement."
                     .to_string(),
+            ),
+            (
+                "capacity_workers",
+                format!(
+                    "{workers} closed-loop workers for {CAPACITY_SECONDS}s, run last so the \
+                     saturation cannot reach the latency metrics above it"
+                ),
             ),
             (
                 "client_shares_the_machine",

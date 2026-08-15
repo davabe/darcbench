@@ -78,6 +78,13 @@
       "represents": "The query-heavy page every content site has, and the one that degrades first as a site grows"
     },
     {
+      "key": "origin.capacity",
+      "unit": "req/s",
+      "direction": "higher_is_better",
+      "description": "Homepage renders sustained by 10 seconds of closed-loop load, run last",
+      "represents": "How many concurrent visitors the machine actually serves - the half of the question a latency figure cannot answer"
+    },
+    {
       "key": "admin.dashboard",
       "unit": "ms",
       "direction": "lower_is_better",
@@ -85,7 +92,7 @@
       "represents": "The page the site's owner waits on all day, and the first thing they complain about"
     }
   ],
-  "metrics": ["origin.cold", "origin.warm", "database.archive", "admin.dashboard"],
+  "metrics": ["origin.cold", "origin.warm", "database.archive", "admin.dashboard", "origin.capacity"],
   "derived_metrics": [],
   "repetitions": {
     "note": "Nine timed requests per steady-state metric, median taken. origin.cold is one observation by definition: a site is only cold once, and repeating it would need the whole stack rebuilt. It is published with no distribution rather than with a fabricated one."
@@ -126,13 +133,15 @@
     "The theme is whichever one the pinned WordPress ships as its default. A theme is a large part of what a render costs, so this measures WordPress's own theme rather than the operator's - the same choice web.static makes about serving its own origin rather than the operator's nginx.",
     "The measuring process shares the machine with the stack it measures, so every figure is a floor. It is a much smaller share than in the load-driven modules - this issues one request at a time and spends the wait blocked - but it is not zero.",
     "WordPress is served over plaintext HTTP on loopback. TLS termination is a real cost of running a site and is measured by web.static, which does it without a CMS in the way.",
-    "This is a single-request latency measurement, not a capacity one. How many concurrent visitors the machine sustains is a different question, and answering it would need the open-model load generator pointed at a stack that takes minutes to build."
+    "origin.capacity is closed-loop and deliberately so: workers looping flat out ask the machine for everything it will give, which is the capacity question, and the phase produces no latency distribution for coordinated omission to distort. It runs last, after every latency metric, so its saturation cannot reach them.",
+    "origin.capacity is a floor twice over. The generator shares the machine with the stack, and on a small host it takes a share of the same cores Apache needs - so the figure understates a machine with threads to spare by less than it understates one without."
   ],
   "scoring": {
     "category": "web",
     "facets": {},
     "metric_weight": {
       "origin.warm": 1.5,
+      "origin.capacity": 1.25,
       "database.archive": 1.0,
       "admin.dashboard": 1.0,
       "origin.cold": 0.5
