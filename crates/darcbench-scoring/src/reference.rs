@@ -714,6 +714,53 @@ pub fn provisional_reference() -> ReferenceProfile {
         latency_point(400.0, 1.0, CategoryKey::Deployment, None),
     );
 
+    // --- wordpress.site -------------------------------------------------------
+    //
+    // Scored into **Web**, all four, including the one whose key says
+    // `database`. Every one of them is a page render measured over HTTP, and
+    // the Database category already measures a database directly through
+    // `database.oltp` - putting a WordPress page in there would let a slow PHP
+    // drag down a score that is supposed to be about the database, and would
+    // count the same MariaDB twice.
+    //
+    // Observed on 2026-08-15, on two vCPUs of a Ryzen 9 9900X: 320 ms cold,
+    // 42 ms warm, 47 ms for the archive, 41 ms for the dashboard. The
+    // extrapolation to DARC-REF-1 is close to a wash and that is the
+    // interesting part: a WordPress request is single-threaded PHP, so it
+    // tracks per-core speed, and the observing machine had the *faster* core.
+    // What it did not have was room - Apache, MariaDB and the measuring
+    // process were sharing two of them - and DARC-REF-1's sixteen threads
+    // remove that contention. Slower cores, no queueing: the two roughly
+    // cancel, and these anchors sit a little below what was measured rather
+    // than well below.
+    //
+    // Every figure assumes no page cache and no object cache, which is what
+    // the module installs and discloses. An anchor set drawn from a cached
+    // WordPress would be two orders of magnitude away and would score every
+    // honest machine at nothing.
+    points.insert(
+        // What almost every visitor gets, so it carries the module.
+        "wordpress.site/origin.warm".into(),
+        latency_point(40.0, 1.5, CategoryKey::Web, None),
+    );
+    points.insert(
+        "wordpress.site/database.archive".into(),
+        latency_point(45.0, 1.0, CategoryKey::Web, None),
+    );
+    points.insert(
+        // The page the site's owner waits on all day, and the one a hosting
+        // buyer complains about first.
+        "wordpress.site/admin.dashboard".into(),
+        latency_point(40.0, 1.0, CategoryKey::Web, None),
+    );
+    points.insert(
+        // Lowest weight of the four: it is one observation by definition - a
+        // site is only cold once - and it is paid once per deploy rather than
+        // once per visitor.
+        "wordpress.site/origin.cold".into(),
+        latency_point(300.0, 0.5, CategoryKey::Web, None),
+    );
+
     ReferenceProfile {
         name: "DARC-REF-1".into(),
         calibrated: false,
@@ -958,7 +1005,7 @@ mod tests {
         // so they could not run, so anchoring them would have been anchoring an
         // idea. They were added when the digests were pinned and both modules
         // had produced metrics on real hardware.
-        const IMPLEMENTED: [&str; 10] = [
+        const IMPLEMENTED: [&str; 11] = [
             "cpu.mixed/",
             "memory.bandwidth/",
             "storage.mixed/",
@@ -969,6 +1016,7 @@ mod tests {
             "database.oltp/",
             "database.cache/",
             "deployment.container/",
+            "wordpress.site/",
         ];
         let r = provisional_reference();
         for key in r.points.keys() {
@@ -1025,6 +1073,13 @@ mod tests {
             "deployment.container/build.cached",
             "deployment.container/startup.cold",
             "deployment.container/health.to_serving",
+            // Every WordPress metric is a page render time, so every one of
+            // them is lower-is-better - and not one of their keys contains the
+            // word a heuristic would look for.
+            "wordpress.site/origin.cold",
+            "wordpress.site/origin.warm",
+            "wordpress.site/database.archive",
+            "wordpress.site/admin.dashboard",
         ];
 
         let declared: std::collections::BTreeSet<&str> = LOWER_IS_BETTER.iter().copied().collect();

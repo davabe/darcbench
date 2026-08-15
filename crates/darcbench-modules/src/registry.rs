@@ -67,6 +67,9 @@ impl Registry {
         let database_cache: Arc<dyn BenchmarkModule> =
             Arc::new(crate::database_cache::DatabaseCache::new());
         modules.insert(database_cache.manifest().id.clone(), database_cache);
+        let wordpress_site: Arc<dyn BenchmarkModule> =
+            Arc::new(crate::wordpress_site::WordpressSite::new());
+        modules.insert(wordpress_site.manifest().id.clone(), wordpress_site);
         let deployment_container: Arc<dyn BenchmarkModule> =
             Arc::new(crate::deployment_container::DeploymentContainer::new());
         modules.insert(
@@ -220,6 +223,12 @@ impl Registry {
                 // Same ordering rule as `web.static`, one tier further out.
                 has("database.oltp"),
                 has("database.cache"),
+                // After the database modules and before the deploy one. It is
+                // the heaviest thing in the suite - two containers, three
+                // images, a WordPress install and three hundred posts inserted
+                // one at a time - so a machine that cannot finish it has still
+                // produced everything cheaper.
+                has("wordpress.site"),
                 // Last of all, and the only module that writes to a host
                 // filesystem it cannot put on a tmpfs: a build goes into the
                 // daemon's storage, because the storage driver is configured

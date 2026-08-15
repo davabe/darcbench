@@ -43,6 +43,7 @@ pub mod storage_mixed;
 pub mod web_origin;
 pub mod web_static;
 pub mod wordpress_fixture;
+pub mod wordpress_site;
 pub mod workloads;
 
 pub use module::{
