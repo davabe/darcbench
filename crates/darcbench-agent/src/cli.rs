@@ -15,7 +15,7 @@ use crate::config::DEFAULT_PORT;
     version,
     about = "DARC//BENCH - Deployment, Application, Runtime & Compute benchmark suite",
     long_about = "DARCBench measures real server and web-application performance.\n\
-                  Tombatossals Softworks LLC - https://getdarc.com"
+                  Tombatossals Softworks LLC - https://darcbench.com"
 )]
 pub(crate) struct Cli {
     /// Emit machine-readable JSON instead of formatted text.

@@ -351,23 +351,57 @@ Small, useful on their own, and prerequisites for the above:
 
 ---
 
-## 8. The domain
+## 8. Two domains, and which is which
 
-`darcbench.com` is the public site. The code currently references
-`getdarc.com` — `Cargo.toml`'s `homepage`, `security@getdarc.com` in
-SECURITY.md, CONTRIBUTING.md and THREAT-MODEL.md, and the
-`com.getdarc.darcbench.owned` container label.
+They coexist, and the split is deliberate rather than a leftover.
 
-**The container label must not be changed casually.** It is what `reap` matches
-to find containers a previous run abandoned, so changing it strands every
-container labelled by an older agent. If it ever changes, the reaper has to
-match both for at least one release cycle. There is no reason to change it: a
-label is an identifier, not a brand.
+**`darcbench.com` is the product.** What DARCBench measures, how to run it, the
+download, the methodology, the leaderboards and the result pages. It is where a
+stranger with a server lands.
 
-The security contact is a commitment published in SECURITY.md and should change
-only alongside a working mailbox.
+**`getdarc.com` is the owner.** getDARC / Tombatossals Softworks LLC. It carries
+the things that identify the *vendor* rather than the product, and those are not
+interchangeable with the product's brand.
 
----
+The rule for deciding where a reference belongs: **does it serve someone looking
+for the tool, or does it identify who is accountable for it?**
+
+| Reference | Domain | Why |
+|---|---|---|
+| `Cargo.toml` `homepage` | `darcbench.com` | The crate's homepage is the product's page. `authors` already carries the owner. |
+| CLI `--help` banner | `darcbench.com` | A user reading it wants where to learn more, not who owns the copyright — the company name is right there beside it. |
+| `security@getdarc.com` | `getdarc.com` | A security contact identifies who receives and triages, which is the company. It is also a published commitment in SECURITY.md and must only change alongside a working mailbox. |
+| `com.getdarc.darcbench.owned` label | `getdarc.com` | Reverse-DNS labels are conventionally the *organisation's* domain, so this is more correct as-is. See the warning below. |
+
+### The container label must not be changed casually
+
+`reap` matches this label to find containers a previous run abandoned - the
+mitigation for "the release profile aborts on panic, and nothing runs on
+`SIGKILL`, so a run that dies leaves its container behind". Changing the string
+strands every container labelled by an older agent, on the machines least able
+to notice.
+
+If it ever has to change, the reaper matches **both** for at least one release
+cycle, and the old one is retired only once no supported version writes it.
+There is no reason to change it: a label is an identifier, not a brand, and this
+one is already the owner's domain, which is what the convention asks for.
+
+### One constraint the site does not get to relax
+
+`darcbench.com` should present results as well as anything in this market does -
+that is a stated goal, and [COMPETITIVE-ANALYSIS.md](COMPETITIVE-ANALYSIS.md)
+already records why: *"a benchmark people enjoy reading gets run."*
+
+But the **HTML report the agent generates stays self-contained and offline**. It
+embeds no external URL, and `scripts/e2e.sh` fails the build if one appears. An
+operator runs this on a server that may have no egress at all, and a report that
+degrades without the network is a report that cannot be filed, mailed or read in
+a datacentre.
+
+So the animated, spectacular presentation lives **on the site**, rendered from
+an uploaded bundle - not in the artifact the agent writes. They are two
+renderers over one signed document, which is also what keeps the local report
+honest: it shows what the bundle contains, with nothing fetched.
 
 ## 9. Open questions
 

@@ -8,7 +8,11 @@ edition = "2021"
 rust-version = "1.82"
 license = "Apache-2.0"
 repository = "https://github.com/davabe/darcbench"
-homepage = "https://getdarc.com"
+# The product's own site: what it measures, how to run it, the leaderboards.
+# `authors` above carries the owner, getDARC / Tombatossals Softworks LLC, whose
+# domain stays on the things that identify the *vendor* rather than the product -
+# the security contact and the container label. See docs/PUBLIC-RESULTS.md.
+homepage = "https://darcbench.com"
 authors = ["Tombatossals Softworks LLC"]
 
 [workspace.dependencies]
