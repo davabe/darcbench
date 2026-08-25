@@ -151,6 +151,29 @@ that silently dropped rows it could not read
   newer bundle ignores it, and a newer one reading an older bundle sees an
   empty basket rather than a wrong one.
 
+**`meta.agent_build_hash`** — the agent records the SHA-256 of its own executable
+- A hard prerequisite for the `Verified` tier, which requires the build hash to
+  match a published release (ADR-0008). The server half does not exist yet;
+  recording it now costs an optional field, and adding it later would mean a
+  schema change during a launch.
+- What it proves: the bundle was produced by a binary byte-identical to one we
+  published. What it does not: that the binary was running unmodified in memory.
+  Nothing short of hardware attestation would, and DARCBench will not require
+  it — the tier ladder carries the rest.
+- `None` when the executable cannot be located or read, rather than a fabricated
+  value. It is the field whose whole purpose is to be checked.
+- **Not a comparability key, deliberately.** A hash changes on every rebuild, so
+  keying on it would make two runs from a contributor's own working tree
+  incomparable with each other — true in the strictest sense and noise that
+  would bury the gaps that matter. Revisit once released binaries are the norm.
+
+**[docs/PUBLIC-RESULTS.md](docs/PUBLIC-RESULTS.md)** — the design for
+`darcbench.com`
+- Submission endpoint, its abuse model, and the leaderboard's partitioning
+  rules. Records why the explanatory half of the site can ship now and the
+  leaderboard cannot: replay and attestation are Phase 6, and calibration
+  gates any number we would have to stand behind publicly.
+
 **`scripts/check-links.sh`** — every path named in a document or a doc comment
 - The CI check read `README.md` and `docs/*.md`, so the fourteen ADRs,
   CONTRIBUTING.md and SECURITY.md went unchecked, as did the seventeen

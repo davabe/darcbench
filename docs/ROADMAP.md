@@ -1130,6 +1130,13 @@ server-side; remote runs work without any inbound connection to the agent.
 **Risks:** leaderboards create the incentive to cheat that Phases 1–5 were built
 to resist. Do not ship leaderboards before nonce and attestation.
 
+**The public site is designed in [PUBLIC-RESULTS.md](PUBLIC-RESULTS.md)**, which
+carries the submission endpoint, its abuse model and the tier ladder that
+decides what a rank is worth. It also records why the explanatory half of
+`darcbench.com` can ship now and the leaderboard cannot: replay and attestation
+are this phase, and calibration — a Phase 2 exit criterion — gates any number we
+would have to stand behind publicly.
+
 **Estimate: ~13.5 ew.**
 
 ---

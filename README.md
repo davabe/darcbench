@@ -241,7 +241,8 @@ scripts/ tests/         validation and end-to-end checks
 **Start here**
 [Product Bible](docs/PRODUCT-BIBLE.md) ·
 [Architecture](docs/ARCHITECTURE.md) ·
-[Roadmap](docs/ROADMAP.md)
+[Roadmap](docs/ROADMAP.md) ·
+[Public results](docs/PUBLIC-RESULTS.md)
 
 **The methodology**
 [Benchmark methodology](docs/BENCHMARK-METHODOLOGY.md) ·

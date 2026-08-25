@@ -23,6 +23,56 @@ pub struct BundleMeta {
     /// comparable score, and validation enforces that.
     pub build_profile: String,
     pub generated_at: chrono::DateTime<chrono::Utc>,
+    /// SHA-256 of the agent executable that produced this bundle.
+    ///
+    /// `Verified` requires this to match a published release
+    /// ([ADR-0008](../../../docs/adr/0008-result-verification.md)), which is
+    /// what raises the cost of faking a result from "edit a JSON file" to
+    /// "reproduce a build and patch it". The server half does not exist yet;
+    /// recording it now costs an optional field, and adding it later would mean
+    /// a schema change during a launch.
+    ///
+    /// **What it proves and does not.** It proves the bundle was produced by a
+    /// binary byte-identical to one we published. It does not prove that binary
+    /// was running unmodified in memory, and nothing short of hardware
+    /// attestation would - which DARCBench will not require. See
+    /// `T-SCORE-FRAUD`.
+    ///
+    /// `None` when the executable cannot be located or read, which is the
+    /// honest answer on a host where `/proc` is restricted or the binary was
+    /// replaced under a running process. A fabricated hash would be worse than
+    /// an absent one: it is the field whose whole purpose is to be checked.
+    ///
+    /// **Not a comparability key, deliberately.** Comparability still turns on
+    /// `agent_version` and `build_target`. A hash changes on every rebuild, so
+    /// keying on it would make two runs from a contributor's own working tree
+    /// incomparable with each other - true in the strictest sense, useless in
+    /// practice, and noise that would bury the gaps that matter. Once released
+    /// binaries are the norm rather than the exception, the hash is the stronger
+    /// key and this should be revisited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_build_hash: Option<String>,
+}
+
+/// SHA-256 of this process's own executable, computed once.
+///
+/// Once, because it cannot change while the process runs and hashing a
+/// ~9 MB binary on every bundle would be a measurable cost in a test suite that
+/// builds hundreds of them.
+fn agent_build_hash() -> Option<String> {
+    use sha2::{Digest, Sha256};
+    static HASH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    HASH.get_or_init(|| {
+        let path = std::env::current_exe().ok()?;
+        let mut file = std::fs::File::open(path).ok()?;
+        let mut hasher = Sha256::new();
+        // Streamed rather than read whole: this runs on the machine under test,
+        // and a benchmark has no business allocating its own binary's size in
+        // one buffer to compute a digest it could stream.
+        std::io::copy(&mut file, &mut hasher).ok()?;
+        Some(format!("sha256:{}", hex::encode(hasher.finalize())))
+    })
+    .clone()
 }
 
 impl BundleMeta {
@@ -39,6 +89,7 @@ impl BundleMeta {
             }
             .to_string(),
             generated_at: chrono::Utc::now(),
+            agent_build_hash: agent_build_hash(),
         }
     }
 }
@@ -505,6 +556,43 @@ mod comparability_tests {
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
+
+    #[test]
+    fn the_build_hash_is_this_executable_and_is_stable() {
+        use sha2::{Digest, Sha256};
+        let meta = BundleMeta::new("0.1.0-test");
+        let hash = meta
+            .agent_build_hash
+            .clone()
+            .expect("the test binary is readable, so a hash must be produced");
+        assert!(hash.starts_with("sha256:"), "{hash}");
+
+        // It must be the hash of *this* executable, not an arbitrary constant.
+        let path = std::env::current_exe().expect("current_exe");
+        let bytes = std::fs::read(path).expect("read self");
+        assert_eq!(
+            hash,
+            format!("sha256:{}", hex::encode(Sha256::digest(&bytes)))
+        );
+
+        // Cached, so a second bundle in the same process agrees without
+        // re-reading nine megabytes.
+        assert_eq!(BundleMeta::new("0.1.0-test").agent_build_hash, Some(hash));
+    }
+
+    #[test]
+    fn a_bundle_written_before_the_build_hash_existed_still_deserialises() {
+        // `#[serde(default)]`: an older bundle simply has no such field, and it
+        // must read back as absent rather than failing the whole parse - the
+        // bundles are the source of truth and must outlive the schema.
+        let mut value = serde_json::to_value(BundleMeta::new("0.1.0-test")).expect("ser");
+        value
+            .as_object_mut()
+            .expect("object")
+            .remove("agent_build_hash");
+        let restored: BundleMeta = serde_json::from_value(value).expect("older bundle must parse");
+        assert_eq!(restored.agent_build_hash, None);
+    }
 
     #[test]
     fn an_unreadable_proc_stat_does_not_dilute_the_cpu_summary() {
