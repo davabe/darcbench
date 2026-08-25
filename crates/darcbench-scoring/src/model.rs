@@ -677,6 +677,7 @@ mod tests {
                 })
                 .collect(),
             outliers: vec![],
+            measures_dispersion: false,
         }
     }
 

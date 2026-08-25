@@ -540,6 +540,7 @@ mod comparability_tests {
             summary: darcbench_protocol::stats::summarize(&[1.0]).unwrap(),
             samples: vec![],
             outliers: vec![],
+            measures_dispersion: false,
         });
         let meta = BundleMeta::new("0.1.0");
         let missing = comparability_not_recorded(

@@ -58,6 +58,25 @@ pub struct Metric {
     /// silently dropped.
     #[serde(default)]
     pub outliers: Vec<usize>,
+    /// True when this metric *measures* dispersion, so its own variation
+    /// between repetitions is the subject rather than a defect.
+    ///
+    /// `network.transfer/tcp_connect.jitter` is the case this exists for. It is
+    /// a spread, and a spread that is stable across repetitions would be a
+    /// suspiciously quiet network rather than a good measurement. The module
+    /// already exempts it from its own stability warning, with the reasoning
+    /// written beside the exemption - but the *validator* applied a blanket CV
+    /// bound to every metric and knew nothing about it, so a healthy run was
+    /// downgraded to `Partial` by the one metric whose variance is the point.
+    ///
+    /// `Partial` is not rankable, so on any host with ordinary internet jitter
+    /// that made a standard run unrankable.
+    ///
+    /// A property of the metric rather than a list in the validator, for the
+    /// same reason [`Direction`] is: only the module knows what it measured,
+    /// and a second list elsewhere is a second thing to keep in step.
+    #[serde(default)]
+    pub measures_dispersion: bool,
 }
 
 /// Why a module did not produce a usable result.

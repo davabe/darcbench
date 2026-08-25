@@ -668,6 +668,7 @@ fn push_metric(
             outliers: outlier_indices(&usable, 3.5),
             summary,
             samples: raw,
+            measures_dispersion: false,
         }),
         _ => warnings.push(Warning {
             code: WarningCode::ValidationFailed,

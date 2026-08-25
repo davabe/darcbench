@@ -73,6 +73,25 @@ test failed on real hardware
   canonicalise, so a run where no tick was readable would have produced a
   bundle that could not be signed at all.
 
+**A dispersion metric was judged for dispersing, which made ordinary machines
+unrankable**
+- `network.transfer/tcp_connect.jitter` measures spread. `network_transfer.rs`
+  already exempted it from its own stability warning and wrote the reasoning
+  beside the exemption — jitter varies with geography, and warning on it would
+  tell an operator their network was congested when what varied was distance.
+- `validate.rs` knew nothing about that. It applied a blanket
+  `MAX_ACCEPTABLE_CV` to every metric, so a run whose module reported **zero
+  warnings** came back `ExcessiveVariance` and was downgraded to `Partial`.
+  `Partial` is not rankable, so any host with ordinary internet jitter produced
+  unrankable standard runs.
+- `Metric::measures_dispersion` carries the exemption into the bundle. A
+  property of the metric rather than a list in the validator, for the same
+  reason `Direction` is: only the module knows what it measured, and a second
+  list elsewhere is a second thing to keep in step.
+- Found by running the standard profile rather than by reading: two runs on the
+  development host, jitter CV 0.80 then 0.90, `network.transfer` named as the
+  reason both times before the fix and neither time after it.
+
 **`prune` could delete one run too many** — it selected by position in a list
 that silently dropped rows it could not read
 - `list` drops an unreadable row, which is right for a history someone is

@@ -107,6 +107,14 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
         }
 
         for metric in &module.metrics {
+            // A metric that measures dispersion is exempt: its variation
+            // between repetitions is what it reports, not noise in reporting
+            // it. Without this, `tcp_connect.jitter` downgraded an otherwise
+            // healthy standard run to `Partial` - and `Partial` is not
+            // rankable, so ordinary internet jitter made a machine unrankable.
+            if metric.measures_dispersion {
+                continue;
+            }
             if let Some(cv) = metric.summary.cv {
                 if cv > MAX_ACCEPTABLE_CV {
                     reasons.push(VerdictReason::ExcessiveVariance {
@@ -535,6 +543,75 @@ mod tests {
     use darcbench_inventory::Inventory;
     use darcbench_protocol::{Profile, RunId};
 
+    /// A metric that *measures* dispersion must not be judged for varying.
+    ///
+    /// The regression: `network.transfer/tcp_connect.jitter` is a spread, the
+    /// module deliberately exempts it from its own stability warning, and the
+    /// validator's blanket CV bound knew nothing about that - so a healthy
+    /// standard run came back `ExcessiveVariance` on the one metric whose
+    /// variance is the measurement. `Partial` is not rankable, so ordinary
+    /// internet jitter made a machine unrankable. Observed on a real run before
+    /// this was fixed: jitter CV 0.80 against a bound of 0.25.
+    #[test]
+    fn a_dispersion_metric_is_not_judged_for_varying() {
+        use darcbench_protocol::metrics::{Metric, ModuleResult, ModuleStatus};
+        use darcbench_protocol::stats::summarize;
+        use darcbench_protocol::{Direction, ModuleId, ModuleRef};
+
+        let noisy = |key: &str, measures_dispersion: bool| {
+            // Samples spread far beyond MAX_ACCEPTABLE_CV.
+            let samples = [1.0, 9.0, 2.0, 8.0, 3.0];
+            Metric {
+                key: key.to_string(),
+                label: key.to_string(),
+                unit: "ms".into(),
+                direction: Direction::LowerIsBetter,
+                value: 3.0,
+                summary: summarize(&samples).expect("summary"),
+                samples: vec![],
+                outliers: vec![],
+                measures_dispersion,
+            }
+        };
+
+        let now = chrono::Utc::now();
+        let module = |metric: Metric| ModuleResult {
+            module: ModuleRef {
+                id: ModuleId::new("network.transfer").expect("id"),
+                version: "1.0.0".into(),
+            },
+            status: ModuleStatus::Completed,
+            cycle: 0,
+            started_at: now,
+            finished_at: now,
+            duration_ms: 1.0,
+            metrics: vec![metric],
+            warnings: vec![],
+            error: None,
+            context: Default::default(),
+        };
+
+        let mut flagged = bundle_with(RunState::Completed, Profile::Standard);
+        flagged.modules = vec![module(noisy("ttfb.mean", false))];
+        let reasons = validate_bundle(&flagged, false).verdict.reasons;
+        assert!(
+            reasons
+                .iter()
+                .any(|r| matches!(r, VerdictReason::ExcessiveVariance { .. })),
+            "an ordinary metric this noisy must still be flagged: {reasons:?}"
+        );
+
+        let mut exempt = bundle_with(RunState::Completed, Profile::Standard);
+        exempt.modules = vec![module(noisy("tcp_connect.jitter", true))];
+        let reasons = validate_bundle(&exempt, false).verdict.reasons;
+        assert!(
+            !reasons
+                .iter()
+                .any(|r| matches!(r, VerdictReason::ExcessiveVariance { .. })),
+            "a dispersion metric must not be flagged for dispersing: {reasons:?}"
+        );
+    }
+
     fn bundle_with(state: RunState, profile: Profile) -> Bundle {
         let now = chrono::Utc::now();
         let inventory = Inventory::collect();
@@ -599,6 +676,7 @@ mod tests {
             },
             samples: vec![],
             outliers: vec![],
+            measures_dispersion: false,
         };
         let module_ref = darcbench_protocol::ModuleRef {
             id: darcbench_protocol::ModuleId::new("cpu.mixed").expect("id"),

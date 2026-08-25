@@ -773,6 +773,7 @@ impl BenchmarkModule for NetworkTransfer {
             outliers: outlier_indices(&connect, 3.5),
             summary: connect_summary,
             samples: latency.samples,
+            measures_dispersion: false,
         });
         if let Some(jitter) = path_jitter(&per_endpoint) {
             // Jitter is what a real-time workload feels: a steady 40 ms path is
@@ -784,6 +785,12 @@ impl BenchmarkModule for NetworkTransfer {
                 direction: Direction::LowerIsBetter,
                 value: jitter.median,
                 outliers: Vec::new(),
+                // This module already exempts jitter from its own stability
+                // warning; the flag is what carries that exemption into the
+                // bundle so the validator honours it too. Without it the
+                // validator's blanket CV bound downgraded the run to `Partial`
+                // on the one metric whose variance is the measurement.
+                measures_dispersion: true,
                 summary: jitter,
                 samples: Vec::new(),
             });
@@ -879,6 +886,7 @@ impl BenchmarkModule for NetworkTransfer {
                 outliers: outlier_indices(&usable, 3.5),
                 summary,
                 samples: outcome.samples,
+                measures_dispersion: false,
             });
         }
 
@@ -1047,6 +1055,7 @@ fn push_latency_metric(metrics: &mut Vec<Metric>, key: &str, label: &str, sample
         outliers: outlier_indices(samples, 3.5),
         summary,
         samples: Vec::new(),
+        measures_dispersion: false,
     });
 }
 

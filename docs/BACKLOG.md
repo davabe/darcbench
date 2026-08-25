@@ -5,6 +5,33 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
 
 ## Correctness and methodology
 
+- [ ] **A category score has no upper bound, and `web.static` can reach 6.7x the
+      reference on a large host.** Measured on 2026-08-25: 72 threads, 45 MiB
+      L3, Web = 6745 against anchors set for DARC-REF-1's core count. The
+      offenders are the loopback throughput metrics -
+      `throughput.large` returned **75 GiB/s**, which is not a web server, it is
+      a memcpy over loopback, and it scales with cores and memory bandwidth
+      almost without limit. `requests.small_keepalive` came back at 949k req/s.
+      Two separate problems live here and they need separating before any
+      leaderboard exists. **Calibration fixes the anchors** — they are declared
+      targets and say so. **Calibration does not fix the shape**: a metric whose
+      ceiling is memory bandwidth, carried at weight 0.75 inside a category
+      called Web, is a "buy more cores to top the web table" vector. The
+      `weak_link_cap` bounds the *total* to 4x the weakest category (1670 here,
+      so it never fired) and bounds no individual category at all.
+- [x] ~~A dispersion metric was judged for dispersing.~~
+      `network.transfer/tcp_connect.jitter` is a spread. The module already
+      exempted it from its own stability warning, with the reasoning written
+      beside the exemption — but `validate.rs` applied a blanket
+      `MAX_ACCEPTABLE_CV` to every metric and knew nothing about it, so a
+      healthy standard run came back `ExcessiveVariance` on the one metric whose
+      variance is the measurement. `Partial` is not rankable, so ordinary
+      internet jitter made a machine unrankable. `Metric::measures_dispersion`
+      now carries the exemption into the bundle, as a property of the metric
+      rather than a second list in the validator — only the module knows what it
+      measured. Verified on real runs: jitter CV 0.80 then 0.90, and
+      `network.transfer` is no longer a verdict reason.
+
 - [ ] **Per-category stability**, replacing the single median-CV multiplier. The
       current model can under-weight one very unstable subsystem inside an
       otherwise steady run.

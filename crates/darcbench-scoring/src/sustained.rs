@@ -294,6 +294,7 @@ mod tests {
                     summary: summarize(&[*value]).expect("summary"),
                     samples: vec![],
                     outliers: vec![],
+                    measures_dispersion: false,
                 })
                 .collect(),
             warnings: vec![],

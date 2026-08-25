@@ -723,6 +723,7 @@ impl BenchmarkModule for WebStatic {
                     outliers: outlier_indices(&usable, 3.5),
                     summary,
                     samples: outcome.samples,
+                    measures_dispersion: false,
                 }),
                 _ => warnings.push(Warning {
                     code: WarningCode::ValidationFailed,
@@ -981,6 +982,7 @@ fn push_latency(
             outliers: outlier_indices(&usable, 3.5),
             summary,
             samples: raw,
+            measures_dispersion: false,
         }),
         _ => warnings.push(Warning {
             code: WarningCode::ValidationFailed,

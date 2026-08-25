@@ -1078,6 +1078,7 @@ impl BenchmarkModule for StorageMixed {
                 outliers: outlier_indices(&outcome.measured, 3.5),
                 summary,
                 samples: outcome.samples,
+                measures_dispersion: false,
             });
 
             if let Some(latency_key) = workload.latency_key {
@@ -1095,6 +1096,7 @@ impl BenchmarkModule for StorageMixed {
                             outliers: outlier_indices(&tails, 3.5),
                             summary: tail_summary,
                             samples: Vec::new(),
+                            measures_dispersion: false,
                         });
                     }
                     _ => {

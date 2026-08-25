@@ -1149,6 +1149,7 @@ mod tests {
             },
             samples: vec![],
             outliers: vec![],
+            measures_dispersion: false,
         }
     }
 

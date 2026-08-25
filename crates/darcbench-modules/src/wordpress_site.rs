@@ -867,6 +867,7 @@ impl WordpressSite {
             summary: single(cold_ms),
             samples: Vec::new(),
             outliers: Vec::new(),
+            measures_dispersion: false,
         });
 
         if reporter.is_cancelled() {
@@ -981,6 +982,7 @@ impl WordpressSite {
                 summary: single(capacity),
                 samples: Vec::new(),
                 outliers: Vec::new(),
+                measures_dispersion: false,
             });
         } else {
             warnings.push(Warning {
@@ -1315,6 +1317,7 @@ fn push_distribution(
                 warmup: false,
             })
             .collect(),
+        measures_dispersion: false,
     });
 }
 

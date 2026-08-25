@@ -463,6 +463,7 @@ impl DeploymentContainer {
                         summary: single(speedup),
                         samples: Vec::new(),
                         outliers: Vec::new(),
+                        measures_dispersion: false,
                     });
                 }
             }
@@ -841,6 +842,7 @@ fn push_distribution(
                 warmup: false,
             })
             .collect(),
+        measures_dispersion: false,
     });
 }
 
@@ -873,6 +875,7 @@ fn push_seconds(metrics: &mut Vec<Metric>, key: &str, label: &str, seconds: f64)
         summary: single(seconds),
         samples: Vec::new(),
         outliers: Vec::new(),
+        measures_dispersion: false,
     });
 }
 
@@ -892,6 +895,7 @@ fn push_rate(metrics: &mut Vec<Metric>, key: &str, label: &str, bytes: u64, seco
         summary: single(mib_per_second),
         samples: Vec::new(),
         outliers: Vec::new(),
+        measures_dispersion: false,
     });
 }
 

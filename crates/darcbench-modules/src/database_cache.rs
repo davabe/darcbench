@@ -596,6 +596,7 @@ impl DatabaseCache {
                     summary: single(result.ops_per_second),
                     samples: Vec::new(),
                     outliers: Vec::new(),
+                    measures_dispersion: false,
                 }),
                 None => warnings.push(Warning {
                     code: WarningCode::ValidationFailed,
@@ -631,6 +632,7 @@ impl DatabaseCache {
                 summary: single(probe.mean_ms),
                 samples: Vec::new(),
                 outliers: Vec::new(),
+                measures_dispersion: false,
             });
             metrics.push(Metric {
                 key: "roundtrip.unloaded_max".into(),
@@ -641,6 +643,7 @@ impl DatabaseCache {
                 summary: single(probe.max_ms),
                 samples: Vec::new(),
                 outliers: Vec::new(),
+                measures_dispersion: false,
             });
         } else {
             warnings.push(Warning {
