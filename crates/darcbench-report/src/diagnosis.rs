@@ -325,6 +325,7 @@ mod tests {
             psi_cpu_some_avg10: None,
             psi_io_some_avg10: None,
             psi_mem_some_avg10: None,
+            cpu_unavailable: false,
             disk_read_bytes_per_s: 0,
             disk_write_bytes_per_s: 0,
             net_rx_bytes_per_s: 0,

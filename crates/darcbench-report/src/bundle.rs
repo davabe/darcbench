@@ -223,21 +223,40 @@ impl TelemetrySummary {
         if samples.is_empty() {
             return Self::default();
         }
-        let n = samples.len() as f64;
-        let mean = |f: fn(&darcbench_inventory::TelemetrySnapshot) -> f64| -> f64 {
-            samples.iter().map(f).sum::<f64>() / n
+        // The CPU percentages are aggregated over the ticks that actually read
+        // `/proc/stat`. A failed read leaves placeholder zeroes in the snapshot,
+        // and averaging those in would report a machine as quieter than it was
+        // observed to be - on the same figures that justify a degraded verdict.
+        // Everything else in a snapshot comes from its own file and is
+        // unaffected, so only these four are filtered.
+        let cpu: Vec<&darcbench_inventory::TelemetrySnapshot> =
+            samples.iter().filter(|s| !s.cpu_unavailable).collect();
+        // Both fold to 0.0 rather than to the identity when no tick was
+        // readable: `fold(NEG_INFINITY, max)` over an empty set yields
+        // `-inf`, which DCJ/1 refuses to canonicalise, so a host that could
+        // not read `/proc/stat` once would produce a bundle that cannot be
+        // signed.
+        let cpu_mean = |f: fn(&darcbench_inventory::TelemetrySnapshot) -> f64| -> f64 {
+            if cpu.is_empty() {
+                return 0.0;
+            }
+            cpu.iter().map(|s| f(s)).sum::<f64>() / cpu.len() as f64
         };
+        let cpu_max = |f: fn(&darcbench_inventory::TelemetrySnapshot) -> f64| -> f64 {
+            cpu.iter().map(|s| f(s)).fold(0.0_f64, f64::max)
+        };
+
         let max = |f: fn(&darcbench_inventory::TelemetrySnapshot) -> f64| -> f64 {
             samples.iter().map(f).fold(f64::NEG_INFINITY, f64::max)
         };
 
         Self {
             samples: samples.len(),
-            cpu_busy_pct_mean: mean(|s| s.cpu_busy_pct),
-            cpu_external_busy_pct_max: max(|s| s.cpu_external_busy_pct),
-            cpu_steal_pct_max: max(|s| s.cpu_steal_pct),
-            cpu_steal_pct_mean: mean(|s| s.cpu_steal_pct),
-            cpu_iowait_pct_mean: mean(|s| s.cpu_iowait_pct),
+            cpu_busy_pct_mean: cpu_mean(|s| s.cpu_busy_pct),
+            cpu_external_busy_pct_max: cpu_max(|s| s.cpu_external_busy_pct),
+            cpu_steal_pct_max: cpu_max(|s| s.cpu_steal_pct),
+            cpu_steal_pct_mean: cpu_mean(|s| s.cpu_steal_pct),
+            cpu_iowait_pct_mean: cpu_mean(|s| s.cpu_iowait_pct),
             load1_max: max(|s| s.load1),
             mem_used_bytes_max: samples.iter().map(|s| s.mem_used_bytes).max().unwrap_or(0),
             swap_used_bytes_max: samples.iter().map(|s| s.swap_used_bytes).max().unwrap_or(0),
@@ -486,6 +505,56 @@ mod comparability_tests {
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
+
+    #[test]
+    fn an_unreadable_proc_stat_does_not_dilute_the_cpu_summary() {
+        use darcbench_inventory::TelemetrySnapshot;
+        let measured = TelemetrySnapshot {
+            cpu_busy_pct: 90.0,
+            cpu_external_busy_pct: 40.0,
+            cpu_steal_pct: 10.0,
+            cpu_iowait_pct: 4.0,
+            load1: 8.0,
+            ..Default::default()
+        };
+        // What `sample()` produces when `/proc/stat` cannot be read: the CPU
+        // fields are placeholders and the snapshot says so.
+        let unmeasured = TelemetrySnapshot {
+            cpu_unavailable: true,
+            load1: 8.0,
+            ..Default::default()
+        };
+
+        let all = TelemetrySummary::from_samples(&[measured.clone(), unmeasured.clone()]);
+        let only_measured = TelemetrySummary::from_samples(&[measured.clone()]);
+        assert_eq!(
+            all.cpu_busy_pct_mean, only_measured.cpu_busy_pct_mean,
+            "a tick nobody measured must not halve the mean"
+        );
+        assert_eq!(
+            all.cpu_external_busy_pct_max, 40.0,
+            "the peak that justifies a degraded verdict must survive"
+        );
+        assert_eq!(all.samples, 2, "the sample count still counts every tick");
+        // load1 comes from its own file and is unaffected by /proc/stat.
+        assert_eq!(all.load1_max, 8.0);
+    }
+
+    #[test]
+    fn a_run_with_no_readable_cpu_tick_still_canonicalises() {
+        use darcbench_inventory::TelemetrySnapshot;
+        let summary = TelemetrySummary::from_samples(&[TelemetrySnapshot {
+            cpu_unavailable: true,
+            ..Default::default()
+        }]);
+        // `fold(NEG_INFINITY, max)` over an empty set would put `-inf` here,
+        // and DCJ/1 refuses to canonicalise a non-finite number - so the
+        // bundle could not be signed at all.
+        assert!(summary.cpu_external_busy_pct_max.is_finite());
+        assert!(summary.cpu_steal_pct_max.is_finite());
+        assert!(summary.cpu_busy_pct_mean.is_finite());
+        assert!(crate::canonical::canonical_json(&summary).is_ok());
+    }
     use super::*;
     use darcbench_inventory::TelemetrySnapshot;
     use darcbench_protocol::VerdictReason;

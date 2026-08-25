@@ -59,6 +59,26 @@ pub struct TelemetrySnapshot {
     pub psi_cpu_some_avg10: Option<f64>,
     pub psi_io_some_avg10: Option<f64>,
     pub psi_mem_some_avg10: Option<f64>,
+    /// True when `/proc/stat` could not be read for this tick, so the four CPU
+    /// percentages above are placeholders rather than measurements.
+    ///
+    /// This module already refuses to fabricate: `cpu_freq_mhz` is `None` on a
+    /// host with no `cpufreq` rather than a 0 MHz CPU, and `cpu_temp_c` rejects
+    /// implausible readings rather than reporting a 0 C package. The CPU
+    /// percentages were the exception - a failed read left them at their
+    /// `Default` zero and nothing said so.
+    ///
+    /// That mattered twice. A bundle published `cpu_busy_pct: 0.0` for a tick
+    /// nobody measured, and the runtime load ceiling read
+    /// `cpu_external_busy_pct` as 0.0 and *reset* its contention tallies - so a
+    /// guard that stops runs failed open on a missing sample, treating "we did
+    /// not look" as "the machine is quiet".
+    ///
+    /// Named for the failure so the common case is `Default`: every existing
+    /// construction site and every bundle written before this field existed
+    /// means "sampled", which is what they were.
+    #[serde(default)]
+    pub cpu_unavailable: bool,
     pub disk_read_bytes_per_s: u64,
     pub disk_write_bytes_per_s: u64,
     pub net_rx_bytes_per_s: u64,
@@ -192,7 +212,11 @@ impl TelemetrySampler {
         // load that is not there, and the guard that consumes this figure is
         // one that stops runs.
         let current_self_cpu = read_self_cpu_jiffies(&mut self.buffer);
-        if let Some(current) = read_cpu_totals(&mut self.buffer) {
+        let totals = read_cpu_totals(&mut self.buffer);
+        // Declared before the percentages are computed, so every early exit
+        // below still leaves the snapshot describing itself honestly.
+        snapshot.cpu_unavailable = totals.is_none();
+        if let Some(current) = totals {
             if let Some(previous) = self.previous_cpu {
                 let total = current.total.saturating_sub(previous.total);
                 if total > 0 {

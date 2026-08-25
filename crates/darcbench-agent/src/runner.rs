@@ -121,6 +121,14 @@ impl EventRecord {
     }
 }
 
+/// Finished runs kept resident after their bundle is on disk.
+///
+/// Small on purpose. Everything an evicted run can be asked for - summary,
+/// bundle, report, event stream - is served from its run directory, so this is
+/// a latency optimisation for the runs a dashboard is likely to be looking at,
+/// not a correctness requirement.
+const RETAINED_RUNS_IN_MEMORY: usize = 8;
+
 /// Cycles an endurance run completes before the duration target may end it.
 ///
 /// Two, because retention is a comparison and one measurement is not one. A
@@ -391,6 +399,15 @@ impl Watchdog {
             self.consecutive_contended = 0;
             self.consecutive_heavily_contended = 0;
             self.contention_reported = false;
+            return None;
+        }
+        // A tick whose `/proc/stat` read failed carries placeholder zeroes, not a
+        // quiet machine. Falling through would clear both tallies, so a host
+        // dropping every other sample could sit above the ceiling indefinitely
+        // and never reach the consecutive count that fires. Hold the counters
+        // instead: a missing observation is neither evidence of contention nor
+        // evidence of its absence, and this is a guard that stops runs.
+        if snapshot.cpu_unavailable {
             return None;
         }
         let external = snapshot.cpu_external_busy_pct;
@@ -887,6 +904,50 @@ impl RunManager {
         &self.index
     }
 
+    /// Drops finished runs from the registry once disk can answer for them.
+    ///
+    /// `runs` used to grow for the lifetime of the process: every run this
+    /// agent had ever executed kept its bundle, its replay buffer and its whole
+    /// telemetry series resident. For `darcbench run` that is one run and it
+    /// does not matter. For a `serve` process taking scheduled runs it is an
+    /// unbounded leak, and it is the shape of deployment this product is aimed
+    /// at.
+    ///
+    /// Two rules make the eviction safe rather than merely cheap.
+    ///
+    /// **Only terminal runs.** A run in flight is the one thing memory is
+    /// authoritative for.
+    ///
+    /// **Only runs whose bundle is on disk.** This is the load-bearing half.
+    /// Every per-run endpoint now falls back to the run directory, so an evicted
+    /// run is still fully answerable - but a run that ended without writing a
+    /// bundle has nothing to fall back *to*, and dropping it would turn a
+    /// readable failure into a 404. Those are exactly the runs whose detail an
+    /// operator most wants, so they stay resident. One `stat` per finished run,
+    /// paid only when a new run starts.
+    ///
+    /// The newest [`RETAINED_RUNS_IN_MEMORY`] are kept regardless, so a
+    /// dashboard watching the run that just ended is served from memory rather
+    /// than re-reading the log it was already streaming.
+    fn evict_replayable(&self, runs: &mut Vec<Arc<RunHandle>>) {
+        let replayable = |run: &Arc<RunHandle>| {
+            run.state().is_terminal() && self.run_dir(&run.id).join("bundle.json").is_file()
+        };
+        let mut evictable = runs.iter().filter(|r| replayable(r)).count();
+        if evictable <= RETAINED_RUNS_IN_MEMORY {
+            return;
+        }
+        // `retain` visits in insertion order, so the oldest go first.
+        runs.retain(|run| {
+            if evictable > RETAINED_RUNS_IN_MEMORY && replayable(run) {
+                evictable -= 1;
+                false
+            } else {
+                true
+            }
+        });
+    }
+
     /// Where a run's artifacts were written.
     pub(crate) fn run_dir(&self, id: &RunId) -> std::path::PathBuf {
         self.state_dir.join("runs").join(id.as_str())
@@ -1047,6 +1108,7 @@ impl RunManager {
                 return Err(RunError::AlreadyRunning(active.id.clone()));
             }
             runs.push(handle.clone());
+            self.evict_replayable(&mut runs);
         }
 
         let manager = self.clone();
@@ -2026,6 +2088,53 @@ mod tests {
         assert!(warning.message.contains("watchdog"));
     }
 
+    /// A tick nobody could measure must not look like a quiet machine.
+    ///
+    /// The regression this pins: an unreadable `/proc/stat` used to leave
+    /// `cpu_external_busy_pct` at its `Default` 0.0, which fell through to the
+    /// `else` arm and cleared both contention tallies. A host dropping every
+    /// other sample could then sit far above the ceiling forever without ever
+    /// reaching the consecutive count that fires - the guard failing open on
+    /// exactly the condition it exists to catch.
+    #[test]
+    fn an_unmeasured_tick_neither_fires_nor_clears_the_load_ceiling() {
+        let handle = watchdog_handle();
+        let contended = TelemetrySnapshot {
+            cpu_busy_pct: 100.0,
+            cpu_external_busy_pct: EXTERNAL_LOAD_ABORT_PCT + 5.0,
+            ..Default::default()
+        };
+        let unmeasured = TelemetrySnapshot {
+            cpu_unavailable: true,
+            ..Default::default()
+        };
+
+        // Interleaved: every second sample is unreadable.
+        let mut watchdog = Watchdog::for_scope(Scope::BareMetal);
+        let mut fired = None;
+        for _ in 0..EXTERNAL_LOAD_ABORT_SAMPLES {
+            assert!(
+                watchdog.check(&handle, &unmeasured).is_none(),
+                "an unmeasured tick must never fire the guard by itself"
+            );
+            fired = watchdog.check(&handle, &contended);
+        }
+        assert!(
+            matches!(fired, Some(WatchdogVerdict::Abort(_))),
+            "sustained contention must still stop the run when half the ticks are missing"
+        );
+
+        // And on its own it is not evidence of contention either.
+        let mut watchdog = Watchdog::for_scope(Scope::BareMetal);
+        for _ in 0..(EXTERNAL_LOAD_ABORT_SAMPLES * 2) {
+            assert!(watchdog.check(&handle, &unmeasured).is_none());
+        }
+        assert_eq!(
+            watchdog.consecutive_heavily_contended, 0,
+            "missing samples must not accumulate towards an abort"
+        );
+    }
+
     /// The load ceiling must ignore the load the benchmark itself creates.
     ///
     /// This is the whole difficulty of the guard: a benchmark saturates the
@@ -2506,6 +2615,70 @@ mod tests {
     /// Regression: the check used a read lock that was released before the
     /// write lock that inserted the handle, so two simultaneous requests could
     /// both see an idle agent and both spawn a CPU-saturating benchmark.
+    /// The registry must shed finished runs, and must not shed the two kinds
+    /// that would become unanswerable if it did.
+    #[test]
+    fn eviction_keeps_what_disk_cannot_answer_for() {
+        let manager = manager();
+
+        let push = |state: RunState, with_bundle: bool| {
+            let handle =
+                RunHandle::new(RunId::try_new().expect("id"), Profile::Quick, vec![], None);
+            handle.set_state(state);
+            if with_bundle {
+                let dir = manager.run_dir(&handle.id);
+                std::fs::create_dir_all(&dir).expect("run dir");
+                std::fs::write(dir.join("bundle.json"), b"{}").expect("bundle");
+            }
+            manager.runs.write().expect("registry").push(handle.clone());
+            handle.id.clone()
+        };
+
+        // Old, finished, and readable from disk: the only kind that may go.
+        let mut evictable = Vec::new();
+        for _ in 0..(RETAINED_RUNS_IN_MEMORY * 2) {
+            evictable.push(push(RunState::Completed, true));
+        }
+        // Finished but wrote no bundle - a failure whose detail lives only here.
+        let bundleless = push(RunState::Failed, false);
+        // Still running: memory is authoritative for it.
+        let live = push(RunState::Running, false);
+
+        {
+            let mut runs = manager.runs.write().expect("registry");
+            manager.evict_replayable(&mut runs);
+        }
+
+        assert!(
+            manager.get(&live).is_some(),
+            "a run in flight must never be evicted"
+        );
+        assert!(
+            manager.get(&bundleless).is_some(),
+            "a finished run with no bundle on disk has nothing to fall back to"
+        );
+
+        let retained = evictable
+            .iter()
+            .filter(|id| manager.get(id).is_some())
+            .count();
+        assert_eq!(
+            retained, RETAINED_RUNS_IN_MEMORY,
+            "the newest {RETAINED_RUNS_IN_MEMORY} replayable runs stay resident"
+        );
+        // Newest kept, oldest dropped - not an arbitrary subset.
+        assert!(
+            manager.get(evictable.last().expect("last")).is_some(),
+            "the most recent finished run must stay resident"
+        );
+        assert!(
+            manager.get(evictable.first().expect("first")).is_none(),
+            "the oldest finished run must be the one to go"
+        );
+
+        let _ = std::fs::remove_dir_all(&manager.state_dir);
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn concurrent_starts_cannot_both_win_the_single_run_slot() {
         let manager = manager();

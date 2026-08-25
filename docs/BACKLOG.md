@@ -77,10 +77,23 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       what the evidence supports. This changes what a bundle *claims*, not what
       a run *enforces* - `Scope::Unknown` arms the runtime load ceiling exactly
       as `BareMetal` does, since only `Container` disarms it.
-- [ ] A failed `/proc/stat` read yields a zeroed telemetry snapshot, which both
+- [x] ~~A failed `/proc/stat` read yields a zeroed telemetry snapshot, which both
       publishes a fabricated `cpu_busy_pct: 0.0` and resets the load-ceiling
-      tallies. Fails open on a guard that stops runs; the snapshot should carry
-      whether it was actually read.
+      tallies.~~ The snapshot now carries `cpu_unavailable`, and three layers
+      act on it. The sampler declares the failure instead of leaving `Default`
+      zeroes that read as measurements. The load ceiling holds its tallies on
+      such a tick rather than clearing them - the fail-open half, and the one
+      that mattered: a host dropping every other sample could sit above the
+      ceiling indefinitely without ever reaching the consecutive count that
+      fires. And `TelemetrySummary` aggregates the four CPU figures over the
+      ticks that were actually read, so an unmeasured tick no longer dilutes the
+      mean that a degraded verdict rests on. Both maxima fold from `0.0` rather
+      than `-inf`, because a run where no tick was readable would otherwise
+      produce a bundle DCJ/1 refuses to canonicalise and therefore cannot sign.
+      **Still open:** the four fields are still `f64` rather than `Option<f64>`,
+      which is this module's own idiom for "not observable" (`cpu_freq_mhz`).
+      The flag makes the absence detectable; `Option` would make it
+      unrepresentable.
 - [ ] `RunIndex::list` drops rows it cannot convert while `get` propagates the
       error, and `prune` selects by position in that list - so a dropped row
       would shift the `--keep-last` window by one. No trigger exists against the
@@ -280,11 +293,15 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       on hosts without `cpufreq`, re-read all of `/proc/cpuinfo` — whose cost
       the kernel scales with core count~~ — both sources resolved once; per-tick
       cost down ~40%.
-- [ ] `RunManager::runs` grows without bound: every run this agent has executed
+- [x] ~~`RunManager::runs` grows without bound: every run this agent has executed
       keeps its bundle, replay buffer and telemetry series in memory for the
-      lifetime of the process. Bounded by the SQLite run index and retention
-      work already scheduled in Phase 2; until then a long-lived `serve` process
-      doing scheduled runs is the exposure.
+      lifetime of the process.~~ Unblocked by the per-run endpoints gaining a
+      disk fallback: a finished run is now fully answerable from its run
+      directory, so the registry can shed it. `evict_replayable` keeps the
+      newest eight and drops the rest, under two rules that make it safe rather
+      than merely cheap - never a run in flight, and never a run whose bundle is
+      not on disk, since a failure that wrote no bundle has nothing to fall back
+      to and is exactly the run an operator most wants the detail of.
 - [ ] `ReferenceProfile::get` formats a `"<module>/<metric>"` key per lookup.
       Negligible at the current metric count; revisit if a profile ever carries
       hundreds of anchors.
