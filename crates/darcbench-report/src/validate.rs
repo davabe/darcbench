@@ -442,6 +442,10 @@ fn scores_match(
         check(close(Some(a.score), Some(b.score)), "categories.score")?;
         check(close(Some(a.weight), Some(b.weight)), "categories.weight")?;
         check(a.metric_count == b.metric_count, "categories.metric_count")?;
+        // The basket is part of what a category score means, so a bundle
+        // claiming a Web score built from two modules while its metrics back
+        // only one must not validate.
+        check(a.modules == b.modules, "categories.modules")?;
     }
 
     // --- facets ------------------------------------------------------------

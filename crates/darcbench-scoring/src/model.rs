@@ -238,6 +238,11 @@ impl ScoringModel {
         // facet - walked every metric nine times and kept a formatted key for
         // each one that nothing ever read.
         let mut by_category: BTreeMap<CategoryKey, Vec<(f64, f64)>> = BTreeMap::new();
+        // Which workloads actually backed each category. A `BTreeSet` so the
+        // published list is sorted and deduplicated without a second pass, and
+        // so a module contributing eleven metrics counts once.
+        let mut modules_by_category: BTreeMap<CategoryKey, std::collections::BTreeSet<String>> =
+            BTreeMap::new();
         let mut by_facet: BTreeMap<Facet, Vec<(f64, f64)>> = BTreeMap::new();
         let mut unreferenced: Vec<String> = Vec::new();
         let mut cvs: Vec<f64> = Vec::new();
@@ -294,6 +299,13 @@ impl ScoringModel {
                     .entry(reference.category)
                     .or_default()
                     .push((ratio, reference.weight));
+                // Recorded here rather than from the module list, so it names
+                // the modules that actually *scored* - one whose every metric
+                // went unreferenced contributed nothing and must not appear.
+                modules_by_category
+                    .entry(reference.category)
+                    .or_default()
+                    .insert(module_id.to_string());
                 if let Some(facet) = reference.facet {
                     by_facet
                         .entry(facet)
@@ -341,6 +353,10 @@ impl ScoringModel {
                     score: gm * REFERENCE_ANCHOR,
                     weight: key.standard_weight(),
                     metric_count: pairs.len(),
+                    modules: modules_by_category
+                        .get(&key)
+                        .map(|ids| ids.iter().cloned().collect())
+                        .unwrap_or_default(),
                 });
             }
         }
@@ -550,6 +566,21 @@ pub struct CategoryOutcome {
     pub score: f64,
     pub weight: f64,
     pub metric_count: usize,
+    /// Module ids that contributed at least one scored metric here, sorted.
+    ///
+    /// Without this a category score cannot be compared honestly, because two
+    /// runs can compute the same-named category from different workloads. The
+    /// Web category is the live example: `php.runtime` roughly doubles the
+    /// metric weight in it, and contributes nothing at all on a machine with no
+    /// PHP installed. Two `web` runs on identical hardware therefore produce
+    /// Web scores built from different baskets, and until now nothing in the
+    /// bundle said so - `metric_count` alone cannot distinguish "fewer modules"
+    /// from "the same modules measured less".
+    ///
+    /// A list rather than a hash, because a reader comparing two runs needs to
+    /// see *which* workload is missing, not merely that something is.
+    #[serde(default)]
+    pub modules: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -694,6 +725,79 @@ mod tests {
             error: None,
             context: Default::default(),
         }
+    }
+
+    /// Builds any registered module's result at `factor` x reference.
+    fn module_result_at(module: &str, factor: f64) -> ModuleResult {
+        let now = chrono::Utc::now();
+        let metrics = anchors_for(module)
+            .into_iter()
+            .map(|(key, p)| {
+                let v = p.value * factor;
+                metric(&key, v, &[v, v, v, v, v])
+            })
+            .collect();
+        ModuleResult {
+            module: ModuleRef {
+                id: ModuleId::new(module).expect("id"),
+                version: "1.0.0".into(),
+            },
+            status: ModuleStatus::Completed,
+            cycle: 0,
+            started_at: now,
+            finished_at: now,
+            duration_ms: 1000.0,
+            metrics,
+            warnings: vec![],
+            error: None,
+            context: Default::default(),
+        }
+    }
+
+    /// A category score must say which workloads produced it.
+    ///
+    /// The case this exists for: `php.runtime` is scored into Web and is only
+    /// present on a machine with PHP installed. Two `web` runs on identical
+    /// hardware therefore compute the Web category from different baskets, and
+    /// a reader comparing them has to be able to see that. `metric_count`
+    /// cannot carry it - it cannot distinguish "one fewer module" from "the
+    /// same modules, measured fewer times".
+    #[test]
+    fn a_category_names_the_modules_that_produced_it() {
+        let model = ScoringModel::current();
+
+        let with_php = model.score_run(
+            Profile::Custom,
+            &[
+                module_result_at("web.static", 1.0),
+                module_result_at("php.runtime", 1.0),
+            ],
+        );
+        let without_php = model.score_run(Profile::Custom, &[module_result_at("web.static", 1.0)]);
+
+        let basket = |card: &ScoreCard| {
+            card.categories
+                .iter()
+                .find(|c| c.key == CategoryKey::Web)
+                .map(|c| c.modules.clone())
+                .unwrap_or_default()
+        };
+
+        assert_eq!(
+            basket(&with_php),
+            vec!["php.runtime".to_string(), "web.static".to_string()],
+            "both workloads scored into Web, sorted and deduplicated"
+        );
+        assert_eq!(
+            basket(&without_php),
+            vec!["web.static".to_string()],
+            "a host with no PHP produces a Web score from one workload"
+        );
+        assert_ne!(
+            basket(&with_php),
+            basket(&without_php),
+            "the difference between the two baskets must be visible in the card"
+        );
     }
 
     #[test]

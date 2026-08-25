@@ -8,7 +8,115 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ## [Unreleased]
 
+### Fixed
+
+**A fresh `serve` listed runs it could not open** — found by running the agent,
+not by reading it
+- `GET /api/v1/runs` and `.../compare/...` answered from the SQLite index while
+  `get_run`, `get_bundle`, `get_report` and `stream_events` resolved through the
+  in-memory registry, which only ever holds runs *this process* started. A
+  `serve` started after a CLI run therefore showed the run in its history and
+  returned 404 for its bundle, its report and its event stream, with all three
+  files sitting in the run directory. Reproduced on 2026-08-25: list 200,
+  compare 200, four per-run endpoints 404.
+- This is the same defect the run index was introduced to fix for the *list* —
+  "a fresh `serve` reported zero runs next to five hundred bundles on disk" —
+  left half-migrated. Each endpoint now falls back to disk, which is ADR-0005's
+  hierarchy applied consistently: bundles are the truth, the index caches them,
+  memory caches that.
+- The event stream replays `events.ndjson` and closes, and parses **strictly**:
+  one undecodable record fails the whole replay rather than silently yielding a
+  shorter one, because a shorter replay is precisely the undetectable gap the
+  SSE contract exists to prevent.
+- `scripts/e2e.sh` never fetched a per-run endpoint for a run started outside
+  the serving process, which is how 45 green checks sat on top of this. It does
+  now.
+
+**`Scope::BareMetal` was decided without recording why**, and its own invariant
+test failed on real hardware
+- Every branch of `detect_scope` cites its evidence except the bare-metal
+  fallback, whose condition was "DMI is non-empty" — true on any host that can
+  open `/sys/class/dmi/id`, which includes every VM. The machine this was found
+  on reports the SMBIOS placeholder `Default string` for both fields and was
+  classified `bare_metal` on the strength of nothing.
+- Known placeholders are now treated as absent: a programmed DMI yields
+  `BareMetal` naming the vendor, and an unprogrammed one yields `Unknown`.
+  Pushing an evidence string and keeping the classification was rejected — it
+  would satisfy the test while preserving the guess.
+- It changes what a bundle *claims*, not what a run *enforces*: `Unknown` arms
+  the runtime load ceiling exactly as `BareMetal` does, and only `Container`
+  disarms it.
+
+**A telemetry tick nobody could read looked like a quiet machine**
+- A failed `/proc/stat` read left all four CPU percentages at their `Default`
+  zero with nothing recording that they were placeholders. Bundles published a
+  fabricated `cpu_busy_pct: 0.0`, and — the half that mattered — the runtime
+  load ceiling read `cpu_external_busy_pct` as 0.0, took the "machine is quiet"
+  branch and **cleared its contention tallies**. A host dropping every other
+  sample could sit far above the ceiling indefinitely and never reach the
+  consecutive count that fires: a guard that stops runs, failing open on the
+  condition it exists to catch.
+- `TelemetrySnapshot::cpu_unavailable` now carries the fact, the watchdog holds
+  its tallies rather than clearing them, and `TelemetrySummary` aggregates the
+  CPU figures over the ticks that were actually read.
+- The two CPU maxima fold from `0.0` rather than `f64::NEG_INFINITY`: over an
+  empty set the old identity yields `-inf`, which DCJ/1 refuses to
+  canonicalise, so a run where no tick was readable would have produced a
+  bundle that could not be signed at all.
+
+**`RunManager::runs` grew for the lifetime of the process**
+- Every run kept its bundle, replay buffer and whole telemetry series resident.
+  Irrelevant for `darcbench run`; an unbounded leak for the `serve` process
+  taking scheduled runs, which is the deployment this product is aimed at.
+- Fixable only once finished runs became answerable from disk. `evict_replayable`
+  keeps the newest eight, and never evicts a run in flight or a run whose bundle
+  is not on disk — a failure that wrote no bundle has nothing to fall back to,
+  and is exactly the run an operator most wants the detail of.
+
 ### Added
+
+**A category now names the modules that produced it** — `CategoryOutcome.modules`
+- The Web category's basket depends on whether PHP is installed: `php.runtime`
+  roughly doubles the metric weight in it and contributes nothing without PHP.
+  Two `web` runs on identical hardware therefore computed Web scores from
+  different workloads with nothing in the bundle saying so. `metric_count`
+  cannot carry it — it cannot distinguish "one fewer module" from "the same
+  modules measured fewer times".
+- Recorded where a metric is bucketed, so a module whose every metric went
+  unreferenced is correctly absent. Recomputation compares the field, so a
+  bundle claiming a basket its metrics do not back fails validation, and the
+  HTML report prints it under each category.
+- **Still open:** `darcbench compare` does not warn when two runs' baskets
+  differ, because the index stores category rows without the module list.
+- **Neither version moves, and that was checked rather than assumed.** No score
+  value changes, so ADR-0007 puts this below a scoring patch and
+  `dbs/0.1.0-dev` stands. The field is additive with `#[serde(default)]`, and
+  RELEASE-STRATEGY.md's compatibility rule is that additive fields never break
+  a consumer, so `darcbench.bundle/1` stands too — an older validator reading a
+  newer bundle ignores it, and a newer one reading an older bundle sees an
+  empty basket rather than a wrong one.
+
+**`scripts/check-links.sh`** — every path named in a document or a doc comment
+- The CI check read `README.md` and `docs/*.md`, so the fourteen ADRs,
+  CONTRIBUTING.md and SECURITY.md went unchecked, as did the seventeen
+  repository paths this codebase names in its doc comments. This project argues
+  its decisions in prose and points at the document that records them; a moved
+  file quietly turned those into dead ends.
+- Needs no compiler, which makes it the cheapest check in the repository.
+
+**An MSRV job** — `rust-version = "1.82"` was a promise nothing verified
+- CI built with the pinned 1.97.1 and with current stable, both far newer.
+  Advisory for now, following the `lint-latest` precedent: the point is to make
+  the gap visible before it blocks anyone.
+
+### Changed
+
+- CI cancels superseded runs on branches, and installs `cargo-audit` and
+  `cargo-deny` prebuilt rather than compiling both from source on every run.
+- Two comments corrected to match their configuration: the crossterm note
+  claimed a duplicate would fail `cargo deny check bans`, which
+  `multiple-versions = "warn"` does not do, and `engines.pnpm` admitted the
+  version the `packageManager` pin exists to exclude.
 
 **The Database category produces a score** — `database.oltp` and
 `database.cache` are registered

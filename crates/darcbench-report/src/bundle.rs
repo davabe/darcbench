@@ -525,8 +525,8 @@ mod tests {
             ..Default::default()
         };
 
-        let all = TelemetrySummary::from_samples(&[measured.clone(), unmeasured.clone()]);
-        let only_measured = TelemetrySummary::from_samples(&[measured.clone()]);
+        let all = TelemetrySummary::from_samples(&[measured.clone(), unmeasured]);
+        let only_measured = TelemetrySummary::from_samples(std::slice::from_ref(&measured));
         assert_eq!(
             all.cpu_busy_pct_mean, only_measured.cpu_busy_pct_mean,
             "a tick nobody measured must not halve the mean"

@@ -115,9 +115,21 @@ pub fn render(bundle: &Bundle) -> String {
     ));
 
     for category in &bundle.scores.categories {
+        // The basket, not just the count. Two runs can compute the same-named
+        // category from different workloads - Web with and without PHP is the
+        // live case - and a reader comparing two reports needs to see which
+        // ones, or the comparison is between two different questions.
+        let basket = if category.modules.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<div class=\"note\">from {}</div>",
+                escape(&category.modules.join(", "))
+            )
+        };
         html.push_str(&format!(
             r#"<div class="card"><div class="label">{label}</div><div class="value">{score}</div>
-               <div class="note">{n} metric(s) &middot; weight {w:.0}%</div></div>"#,
+               <div class="note">{n} metric(s) &middot; weight {w:.0}%</div>{basket}</div>"#,
             label = escape(&category.label),
             score = fmt_score(Some(category.score)),
             n = category.metric_count,

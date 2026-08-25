@@ -103,12 +103,19 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       `php.runtime` bounds its children by wall clock only. A PHP whose
       `memory_limit` is `-1` can still be asked for more memory than the machine
       has. Needs a vetted wrapper crate or the privileged helper below.
-- [ ] The Web category's basket differs depending on whether PHP is installed:
+- [x] ~~The Web category's basket differs depending on whether PHP is installed:
       `php.runtime` roughly doubles the metric weight in it, and contributes
-      nothing on a machine without PHP. Two `web` runs on comparable hardware
-      can therefore produce Web scores computed from different baskets, with
-      nothing saying so. "Which modules contributed to a category" belongs in
-      the comparability keys.
+      nothing on a machine without PHP.~~ `CategoryOutcome` now publishes
+      `modules`, the sorted module ids that contributed at least one *scored*
+      metric to that category - taken at the point a metric is bucketed, so a
+      module whose every metric went unreferenced is correctly absent.
+      `metric_count` could not carry this: it cannot distinguish "one fewer
+      module" from "the same modules measured fewer times". Recomputation
+      compares the field, so a bundle claiming a basket its metrics do not back
+      fails validation, and the HTML report prints it under each category.
+      **Still open:** `darcbench compare` does not yet warn when two runs'
+      baskets differ for a shared category - the index stores category rows
+      without the module list, so that needs a schema column.
 - [ ] `runtime_exec`'s ancestor walk covers the *resolved* path only, so an
       attacker who controls an ancestor of an allow-listed *name* can retarget a
       directory symlink. Not an escalation - the target must still pass the
