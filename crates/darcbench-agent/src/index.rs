@@ -58,6 +58,12 @@ pub(crate) enum IndexError {
     #[error("run index: {0}")]
     Io(#[from] std::io::Error),
     #[error(
+        "run index: {unreadable} row(s) could not be read, so the retention window cannot be \
+         computed from a complete list. Nothing was deleted. The index is rebuilt from the \
+         bundles at every start, so restarting the agent and retrying is the fix."
+    )]
+    PartialView { unreadable: usize },
+    #[error(
         "run index at {path} was written by a newer agent (schema {found}, this build \
          understands {expected}). Delete it to have this agent rebuild it from the bundles, \
          which remain the source of truth."
@@ -465,14 +471,39 @@ impl RunIndex {
 
     /// The most recent runs, newest first.
     pub(crate) fn list(&self, limit: usize) -> Result<Vec<IndexedRun>, IndexError> {
+        Ok(self.list_rows(limit)?.0)
+    }
+
+    /// The most recent runs, plus how many rows could not be read.
+    ///
+    /// `list` drops an unreadable row, which is right for a history someone is
+    /// looking at: one bad row should not blank the page. It is wrong for
+    /// anything that *acts* on position in the result, because a dropped row
+    /// silently shifts everything after it - `prune` selecting by index into
+    /// this list would then keep one run fewer than `--keep-last` asked for,
+    /// and deleting a benchmark result is not undoable.
+    ///
+    /// So the count is returned rather than discarded, and callers that cannot
+    /// tolerate a partial view check it. No row can fail to convert against the
+    /// current schema; the asymmetry is removed anyway, because "no trigger
+    /// exists today" is not a property that survives a schema change.
+    fn list_rows(&self, limit: usize) -> Result<(Vec<IndexedRun>, usize), IndexError> {
         let Some(connection) = self.connection() else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0));
         };
         let mut statement = connection.prepare(&format!(
             "SELECT {COLUMNS} FROM runs ORDER BY finished_at DESC LIMIT ?1"
         ))?;
         let rows = statement.query_map([limit as i64], row_to_run)?;
-        Ok(rows.filter_map(Result::ok).collect())
+        let mut runs = Vec::new();
+        let mut unreadable = 0usize;
+        for row in rows {
+            match row {
+                Ok(run) => runs.push(run),
+                Err(_) => unreadable += 1,
+            }
+        }
+        Ok((runs, unreadable))
     }
 
     pub(crate) fn get(&self, run_id: &str) -> Result<Option<IndexedRun>, IndexError> {
@@ -800,7 +831,13 @@ impl RunIndex {
             return Ok(outcome);
         }
 
-        let all = self.list(usize::MAX)?;
+        let (all, unreadable) = self.list_rows(usize::MAX)?;
+        if unreadable > 0 {
+            // Refuse rather than delete from a view known to be incomplete.
+            // The window is positional, so an invisible row moves it, and the
+            // operation has no undo. Rebuilding the index is one restart away.
+            return Err(IndexError::PartialView { unreadable });
+        }
         let cutoff = policy
             .older_than_days
             .map(|days| chrono::Utc::now() - chrono::Duration::days(i64::from(days)));
@@ -1221,6 +1258,79 @@ mod tests {
             "{:?}",
             comparison.incomparable_reasons
         );
+    }
+
+    /// A retention window computed from an incomplete list would delete the
+    /// wrong run, so `prune` refuses instead.
+    ///
+    /// `list` drops a row it cannot read, which is right for a page someone is
+    /// looking at and wrong for an operation with no undo: the window is
+    /// positional, so an invisible row shifts it and `--keep-last 2` keeps one.
+    #[test]
+    fn prune_refuses_rather_than_delete_from_a_partial_view() {
+        let index = RunIndex::in_memory().unwrap();
+        let runs_dir = std::env::temp_dir().join(format!(
+            "darcbench-partial-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+
+        let mut ids = Vec::new();
+        for _ in 0..3 {
+            let b = bundle(
+                Some(1000.0),
+                ResultState::Local,
+                vec![metric("m", 1.0, Direction::HigherIsBetter)],
+            );
+            let dir = runs_dir.join(b.run.run_id.as_str());
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("bundle.json"), b"{}").unwrap();
+            index
+                .record(&b, std::path::Path::new("/nonexistent/bundle.json"))
+                .unwrap();
+            ids.push(b.run.run_id.as_str().to_string());
+        }
+
+        // Make one row unreadable the way a schema change would: a value whose
+        // type `row_to_run` cannot convert. SQLite's dynamic typing allows it.
+        index
+            .connection()
+            .unwrap()
+            .execute(
+                "UPDATE runs SET duration_ms = 'not-a-number' WHERE run_id = ?1",
+                [&ids[0]],
+            )
+            .unwrap();
+
+        // The lenient path still works - a broken row must not blank the list.
+        assert_eq!(
+            index.list(usize::MAX).unwrap().len(),
+            2,
+            "list degrades to the rows it can read"
+        );
+
+        let outcome = index.prune(
+            &runs_dir,
+            RetentionPolicy {
+                older_than_days: None,
+                keep_last: Some(1),
+            },
+            false,
+        );
+        assert!(
+            matches!(outcome, Err(IndexError::PartialView { unreadable: 1 })),
+            "prune must refuse a partial view, got {outcome:?}"
+        );
+        for id in &ids {
+            assert!(
+                runs_dir.join(id).is_dir(),
+                "a refused prune must delete nothing, but {id} is gone"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&runs_dir);
     }
 
     /// Two same-named categories built from different workloads are not the

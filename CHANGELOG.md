@@ -73,6 +73,36 @@ test failed on real hardware
   canonicalise, so a run where no tick was readable would have produced a
   bundle that could not be signed at all.
 
+**`prune` could delete one run too many** — it selected by position in a list
+that silently dropped rows it could not read
+- `list` drops an unreadable row, which is right for a history someone is
+  looking at: one bad row should not blank the page. `prune` used the same
+  function and then indexed into the result, so an invisible row shifted the
+  window and `--keep-last 2` would have kept one. Deleting a benchmark result
+  has no undo.
+- The two callers want different things and now get different functions.
+  `prune` refuses outright when any row was unreadable, and says so — the index
+  rebuilds from the bundles on the next start, so refusing costs a restart and
+  guessing costs a result.
+- No row can fail to convert against the current schema. The asymmetry is
+  removed anyway, because "no trigger exists today" is not a property that
+  survives a schema change.
+
+**`runtime_exec` checked which binary it would execute, but not who chose it**
+- The safe-path walk resolved symlinks first and then checked every ancestor of
+  the *resolved* path. That leaves the path *as written* unchecked: if
+  `/usr/local/bin` were an attacker-owned symlink, `/usr/local/bin/node` would
+  canonicalise into a directory they picked, and every subsequent check would be
+  applied to a target they chose rather than the one the allow-list meant.
+- `check_unresolved_chain` walks the written path with `symlink_metadata` — the
+  pass that can see the links rather than what they point at. A symlink is
+  checked by ownership alone, because permission bits on a symlink are
+  meaningless on Linux and whoever owns the link chooses where it points.
+- Still not a privilege escalation: the target has to pass every other check, so
+  the substitution can only be another root-owned binary. But "you may choose
+  which trusted binary we execute" is not a property to leave in a program whose
+  argument is that it does not execute what it has not verified.
+
 **`RunManager::runs` grew for the lifetime of the process**
 - Every run kept its bundle, replay buffer and whole telemetry series resident.
   Irrelevant for `darcbench run`; an unbounded leak for the `serve` process

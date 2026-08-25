@@ -95,6 +95,10 @@ pub fn discover(candidates: &[&str]) -> (Option<Interpreter>, Vec<Rejection>) {
 /// Symlinks are resolved first, because the check has to apply to what will
 /// actually be executed rather than to the name used to reach it. `/usr/bin/php`
 /// pointing at a world-writable file elsewhere must fail, and it does.
+///
+/// Then [`check_unresolved_chain`] applies the check a second time to the path
+/// as written, because resolving first answers "is the target safe?" and leaves
+/// "could somebody else have chosen that target?" unasked.
 fn check_safe(path: &Path) -> Result<PathBuf, String> {
     let resolved = path
         .canonicalize()
@@ -127,7 +131,59 @@ fn check_safe(path: &Path) -> Result<PathBuf, String> {
         }
         ancestor = directory.parent();
     }
+
+    check_unresolved_chain(path)?;
     Ok(resolved)
+}
+
+/// The same check applied to the path *as written*, without following links.
+///
+/// The walk above covers the resolved path only, which leaves a gap: an
+/// attacker who controls a directory symlink on the way to an allow-listed
+/// *name* chooses which root-owned binary the resolved path lands on. If
+/// `/usr/local/bin` were an attacker-owned symlink, `/usr/local/bin/node` would
+/// canonicalise into a directory they picked, and every check above would then
+/// be applied to a target they chose rather than to the one the allow-list
+/// meant.
+///
+/// It is not a privilege escalation - the target must still pass every check,
+/// so the substitution can only be another root-owned, root-writable-only
+/// binary - but "you may choose which trusted binary we execute" is not a
+/// property worth leaving in a program whose whole argument is that it does not
+/// execute what it has not verified.
+///
+/// `symlink_metadata`, not `metadata`: this walk exists precisely to see the
+/// links rather than what they point at.
+fn check_unresolved_chain(path: &Path) -> Result<(), String> {
+    for component in path.ancestors().skip(1) {
+        if component.as_os_str().is_empty() {
+            continue;
+        }
+        let metadata = std::fs::symlink_metadata(component)
+            .map_err(|error| format!("`{}` cannot be inspected: {error}", component.display()))?;
+
+        if metadata.file_type().is_symlink() {
+            // Permission bits on a symlink are meaningless on Linux - they are
+            // conventionally 0777 and the kernel ignores them - so ownership is
+            // the whole check. Whoever owns the link chooses where it points.
+            if metadata.uid() != 0 {
+                return Err(format!(
+                    "`{}` is a symlink owned by uid {}, not root, so a non-root user could \
+                     retarget it and choose which binary this name resolves to",
+                    component.display(),
+                    metadata.uid()
+                ));
+            }
+            continue;
+        }
+        if let Some(problem) = unsafe_ownership(&metadata) {
+            return Err(format!(
+                "`{}` {problem}, so a non-root user could redirect this path",
+                component.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// `None` when a directory cannot be written by anyone but its owner.
@@ -536,6 +592,42 @@ fn reap(child: &mut std::process::Child) {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
     use super::*;
+
+    /// A directory symlink somebody else controls chooses which binary an
+    /// allow-listed name resolves to, and the resolved-path walk cannot see it.
+    #[test]
+    fn a_non_root_symlink_on_the_way_to_a_name_is_refused() {
+        let dir = std::env::temp_dir().join(format!(
+            "darcbench-chain-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(dir.join("real")).unwrap();
+        std::os::unix::fs::symlink(dir.join("real"), dir.join("link")).unwrap();
+
+        // The test process is not root, so the link it just created is owned by
+        // uid != 0 - which is exactly the condition being guarded against.
+        let error = check_unresolved_chain(&dir.join("link").join("php"))
+            .expect_err("a non-root symlink in the chain must be refused");
+        assert!(
+            error.contains("symlink") && error.contains("retarget"),
+            "the message must name the symlink and say why it matters: {error}"
+        );
+
+        // A plain directory owned by the same non-root user is also refused,
+        // but as a directory - the two branches must not be confused, because
+        // the fix an operator applies differs.
+        let error = check_unresolved_chain(&dir.join("real").join("php"))
+            .expect_err("a non-root directory in the chain must be refused");
+        assert!(
+            !error.contains("symlink") && error.contains("redirect"),
+            "a directory must not be reported as a symlink: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_path_that_does_not_exist_is_not_a_rejection() {

@@ -94,10 +94,15 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       which is this module's own idiom for "not observable" (`cpu_freq_mhz`).
       The flag makes the absence detectable; `Option` would make it
       unrepresentable.
-- [ ] `RunIndex::list` drops rows it cannot convert while `get` propagates the
-      error, and `prune` selects by position in that list - so a dropped row
-      would shift the `--keep-last` window by one. No trigger exists against the
-      current schema; the asymmetry is still worth removing.
+- [x] ~~`RunIndex::list` drops rows it cannot convert while `get` propagates the
+      error, and `prune` selects by position in that list.~~ The two callers want
+      different things, so they now get different functions. `list` still
+      degrades to the rows it can read - one bad row must not blank a history
+      someone is looking at - while `list_rows` also returns how many were
+      unreadable, and `prune` **refuses outright** when any were. The window is
+      positional, so an invisible row shifts it and `--keep-last 2` would keep
+      one; deleting a benchmark result has no undo, and the index rebuilds from
+      the bundles on the next start.
 - [ ] Resource limits on child processes for the runtime modules. `rlimits` need
       `Command::pre_exec`, which is `unsafe`, and the workspace forbids it - so
       `php.runtime` bounds its children by wall clock only. A PHP whose
@@ -117,11 +122,16 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       index schema 3. An *unrecorded* basket is skipped rather than reported,
       because a bundle written before the field is not evidence that the
       workloads differed.
-- [ ] `runtime_exec`'s ancestor walk covers the *resolved* path only, so an
+- [x] ~~`runtime_exec`'s ancestor walk covers the *resolved* path only, so an
       attacker who controls an ancestor of an allow-listed *name* can retarget a
-      directory symlink. Not an escalation - the target must still pass the
-      check, so they can only substitute another root-owned binary - but a
-      `symlink_metadata` pass over the original chain would close it.
+      directory symlink.~~ `check_unresolved_chain` walks the path as written
+      with `symlink_metadata`, which is the pass that can see the links rather
+      than what they point at. A symlink in the chain is checked by ownership
+      alone, because permission bits on a symlink are meaningless on Linux and
+      whoever owns the link chooses where it points. Still not an escalation -
+      the target had to pass every other check either way - but "you may choose
+      which trusted binary we execute" is not a property to leave in a program
+      whose argument is that it does not execute what it has not verified.
 - [ ] Per-cycle telemetry alignment. The sustained diagnosis compares the
       opening and closing thirds of the whole telemetry series, which is right
       when cycles are evenly spaced and slightly off when one cycle ran long.
