@@ -12,6 +12,7 @@ affecting measurement or scoring is a test that would fail without it.
 | Integration | `runner`, `server` | Full run lifecycle, event ordering, cancellation, persistence |
 | Contract | `protocol`, `canonical` | Serialisation stability, forward compatibility, signature round-trip |
 | End-to-end | `scripts/e2e.sh` | The real binary: doctor → run → verify → tamper detection |
+| Reference | `scripts/check-links.sh` | Every path named in a document or a doc comment still exists |
 | Browser | Playwright (manual) | The dashboard renders, streams and completes a run |
 
 ## What is covered today

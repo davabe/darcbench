@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# A second push to a branch makes the first run's result irrelevant. Without
+# this, both run to completion - and the expensive jobs here are a full release
+# build of the workspace plus an end-to-end run, so the waste is minutes, not
+# seconds. `main` is excluded from cancellation: its runs are the record of what
+# was merged, and cancelling one leaves a commit with no result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -145,6 +154,35 @@ jobs:
       - name: Format on stable
         run: rustup run stable cargo fmt --all -- --check
 
+  msrv:
+    name: MSRV (advisory)
+    runs-on: ubuntu-latest
+    # `rust-version` in the workspace Cargo.toml promises consumers can build
+    # this with 1.82. Nothing verified that promise: CI built with the pinned
+    # 1.97.1 and with current stable, and both are far newer, so an MSRV
+    # violation introduced by a dependency bump or a newer language feature
+    # would have shipped unnoticed.
+    #
+    # Advisory for the same reason `lint-latest` is: the point is to make the
+    # gap visible before it blocks anyone. Promote it to a blocking job once it
+    # has been green for a release, or raise `rust-version` to whatever it
+    # actually needs - either is an honest answer; the current silence is not.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the declared MSRV toolchain
+        run: |
+          msrv="$(grep -oP '(?<=^rust-version = ")[^"]+' Cargo.toml)"
+          echo "declared MSRV: $msrv"
+          rustup toolchain install "$msrv" --profile minimal
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@v2
+      # `check`, not `test`: the promise is that a consumer can build the
+      # workspace, and the test suite pulls in dev-dependencies whose own MSRV
+      # is not part of that promise.
+      - name: Check the workspace builds at the declared MSRV
+        run: rustup run "$MSRV" cargo check --workspace --all-features --locked
+
   supply-chain:
     name: Supply chain
     runs-on: ubuntu-latest
@@ -152,8 +190,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install pinned Rust toolchain
         run: rustup show
-      - name: Install cargo-audit and cargo-deny
-        run: cargo install cargo-audit cargo-deny --locked
+      # Prebuilt binaries, not `cargo install`. Building these two from source
+      # took several minutes of every CI run and produced a byte-identical
+      # result each time; they are tools this workflow runs, not dependencies of
+      # the product, so there is nothing to be gained from compiling them here.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
       - name: Advisory audit
         run: cargo audit
       - name: Licence and dependency policy
@@ -166,12 +209,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Every documented file exists
-        run: |
-          missing=0
-          for f in $(grep -ohrE '\((\./)?(docs|crates|apps|scripts|benchmarks)/[A-Za-z0-9._/-]+\)' \
-                       README.md docs/*.md 2>/dev/null \
-                     | tr -d '()' | sed 's|^\./||' | sort -u); do
-            [ -e "$f" ] || { echo "broken link target: $f"; missing=1; }
-          done
-          exit $missing
+      # A script rather than an inline block, so a contributor can run the same
+      # check before pushing. It also covers what the inline version did not:
+      # the ADRs under docs/adr/, CONTRIBUTING.md, SECURITY.md, and the
+      # repository paths this codebase names in its doc comments.
+      - name: Every documented path exists
+        run: ./scripts/check-links.sh

@@ -49,7 +49,11 @@ rustls-pki-types = "1"
 # crossterm is deliberately NOT a direct dependency: ratatui re-exports the
 # exact version it was built against as `ratatui::crossterm`, and depending on
 # it separately is how a workspace ends up linking two incompatible copies of
-# the terminal backend and failing `cargo deny check bans` for duplicates.
+# the terminal backend. Note that nothing *enforces* this: `deny.toml` sets
+# `bans.multiple-versions = "warn"`, because the lockfile already carries
+# unavoidable duplicates from the build-tooling crates, so a second crossterm
+# would be reported and CI would still pass. The discipline is the comment you
+# are reading.
 ratatui = "0.29"
 # The standalone run index. `bundled` compiles SQLite from the amalgamation
 # shipped in the crate, so the agent keeps its single-static-binary promise on

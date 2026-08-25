@@ -65,6 +65,7 @@ cargo fmt --all
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --release
 (cd apps/web && pnpm build)              # runs tsc --noEmit
+./scripts/check-links.sh                 # no compiler needed; run it first
 ./scripts/e2e.sh
 ```
 
