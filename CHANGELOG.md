@@ -73,6 +73,33 @@ test failed on real hardware
   canonicalise, so a run where no tick was readable would have produced a
   bundle that could not be signed at all.
 
+**`build_target` could not tell musl from glibc**, and it is a comparability key
+- It was built from `std::env::consts::ARCH` and `OS`, yielding `x86_64-linux`
+  for both. Static musl is the default download and building from source gives
+  gnu, so the collision covered the most common pair of builds there is.
+- The two are not interchangeable for this product: musl and glibc differ in
+  allocator and in `memcpy`, which is precisely what `cpu.mixed` and
+  `memory.bandwidth` measure. Calibrating with musl on two hosts and a
+  source-built gnu binary on the third would have blended two libcs into one
+  reference with nothing reporting it.
+- Now the full triple, from a `build.rs` in `darcbench-report` — Cargo sets
+  `TARGET` for build scripts and nowhere else, which is the only reason that
+  file exists. Verified on real runs: `x86_64-unknown-linux-musl` and
+  `x86_64-unknown-linux-gnu`.
+- **Expect this to make older runs non-comparable with new ones**, since the
+  recorded value changes from `x86_64-linux` to a full triple. Same shape as the
+  scope fix: what the bundle records genuinely changed.
+
+**[docs/CALIBRATION-RUNBOOK.md](docs/CALIBRATION-RUNBOOK.md)** — the operational
+half of the calibration procedure
+- SCORING-SYSTEM.md §3.1 defines what calibration is. This is what to rent, what
+  to install, what to type and what to send back, because calibration is the one
+  thing gating `dbs/1.0.0` and it cannot be done by writing more code.
+- Includes the conditions to expect rather than discover: `web.static` scoring
+  far above 1000 on a large host, `network.transfer` having the worst
+  across-host CV of any module, and `deep` silently leaving four categories
+  unanchored without a container daemon.
+
 **A dispersion metric was judged for dispersing, which made ordinary machines
 unrankable**
 - `network.transfer/tcp_connect.jitter` measures spread. `network_transfer.rs`

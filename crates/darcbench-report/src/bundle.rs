@@ -16,8 +16,18 @@ pub struct BundleMeta {
     pub schema: String,
     pub protocol: String,
     pub agent_version: String,
-    /// Target triple the agent was built for. Part of comparability: the same
-    /// workload compiled for a different target is not the same workload.
+    /// Target triple the agent was built for, e.g.
+    /// `x86_64-unknown-linux-musl`. Part of comparability: the same workload
+    /// compiled for a different target is not the same workload.
+    ///
+    /// The **full triple**, from `build.rs`. It used to be built from
+    /// `std::env::consts::ARCH` and `OS`, which yields `x86_64-linux` and drops
+    /// the libc - so a static musl binary and a glibc one reported the same
+    /// string and compared as equals. They are not equals: the two differ in
+    /// allocator and in `memcpy`, which is precisely what `cpu.mixed` and
+    /// `memory.bandwidth` measure. Static musl is the default download and
+    /// building from source gives gnu, so that collision covered the most
+    /// common pair of builds there is.
     pub build_target: String,
     /// `release` or `debug`. A debug-built agent must never produce a
     /// comparable score, and validation enforces that.
@@ -81,7 +91,7 @@ impl BundleMeta {
             schema: BUNDLE_SCHEMA_VERSION.to_string(),
             protocol: PROTOCOL_VERSION.to_string(),
             agent_version: agent_version.to_string(),
-            build_target: format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS),
+            build_target: env!("DARCBENCH_TARGET").to_string(),
             build_profile: if cfg!(debug_assertions) {
                 "debug"
             } else {

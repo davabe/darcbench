@@ -242,7 +242,8 @@ scripts/ tests/         validation and end-to-end checks
 [Product Bible](docs/PRODUCT-BIBLE.md) ·
 [Architecture](docs/ARCHITECTURE.md) ·
 [Roadmap](docs/ROADMAP.md) ·
-[Public results](docs/PUBLIC-RESULTS.md)
+[Public results](docs/PUBLIC-RESULTS.md) ·
+[Calibration runbook](docs/CALIBRATION-RUNBOOK.md)
 
 **The methodology**
 [Benchmark methodology](docs/BENCHMARK-METHODOLOGY.md) ·
