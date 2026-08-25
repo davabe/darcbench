@@ -24,6 +24,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use darcbench_inventory::{Inventory, RedactionPolicy};
+use darcbench_protocol::events::Envelope;
 use darcbench_protocol::{ModuleId, Profile, RunId, ENDURANCE_MAX_MINUTES, ENDURANCE_MIN_MINUTES};
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
@@ -643,13 +644,41 @@ async fn get_run(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require(&headers, &query, &state, false)?;
     let id = parse_run_id(&run_id)?;
-    let handle = state
+    if let Some(handle) = state.manager.get(&id) {
+        return Ok(Json(serde_json::json!({
+            "summary": handle.summary(),
+            "last_seq": handle.last_seq(),
+        })));
+    }
+    // Not a run of this process. The index knows every run this state directory
+    // has completed, so answer from the row in the same shape `list_runs` uses
+    // - otherwise the list shows a run whose detail view 404s.
+    //
+    // `last_seq` is null rather than counted: for a finished run it exists only
+    // to resume an SSE stream, the clients derive their position from the events
+    // themselves, and reading the whole log to produce a number nobody consumes
+    // is not worth a file read per request.
+    let indexed = state
         .manager
-        .get(&id)
+        .index()
+        .get(id.as_str())
+        .ok()
+        .flatten()
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?;
     Ok(Json(serde_json::json!({
-        "summary": handle.summary(),
-        "last_seq": handle.last_seq(),
+        "summary": {
+            "run_id": indexed.run_id,
+            "profile": indexed.profile,
+            "state": indexed.run_state.to_lowercase(),
+            "created_at": indexed.finished_at,
+            "finished_at": indexed.finished_at,
+            "modules": indexed.modules,
+            "progress": 1.0,
+            "total_score": indexed.total_score,
+            "result_state": indexed.result_state,
+            "stopped_because": indexed.stopped_because,
+        },
+        "last_seq": serde_json::Value::Null,
     })))
 }
 
@@ -679,17 +708,21 @@ async fn get_bundle(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require(&headers, &query, &state, false)?;
     let id = parse_run_id(&run_id)?;
-    let handle = state
-        .manager
-        .get(&id)
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?;
-    let bundle = handle.bundle().ok_or_else(|| {
-        ApiError::new(
-            StatusCode::CONFLICT,
-            "run_incomplete",
-            "The run has not finished, so there is no result bundle yet.",
-        )
-    })?;
+    let bundle = match state.manager.get(&id) {
+        Some(handle) => handle.bundle().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "run_incomplete",
+                "The run has not finished, so there is no result bundle yet.",
+            )
+        })?,
+        // A run from an earlier process. Its bundle is on disk; see
+        // `RunManager::stored_bundle`.
+        None => state
+            .manager
+            .stored_bundle(&id)
+            .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?,
+    };
     serde_json::to_value(&bundle).map(Json).map_err(|e| {
         ApiError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -708,22 +741,39 @@ async fn get_report(
 ) -> Result<Response, ApiError> {
     require(&headers, &query, &state, false)?;
     let id = parse_run_id(&run_id)?;
-    let handle = state
-        .manager
-        .get(&id)
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?;
-    let bundle = handle.bundle().ok_or_else(|| {
-        ApiError::new(
-            StatusCode::CONFLICT,
-            "run_incomplete",
-            "The run has not finished.",
-        )
-    })?;
+    let bundle = match state.manager.get(&id) {
+        Some(handle) => handle.bundle().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "run_incomplete",
+                "The run has not finished.",
+            )
+        })?,
+        None => state
+            .manager
+            .stored_bundle(&id)
+            .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?,
+    };
     Ok((
         [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
         darcbench_report::html::render(&bundle),
     )
         .into_response())
+}
+
+/// Boxed so the live and the replayed-from-disk paths can share one return
+/// type. Both are `Stream`s of the same items; only their origin differs.
+type EventStream =
+    std::pin::Pin<Box<dyn Stream<Item = Result<SseEvent, std::convert::Infallible>> + Send>>;
+
+/// One protocol envelope as one SSE frame, `seq` carried as the event id so a
+/// reconnecting client can resume with `Last-Event-ID`.
+fn sse_from(envelope: &Envelope) -> SseEvent {
+    let payload = serde_json::to_string(envelope).unwrap_or_else(|_| "{}".to_string());
+    SseEvent::default()
+        .id(envelope.seq.to_string())
+        .event(envelope.kind())
+        .data(payload)
 }
 
 /// Server-Sent Events stream for a run.
@@ -737,19 +787,43 @@ async fn stream_events(
     headers: HeaderMap,
     Path(run_id): Path<String>,
     Query(query): Query<TokenQuery>,
-) -> Result<Sse<impl Stream<Item = Result<SseEvent, std::convert::Infallible>>>, ApiError> {
+) -> Result<Response, ApiError> {
     require(&headers, &query, &state, false)?;
     let id = parse_run_id(&run_id)?;
-    let handle = state
-        .manager
-        .get(&id)
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run."))?;
 
     let last_seen = headers
         .get("last-event-id")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok())
         .or(query.last_event_id);
+
+    // A run this process did not start has no live stream to join, because the
+    // process that ran it has exited. Its recorded log is the whole answer, so
+    // replay it and close - rather than 404 for a run the list just showed.
+    let Some(handle) = state.manager.get(&id) else {
+        let replay = state.manager.stored_events(&id).ok_or_else(|| {
+            if state.manager.stored_bundle(&id).is_some() {
+                // The result survived and its log did not. Say which, rather
+                // than reporting the run as absent when it plainly is not.
+                ApiError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "event_log_unreadable",
+                    "The run exists and its bundle is readable, but `events.ndjson` is missing \
+                     or contains a record that could not be decoded.",
+                )
+            } else {
+                ApiError::new(StatusCode::NOT_FOUND, "unknown_run", "No such run.")
+            }
+        })?;
+        let stream = tokio_stream::iter(
+            replay
+                .into_iter()
+                .filter(move |envelope| last_seen.is_none_or(|seen| envelope.seq > seen))
+                .map(|envelope| Ok(sse_from(&envelope))),
+        );
+        // No keep-alive: this stream ends on its own once the log is drained.
+        return Ok(Sse::new(Box::pin(stream) as EventStream).into_response());
+    };
 
     // Subscribe *before* snapshotting the backlog. In the other order, an event
     // emitted between the snapshot and the subscription is in neither - and on a
@@ -782,23 +856,18 @@ async fn stream_events(
 
     let stream = backlog_stream
         .chain(live_stream)
-        .map(|item: Result<_, ()>| {
-            let envelope = match item {
-                Ok(envelope) => envelope,
-                Err(()) => return Ok(SseEvent::default().event("stream.error").data("{}")),
-            };
-            let payload = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".to_string());
-            Ok(SseEvent::default()
-                .id(envelope.seq.to_string())
-                .event(envelope.kind())
-                .data(payload))
+        .map(|item: Result<_, ()>| match item {
+            Ok(envelope) => Ok(sse_from(&envelope)),
+            Err(()) => Ok(SseEvent::default().event("stream.error").data("{}")),
         });
 
-    Ok(Sse::new(stream).keep_alive(
-        KeepAlive::new()
-            .interval(std::time::Duration::from_secs(15))
-            .text("keepalive"),
-    ))
+    Ok(Sse::new(Box::pin(stream) as EventStream)
+        .keep_alive(
+            KeepAlive::new()
+                .interval(std::time::Duration::from_secs(15))
+                .text("keepalive"),
+        )
+        .into_response())
 }
 
 async fn serve_ui(

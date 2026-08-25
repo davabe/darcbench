@@ -65,6 +65,18 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       in operational meaning across the fleet this tool targets. A share is the
       right *shape* (contention matters relative to capacity) but the small end
       deserves checking against a real `unattended-upgrades` run before 1.0.
+- [x] ~~**`Scope::BareMetal` is decided without recording why.**~~ Every branch
+      of `detect_scope` cited its evidence except the bare-metal fallback,
+      whose condition was `!vendor.is_empty() || !product.is_empty()` - true on
+      any host that can open `/sys/class/dmi/id`, which includes every VM.
+      `platform::tests::scope_detection_is_evidence_backed` failed on the
+      machine it was found on, which reports the SMBIOS placeholder
+      `Default string` for both fields. `dmi_identity` now treats the known
+      placeholders as absent: a host with a programmed DMI is `BareMetal` and
+      says so with the vendor named, and one without is `Unknown`, which is
+      what the evidence supports. This changes what a bundle *claims*, not what
+      a run *enforces* - `Scope::Unknown` arms the runtime load ceiling exactly
+      as `BareMetal` does, since only `Container` disarms it.
 - [ ] A failed `/proc/stat` read yields a zeroed telemetry snapshot, which both
       publishes a fabricated `cpu_busy_pct: 0.0` and resets the load-ceiling
       tallies. Fails open on a guard that stops runs; the snapshot should carry
@@ -110,6 +122,20 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       Bundles remain the source of truth; the index is rebuilt from them at
       startup by `reconcile`. **Still open:** pagination for the run list, which
       is bounded at 200 rows today, and the fleet-scale queries Phase 7 wants.
+- [x] ~~**A fresh `serve` lists runs it cannot open.**~~ `get_run`, `get_bundle`,
+      `get_report` and `stream_events` resolved only through `RunManager::get`,
+      which searches the in-memory `runs` vector - populated solely by runs
+      *this* process started. So a `serve` started after a CLI run listed the
+      run and answered 404 for its bundle, its report and its event stream,
+      while the files sat in the run directory the whole time. The same defect
+      the index was introduced to fix for the *list* (ROADMAP Phase 2), left
+      half-migrated. Each now falls back to disk on an in-memory miss, per the
+      ADR-0005 hierarchy: bundles are the truth, the index caches them, memory
+      caches that. The event stream replays `events.ndjson` and closes - there
+      is no live stream to join once the process that ran it has exited - and
+      it parses strictly, so an undecodable record is reported as
+      `event_log_unreadable` rather than silently shortening the replay.
+      `cancel` still returns 404: a finished run cannot be cancelled.
 - [ ] `darcbench status` / `cancel` against a *running* agent over a Unix socket.
 - [ ] Stale-run detection on startup. Crash *recovery* is now partly covered:
       `reconcile` reindexes bundles written by a process that died, and ignores
@@ -120,6 +146,25 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
 - [ ] Privileged helper separated from the unprivileged HTTP process, for the
       Phase 2+ modules that need capabilities.
 - [ ] Shell completions.
+- [ ] The query-string token authenticates *every* read endpoint, not only the
+      one that needs it. `EventSource` cannot set headers, which is the reason
+      the mechanism exists, but the UI actually spends it once on
+      `POST /api/v1/session?token=` and rides the cookie afterwards. Behind the
+      reverse proxy of ADR-0014 a query token lands in the proxy's access log in
+      plaintext, so the blast radius is wider than the need. Narrowing it to the
+      session endpoint is a documented API change (`docs/API.md` lists `?token=`
+      as ambient auth on the whole surface), not a bug fix.
+- [ ] `EventRecord::append` encodes every event twice and allocates a
+      `serde_json::Value` tree for the second: once with `to_vec` for the NDJSON
+      log, then again through `canonical_json`, which goes via `to_value` before
+      re-serialising. An endurance run emits thousands of events, and this
+      module's own doc comment argues that the observer's cost is charged to the
+      measurement. A canonical serialiser that writes straight to the hasher
+      would remove the intermediate tree and one of the two encodings.
+- [ ] `EventRecord::ndjson` accumulates the whole event log in memory for the
+      lifetime of the run and is written out only at the end. Same exposure as
+      the unbounded `RunManager::runs` above, and the same fix shape: stream it
+      to `events.ndjson` as it is produced.
 
 ## Protocol and clients
 
@@ -151,12 +196,29 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
 - [ ] Low disk, missing dependency, occupied port, failed container, database
       startup failure, invalid WordPress installation, no internet — all
       currently untested paths that matter once Phase 2–4 modules exist.
+- [x] ~~`scripts/e2e.sh` never fetches a per-run endpoint for a run it did not
+      start inside the serving process~~ - which is why the `serve` defect above
+      survived 45 green checks. It now asserts that `serve` returns the summary,
+      bundle and report of a run made by an earlier process, that the replayed
+      event stream matches `events.ndjson` line for line and ends on
+      `run.completed`, and that cancelling a finished run is still refused.
 - [ ] Root vs non-root test matrix.
 - [ ] arm64 CI runners.
 - [ ] Slow-SSE-client test with a deliberately throttled consumer.
 - [ ] Tampered-bundle corpus as a fixture set.
 - [ ] Coverage measurement (`cargo-llvm-cov`).
 - [ ] Multi-machine reproducibility corpus — blocked on calibration hardware.
+- [ ] Promote the `msrv` CI job from advisory to blocking, or raise
+      `rust-version`. `Cargo.toml` promises 1.82 and, until that job was added,
+      nothing built with it: CI used the pinned 1.97.1 and current stable, both
+      far newer. The job follows the `lint-latest` precedent and does not block
+      a merge yet, which means the promise is now *visible* rather than kept.
+- [ ] `deny.toml` carries an `[advisories]` section with `yanked = "deny"` that
+      is never evaluated: CI runs `cargo deny check licenses bans sources`, and
+      advisories are covered separately by `cargo audit`, which does not deny
+      yanked crates unless asked. Either add `advisories` to the `cargo deny`
+      invocation or delete the dead config — the current state reads as a policy
+      and behaves as a comment.
 
 ## Research
 
@@ -230,6 +292,14 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       visit order, then the next-pointers). Peak construction memory is twice
       the chase working set, which the 3-buffer budget already covers, but a
       single-array construction would free real headroom on a small instance.
+      Sharpened on review: the second array is not just an extra allocation, it
+      is an extra *step*. Sattolo's algorithm run over an identity array already
+      yields a single full-length cycle read as a next-pointer function, which
+      is exactly what the chase wants — so `permutation()` could return `order`
+      directly and drop both the `next` array and the O(n) pass that fills it.
+      The rewrite changes which permutation a given seed produces, so it needs
+      the pointer-chase latency to be re-measured on a known host before it
+      lands, not merely a green test suite.
 - [ ] The unit suite cannot run a full profile at a realistic working-set size:
       an unoptimised `memory.bandwidth` run took over eight minutes. Full-profile
       coverage lives in `scripts/e2e.sh` against a release build. A test hook for

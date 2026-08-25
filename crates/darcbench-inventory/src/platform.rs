@@ -217,13 +217,60 @@ fn detect_scope() -> (Scope, Option<String>, Option<String>, Vec<String>) {
         Scope::Container
     } else if hypervisor.is_some() {
         Scope::VirtualMachine
-    } else if !vendor.is_empty() || !product.is_empty() {
+    } else if let Some(named) = dmi_identity(&vendor, &product) {
+        // The evidence for "physical" is negative - no hypervisor marker fired -
+        // and it is only worth anything if the DMI we read actually describes a
+        // machine. Recording it is not decoration: every other branch here
+        // cites its reason, and a scope that names itself without one is the
+        // thing `scope_detection_is_evidence_backed` exists to catch.
+        evidence.push(format!(
+            "DMI identifies `{named}` and no container or hypervisor marker was found"
+        ));
         Scope::BareMetal
     } else {
         Scope::Unknown
     };
 
     (scope, hypervisor, container_runtime, evidence)
+}
+
+/// The DMI identity, if the firmware actually programmed one.
+///
+/// `!vendor.is_empty()` is not that test. SMBIOS ships placeholder strings and
+/// whitebox and OEM builders routinely leave them in: the machine this was
+/// found on reports `Default string` for both `sys_vendor` and `product_name`.
+/// Those fields are present, non-empty, and say nothing - so the old condition
+/// classified such a host as bare metal on the strength of being able to open
+/// `/sys/class/dmi/id` at all, which every VM can do too.
+///
+/// Treating them as absent moves that host to `Unknown`, which is what the
+/// evidence supports. Nothing is lost by the change: `Scope::Unknown` arms the
+/// runtime load ceiling exactly as `BareMetal` does - only `Container` disarms
+/// it - so this alters what the bundle *claims*, not what the run *enforces*.
+fn dmi_identity<'a>(vendor: &'a str, product: &'a str) -> Option<&'a str> {
+    /// Lowercased, because both inputs already are.
+    const PLACEHOLDERS: &[&str] = &[
+        "default string",
+        "to be filled by o.e.m.",
+        "to be filled by oem",
+        "system manufacturer",
+        "system product name",
+        "system name",
+        "not specified",
+        "not applicable",
+        "unknown",
+        "none",
+        "o.e.m.",
+        "oem",
+        "empty",
+        "n/a",
+        "chassis manufacturer",
+    ];
+    let informative = |value: &str| {
+        let value = value.trim();
+        !value.is_empty() && !PLACEHOLDERS.contains(&value)
+    };
+    [vendor, product].into_iter().find(|v| informative(v))
 }
 
 /// cgroup v2 `cpu.max` -> whole CPUs, or v1 quota/period.
@@ -352,6 +399,29 @@ mod tests {
                 "a non-Unknown scope must cite evidence"
             );
         }
+    }
+
+    #[test]
+    fn unprogrammed_dmi_is_not_an_identity() {
+        // The exact strings seen in the wild, and the reason the bare-metal
+        // branch used to fire with nothing to show for it.
+        assert_eq!(dmi_identity("default string", "default string"), None);
+        assert_eq!(dmi_identity("", ""), None);
+        assert_eq!(
+            dmi_identity("to be filled by o.e.m.", "system product name"),
+            None
+        );
+    }
+
+    #[test]
+    fn a_programmed_dmi_field_is_an_identity() {
+        assert_eq!(dmi_identity("supermicro", "x11"), Some("supermicro"));
+        // Either field alone is enough; a vendor that left only the product
+        // name still told us something.
+        assert_eq!(
+            dmi_identity("default string", "poweredge r640"),
+            Some("poweredge r640")
+        );
     }
 
     #[test]

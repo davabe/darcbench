@@ -887,6 +887,43 @@ impl RunManager {
         &self.index
     }
 
+    /// Where a run's artifacts were written.
+    pub(crate) fn run_dir(&self, id: &RunId) -> std::path::PathBuf {
+        self.state_dir.join("runs").join(id.as_str())
+    }
+
+    /// The bundle on disk for a run this process did not execute.
+    ///
+    /// `get` searches `runs`, which only ever holds runs *this* process started.
+    /// Every per-run endpoint resolved through it alone, so a `serve` started
+    /// after a CLI run listed the run from the index and then answered 404 for
+    /// its bundle, its report and its event stream - with the files sitting in
+    /// the run directory the whole time. That is the same defect the index was
+    /// introduced to fix for the *list*, left half-migrated.
+    ///
+    /// Reading the bundle back is what `reconcile` already does at startup, and
+    /// it is the hierarchy ADR-0005 sets: the bundles are the source of truth,
+    /// the index is a cache over them, and memory is a cache over that.
+    pub(crate) fn stored_bundle(&self, id: &RunId) -> Option<Bundle> {
+        let raw = std::fs::read(self.run_dir(id).join("bundle.json")).ok()?;
+        serde_json::from_slice(&raw).ok()
+    }
+
+    /// The recorded event log for a run this process did not execute.
+    ///
+    /// Strict: a line that will not parse yields `None` for the whole log
+    /// rather than a shorter one. The SSE contract is that a client is never
+    /// handed an undetectable gap, and silently skipping a malformed record
+    /// would break exactly that - the caller reports the log as unreadable
+    /// instead.
+    pub(crate) fn stored_events(&self, id: &RunId) -> Option<Vec<Envelope>> {
+        let raw = std::fs::read_to_string(self.run_dir(id).join("events.ndjson")).ok()?;
+        raw.lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| serde_json::from_str::<Envelope>(line).ok())
+            .collect()
+    }
+
     /// Brings the index back into agreement with the bundles on disk.
     ///
     /// Called once at startup. This is what makes a lost or corrupted index a

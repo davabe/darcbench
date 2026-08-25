@@ -165,6 +165,36 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 
+# The run above was made by a *previous* process. Every per-run endpoint used to
+# resolve only through the in-memory run list, so `serve` listed this run and
+# then 404'd its bundle, its report and its event stream. Nothing caught it:
+# the SSE and cancellation checks further down both use a run started inside
+# this serving process, which is the one case that always worked.
+RUN_ID=$(basename "$RUN_DIR")
+for ep in "" "/bundle" "/report"; do
+  check "serve answers ${ep:-/} for a run from an earlier process" \
+    "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$B/api/v1/runs/$RUN_ID$ep")" "200"
+done
+pycheck "the replayed event stream is the recorded log, gapless and terminal" "
+import json, urllib.request
+req = urllib.request.Request('$B/api/v1/runs/$RUN_ID/events',
+                             headers={'Authorization': 'Bearer $TOKEN'})
+body = urllib.request.urlopen(req, timeout=30).read().decode()
+seqs, kinds = [], []
+for block in body.split('\n\n'):
+    for line in block.splitlines():
+        if line.startswith('id:'):   seqs.append(int(line[3:].strip()))
+        if line.startswith('event:'): kinds.append(line[6:].strip())
+assert seqs, 'the replay delivered no events'
+assert seqs == sorted(seqs) and len(seqs) == len(set(seqs)), 'replay must be ordered and gapless'
+assert kinds[-1] == 'run.completed', 'replay must end where the log ends, got ' + kinds[-1]
+on_disk = sum(1 for _ in open('$RUN_DIR/events.ndjson'))
+assert len(seqs) == on_disk, f'replayed {len(seqs)} of {on_disk} recorded events'
+"
+check "a cancel against a finished run is still refused" \
+  "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" "$B/api/v1/runs/$RUN_ID/cancel")" "404"
+check "an unknown run id is still 404"  "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$B/api/v1/runs/run_$(printf '0%.0s' $(seq 32))/bundle")" "404"
+
 check "healthz is unauthenticated"      "$(curl -s -o /dev/null -w '%{http_code}' "$B/healthz")" "200"
 check "inventory requires a token"      "$(curl -s -o /dev/null -w '%{http_code}' "$B/api/v1/inventory")" "401"
 check "cookie auth cannot start a run"  "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: darcbench_session=$TOKEN" -H 'Content-Type: application/json' -d '{}' "$B/api/v1/runs")" "403"
