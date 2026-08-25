@@ -45,7 +45,7 @@ use rusqlite::{Connection, OptionalExtension};
 /// alternative is an older binary silently reading columns that have since
 /// changed meaning. Rebuilding from the bundles is cheap, so refusing is
 /// affordable in a way that guessing is not.
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 /// File name under the state directory. Sibling of `runs/`, not inside it, so
 /// the run directories stay exactly what the on-disk layout documents.
@@ -339,6 +339,11 @@ impl RunIndex {
                  label  TEXT NOT NULL,
                  score  REAL NOT NULL,
                  weight REAL NOT NULL,
+                 -- Comma-separated module ids that produced this category, as
+                 -- the score card publishes them. Stored so a comparison can
+                 -- see that two same-named categories were computed from
+                 -- different workloads without opening either bundle.
+                 modules TEXT NOT NULL DEFAULT '',
                  PRIMARY KEY (run_id, key)
              );
              COMMIT;",
@@ -442,14 +447,15 @@ impl RunIndex {
         }
         for category in &bundle.scores.categories {
             transaction.execute(
-                "INSERT OR REPLACE INTO categories (run_id, key, label, score, weight)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT OR REPLACE INTO categories (run_id, key, label, score, weight, modules)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 rusqlite::params![
                     run_id,
                     format!("{:?}", category.key),
                     category.label,
                     category.score,
                     category.weight,
+                    category.modules.join(","),
                 ],
             )?;
         }
@@ -542,7 +548,44 @@ impl RunIndex {
         }
         unmatched.sort();
 
-        let incomparable_reasons = comparability_gaps(&baseline, &candidate);
+        let mut incomparable_reasons = comparability_gaps(&baseline, &candidate);
+        // A category computed from different workloads is not the same
+        // measurement, however identical the two machines are. The Web category
+        // is the live case: `php.runtime` is scored into it and only exists on a
+        // host with PHP installed, so two `web` runs on one machine can produce
+        // Web scores from different baskets. Reported alongside the other
+        // reasons rather than as a separate concept, because the consequence is
+        // the same - the numbers do not line up - and a caller that renders one
+        // renders the other.
+        let baseline_baskets = self.baskets_of(baseline_id)?;
+        let candidate_baskets = self.baskets_of(candidate_id)?;
+        for (key, before) in &baseline_baskets {
+            let Some(after) = candidate_baskets.get(key) else {
+                continue;
+            };
+            if before == after {
+                continue;
+            }
+            // An empty basket means the bundle predates the field, not that the
+            // category was computed from no modules. Absence of the record is
+            // not evidence of a difference, and reporting it as one would put
+            // "computed from nothing" in front of an operator comparing a run
+            // made last month with one made today - which is both false and the
+            // most common comparison there is. The same discipline the rest of
+            // this codebase applies to unmeasured facts.
+            if before.is_empty() || after.is_empty() {
+                continue;
+            }
+            let named = |ids: &std::collections::BTreeSet<String>| {
+                ids.iter().cloned().collect::<Vec<_>>().join(", ")
+            };
+            incomparable_reasons.push(format!(
+                "the {key} category was computed from different modules: {} then {}",
+                named(before),
+                named(after),
+            ));
+        }
+
         Ok(Some(Comparison {
             comparable: incomparable_reasons.is_empty(),
             incomparable_reasons,
@@ -551,6 +594,40 @@ impl RunIndex {
             metrics,
             unmatched,
         }))
+    }
+
+    /// Category baskets of one run, keyed by category.
+    ///
+    /// The module ids come back as a set rather than the stored string, because
+    /// the question a comparison asks is which workloads differ, and ordering
+    /// is an artefact of storage.
+    fn baskets_of(
+        &self,
+        run_id: &str,
+    ) -> Result<BTreeMap<String, std::collections::BTreeSet<String>>, IndexError> {
+        let Some(connection) = self.connection() else {
+            return Ok(BTreeMap::new());
+        };
+        let mut statement =
+            connection.prepare("SELECT key, modules FROM categories WHERE run_id = ?1")?;
+        let rows = statement.query_map([run_id], |row| {
+            let key: String = row.get(0)?;
+            let modules: String = row.get(1)?;
+            Ok((key, modules))
+        })?;
+        Ok(rows
+            .filter_map(Result::ok)
+            .map(|(key, modules)| {
+                (
+                    key,
+                    modules
+                        .split(',')
+                        .filter(|m| !m.is_empty())
+                        .map(str::to_string)
+                        .collect(),
+                )
+            })
+            .collect())
     }
 
     /// Cycle-0 metrics of one run, keyed `<module>/<metric_key>`.
@@ -1139,6 +1216,172 @@ mod tests {
             by_key["latency"], 0.5,
             "doubled latency is half as good, not twice as good"
         );
+        assert!(
+            comparison.comparable,
+            "{:?}",
+            comparison.incomparable_reasons
+        );
+    }
+
+    /// Two same-named categories built from different workloads are not the
+    /// same measurement, and the comparison has to say so.
+    ///
+    /// The live case is Web: `php.runtime` is scored into it and exists only on
+    /// a host with PHP installed, so two `web` runs on one machine can produce
+    /// Web scores from different baskets while every other comparability fact
+    /// matches.
+    #[test]
+    fn a_category_built_from_different_modules_is_not_comparable() {
+        use darcbench_scoring::{CategoryKey, CategoryOutcome};
+
+        let basket = |modules: &[&str]| CategoryOutcome {
+            key: CategoryKey::Web,
+            label: "Web".into(),
+            score: 1000.0,
+            weight: 0.2,
+            metric_count: 4,
+            modules: modules.iter().map(|m| m.to_string()).collect(),
+        };
+
+        let mut baseline = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 10.0, Direction::HigherIsBetter)],
+        );
+        baseline.scores.categories = vec![basket(&["php.runtime", "web.static"])];
+
+        let mut candidate = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 10.0, Direction::HigherIsBetter)],
+        );
+        // Everything else about these two runs matches, so the basket is the
+        // only thing that can make them incomparable.
+        candidate.run.environment_digest = baseline.run.environment_digest.clone();
+        candidate.scores.categories = vec![basket(&["web.static"])];
+
+        let index = RunIndex::in_memory().unwrap();
+        for b in [&baseline, &candidate] {
+            index
+                .record(b, std::path::Path::new("/nonexistent/bundle.json"))
+                .unwrap();
+        }
+
+        let comparison = index
+            .compare(baseline.run.run_id.as_str(), candidate.run.run_id.as_str())
+            .unwrap()
+            .unwrap();
+
+        assert!(
+            !comparison.comparable,
+            "a differing basket must make the runs incomparable"
+        );
+        let reason = comparison
+            .incomparable_reasons
+            .iter()
+            .find(|r| r.contains("Web"))
+            .expect("the Web category must be named");
+        assert!(
+            reason.contains("php.runtime"),
+            "the reason must name the workload that differs, not merely that one does: {reason}"
+        );
+        // The numbers are still produced. A comparison is labelled, never
+        // withheld.
+        assert_eq!(comparison.metrics.len(), 1);
+    }
+
+    /// A bundle written before the basket field existed records nothing, and
+    /// "not recorded" must not be reported as "different".
+    ///
+    /// Otherwise every comparison between a run made before this field and one
+    /// made after it - the most common comparison there is, for a while - would
+    /// claim the categories were computed from different workloads, and say one
+    /// of them used no modules at all.
+    #[test]
+    fn an_unrecorded_basket_is_not_a_difference() {
+        use darcbench_scoring::{CategoryKey, CategoryOutcome};
+        let mut baseline = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 10.0, Direction::HigherIsBetter)],
+        );
+        // As `#[serde(default)]` leaves it when an older bundle is read.
+        baseline.scores.categories = vec![CategoryOutcome {
+            key: CategoryKey::Web,
+            label: "Web".into(),
+            score: 1000.0,
+            weight: 0.2,
+            metric_count: 4,
+            modules: vec![],
+        }];
+        let mut candidate = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 10.0, Direction::HigherIsBetter)],
+        );
+        candidate.run.environment_digest = baseline.run.environment_digest.clone();
+        candidate.scores.categories = vec![CategoryOutcome {
+            key: CategoryKey::Web,
+            label: "Web".into(),
+            score: 1000.0,
+            weight: 0.2,
+            metric_count: 4,
+            modules: vec!["web.static".to_string()],
+        }];
+
+        let index = RunIndex::in_memory().unwrap();
+        for b in [&baseline, &candidate] {
+            index
+                .record(b, std::path::Path::new("/nonexistent/bundle.json"))
+                .unwrap();
+        }
+        let comparison = index
+            .compare(baseline.run.run_id.as_str(), candidate.run.run_id.as_str())
+            .unwrap()
+            .unwrap();
+        assert!(
+            comparison.comparable,
+            "an unrecorded basket must not be reported as a differing one: {:?}",
+            comparison.incomparable_reasons
+        );
+    }
+
+    /// Two runs whose baskets agree stay comparable.
+    #[test]
+    fn an_identical_basket_is_not_a_reason_to_refuse() {
+        use darcbench_scoring::{CategoryKey, CategoryOutcome};
+        let basket = CategoryOutcome {
+            key: CategoryKey::Web,
+            label: "Web".into(),
+            score: 1000.0,
+            weight: 0.2,
+            metric_count: 4,
+            modules: vec!["web.static".to_string()],
+        };
+        let mut baseline = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 10.0, Direction::HigherIsBetter)],
+        );
+        baseline.scores.categories = vec![basket.clone()];
+        let mut candidate = bundle(
+            Some(1000.0),
+            ResultState::Local,
+            vec![metric("shared", 12.0, Direction::HigherIsBetter)],
+        );
+        candidate.run.environment_digest = baseline.run.environment_digest.clone();
+        candidate.scores.categories = vec![basket];
+
+        let index = RunIndex::in_memory().unwrap();
+        for b in [&baseline, &candidate] {
+            index
+                .record(b, std::path::Path::new("/nonexistent/bundle.json"))
+                .unwrap();
+        }
+        let comparison = index
+            .compare(baseline.run.run_id.as_str(), candidate.run.run_id.as_str())
+            .unwrap()
+            .unwrap();
         assert!(
             comparison.comparable,
             "{:?}",

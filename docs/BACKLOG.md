@@ -113,9 +113,10 @@ Ordered roughly by value. Phase-scheduled work is in [ROADMAP.md](ROADMAP.md).
       module" from "the same modules measured fewer times". Recomputation
       compares the field, so a bundle claiming a basket its metrics do not back
       fails validation, and the HTML report prints it under each category.
-      **Still open:** `darcbench compare` does not yet warn when two runs'
-      baskets differ for a shared category - the index stores category rows
-      without the module list, so that needs a schema column.
+      `darcbench compare` reports a differing basket as a named reason, over
+      index schema 3. An *unrecorded* basket is skipped rather than reported,
+      because a bundle written before the field is not evidence that the
+      workloads differed.
 - [ ] `runtime_exec`'s ancestor walk covers the *resolved* path only, so an
       attacker who controls an ancestor of an allow-listed *name* can retarget a
       directory symlink. Not an escalation - the target must still pass the

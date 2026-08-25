@@ -46,6 +46,15 @@ test failed on real hardware
 - It changes what a bundle *claims*, not what a run *enforces*: `Unknown` arms
   the runtime load ceiling exactly as `BareMetal` does, and only `Container`
   disarms it.
+- **One consequence operators should expect.** On a host whose DMI is
+  unprogrammed the recorded scope changes, and scope is part of the
+  performance-relevant inventory, so the environment digest changes with it.
+  Runs taken before and after this fix on such a host are therefore reported
+  **not comparable**, citing a machine difference. Observed on the development
+  host: `bare_metal` then `unknown`, same machine. That is the digest working
+  as designed - what the bundle records about the machine genuinely did change -
+  but the cause is a corrected classification rather than different hardware,
+  and the comparison cannot tell those apart.
 
 **A telemetry tick nobody could read looked like a quiet machine**
 - A failed `/proc/stat` read left all four CPU percentages at their `Default`
@@ -75,6 +84,23 @@ test failed on real hardware
 
 ### Added
 
+**`darcbench compare` refuses a category built from different workloads**
+- The fact landed in the bundle with `CategoryOutcome.modules`; this puts it in
+  the index (schema 3) so a comparison can use it without opening either
+  bundle. A Web score computed from `web.static` alone and one computed from
+  `web.static` plus `php.runtime` now produce a named reason rather than a
+  silent mismatch, and the reason says *which* workload differs.
+- Migration is a rebuild, as ADR-0005's hierarchy allows: everything in the
+  index derives from the bundles, so dropping and re-reconciling cannot leave a
+  half-converted row. Verified on a live v2 database - it reopened, rebuilt and
+  listed the same runs.
+- **An empty basket is skipped, not reported as a difference.** A bundle
+  written before the field records nothing, and absence of the record is not
+  evidence that the workloads differed. Reporting it would tell an operator
+  comparing last month's run with today's that one of them was computed from no
+  modules at all, which is false and would be the most common comparison there
+  is.
+
 **A category now names the modules that produced it** — `CategoryOutcome.modules`
 - The Web category's basket depends on whether PHP is installed: `php.runtime`
   roughly doubles the metric weight in it and contributes nothing without PHP.
@@ -86,8 +112,7 @@ test failed on real hardware
   unreferenced is correctly absent. Recomputation compares the field, so a
   bundle claiming a basket its metrics do not back fails validation, and the
   HTML report prints it under each category.
-- **Still open:** `darcbench compare` does not warn when two runs' baskets
-  differ, because the index stores category rows without the module list.
+
 - **Neither version moves, and that was checked rather than assumed.** No score
   value changes, so ADR-0007 puts this below a scoring patch and
   `dbs/0.1.0-dev` stands. The field is additive with `#[serde(default)]`, and
