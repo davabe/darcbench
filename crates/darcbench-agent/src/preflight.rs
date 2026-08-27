@@ -263,6 +263,32 @@ pub(crate) fn run(input: &PreflightInput<'_>) -> PreflightCompleted {
         }
     }
 
+    // --- frequency governor -------------------------------------------------
+    // Recorded in the bundle since the first version and, until this, acted on
+    // by nothing. A host measured with `schedutil` produced scores depressed by
+    // an amount no reader can separate from the hardware, and said so nowhere:
+    // the governor decides whether a burst-shaped benchmark is measuring the
+    // silicon or the ramp-up policy in front of it, and every workload here is
+    // burst-shaped by design.
+    //
+    // A warning and not a block. An operator who cannot set the governor -
+    // a shared host, a locked BIOS, a cloud instance that exposes none - can
+    // still take a measurement of the machine as it will actually be used, and
+    // that is a legitimate thing to want. What they may not do is take it
+    // without being told, which is what happened.
+    if let Some(governor) = inventory.cpu.governor.as_deref() {
+        if !governor.eq_ignore_ascii_case("performance") {
+            findings.push(PreflightFinding {
+                check: "cpu.governor".into(),
+                severity: Severity::Warning,
+                message: format!(
+                    "CPU frequency governor is `{governor}`, not `performance`. Every workload                      here runs in bursts, so a governor that ramps clocks on demand measures its                      own reaction time along with the hardware - and does so differently on each                      run. Set it with `cpupower frequency-set -g performance` before a result                      you intend to compare."
+                ),
+                blocking: false,
+            });
+        }
+    }
+
     // --- production signals --------------------------------------------------
     let production = inventory.software.production_likelihood;
     if production == ProductionLikelihood::Likely {
@@ -503,7 +529,65 @@ mod tests {
         };
         inv.platform.scope = Scope::BareMetal;
         inv.platform.cgroup_cpu_limit = None;
+        // Pinned, not collected. This is the "nothing is wrong with this host"
+        // baseline, and a CI runner defaulting to `powersave` would otherwise
+        // add a finding to every test that uses it.
+        inv.cpu.governor = Some("performance".into());
         inv
+    }
+
+    /// A governor that is not `performance` must be reported before the run.
+    ///
+    /// Found in the field: a host ran the whole suite under `schedutil` and
+    /// nothing anywhere mentioned it. The value was in the bundle the entire
+    /// time - collected, signed, published - and no code read it. Its scores
+    /// are depressed by an amount a reader cannot separate from the hardware.
+    ///
+    /// Not blocking, because measuring a machine as it is actually configured
+    /// is a legitimate thing to want, and on plenty of hosts the governor is
+    /// not the operator's to change. Being told is not optional.
+    #[test]
+    fn a_governor_that_is_not_performance_is_reported() {
+        let registry = Registry::builtin();
+        let modules = registry.modules_for_profile(Profile::Quick);
+        let dir = std::env::temp_dir();
+        let report =
+            |inv: &Inventory| run(&input(inv, &registry, &modules, &dir, &quick_params(&dir)));
+
+        let mut ramping = quiet_inventory();
+        ramping.cpu.governor = Some("schedutil".into());
+        let result = report(&ramping);
+        let finding = result
+            .findings
+            .iter()
+            .find(|f| f.check == "cpu.governor")
+            .expect("a non-performance governor must be reported");
+        assert!(!finding.blocking, "reporting it must not block the run");
+        assert!(
+            finding.message.contains("schedutil"),
+            "the finding must name the governor it found: {}",
+            finding.message
+        );
+
+        assert!(
+            !report(&quiet_inventory())
+                .findings
+                .iter()
+                .any(|f| f.check == "cpu.governor"),
+            "`performance` must be silent"
+        );
+
+        // A host that exposes no governor at all - a container, a hypervisor
+        // that hides cpufreq - is not accused of having the wrong one.
+        let mut absent = quiet_inventory();
+        absent.cpu.governor = None;
+        assert!(
+            !report(&absent)
+                .findings
+                .iter()
+                .any(|f| f.check == "cpu.governor"),
+            "an absent governor is not a wrong governor"
+        );
     }
 
     /// A more invasive run must never be shown as less risky.

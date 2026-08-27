@@ -1079,6 +1079,7 @@ impl BenchmarkModule for StorageMixed {
                 summary,
                 samples: outcome.samples,
                 measures_dispersion: false,
+                tail_quantile: false,
             });
 
             if let Some(latency_key) = workload.latency_key {
@@ -1087,6 +1088,42 @@ impl BenchmarkModule for StorageMixed {
                 let thin = counts.iter().any(|n| *n < MIN_LATENCY_SAMPLES);
                 match (summarize(&tails), thin) {
                     (Some(tail_summary), false) => {
+                        // An erratic tail is a fact about the device, and this
+                        // is the only place that knows enough to say so: the
+                        // percentile, how many operations fed it, and that it
+                        // is an order statistic rather than a mean.
+                        //
+                        // It is reported and not enforced. A tail quantile
+                        // drifts between repetitions on a machine behaving
+                        // perfectly, because a handful of slow operations
+                        // decide it - so a bound on its variation would
+                        // disqualify hardware rather than describe it. The
+                        // widest bound in the suite, at three times the
+                        // throughput bound, because even that is generous.
+                        if let Some(cv) = tail_summary.cv {
+                            if cv > self.manifest.stability_cv_bound * 3.0 {
+                                warnings.push(Warning {
+                                    // Informational, not `HighVariance`.
+                                    // `WarningCode::degrades_result` is true for high
+                                    // variance, so raising that code here would degrade
+                                    // the module and land the run back in `Partial` by a
+                                    // second route - undoing the exemption two fields up.
+                                    code: WarningCode::Informational,
+                                    message: format!(
+                                        "`{latency_key}` varied by {:.0}% between repetitions. \
+                                         The slow 1% of operations on this device is not \
+                                         reproducible, which is itself a finding about the \
+                                         device - worn flash, an unstable controller, or a \
+                                         neighbour competing for it. The run stays \
+                                         comparable: a tail quantile is not evidence about \
+                                         the machine's steadiness the way a throughput \
+                                         median is.",
+                                        cv * 100.0
+                                    ),
+                                    metric_key: Some(latency_key.to_string()),
+                                });
+                            }
+                        }
                         metrics.push(Metric {
                             key: latency_key.to_string(),
                             label: format!("{} p{TAIL_PERCENTILE:.0} latency", workload.label),
@@ -1097,6 +1134,7 @@ impl BenchmarkModule for StorageMixed {
                             summary: tail_summary,
                             samples: Vec::new(),
                             measures_dispersion: false,
+                            tail_quantile: true,
                         });
                     }
                     _ => {

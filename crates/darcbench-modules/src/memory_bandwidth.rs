@@ -908,6 +908,7 @@ impl BenchmarkModule for MemoryBandwidth {
                     samples: outcome.samples,
                     key: metric_key,
                     measures_dispersion: false,
+                    tail_quantile: false,
                 });
 
                 completed_units += 1.0;

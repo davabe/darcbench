@@ -774,6 +774,7 @@ impl BenchmarkModule for NetworkTransfer {
             summary: connect_summary,
             samples: latency.samples,
             measures_dispersion: false,
+            tail_quantile: false,
         });
         if let Some(jitter) = path_jitter(&per_endpoint) {
             // Jitter is what a real-time workload feels: a steady 40 ms path is
@@ -791,6 +792,7 @@ impl BenchmarkModule for NetworkTransfer {
                 // validator's blanket CV bound downgraded the run to `Partial`
                 // on the one metric whose variance is the measurement.
                 measures_dispersion: true,
+                tail_quantile: false,
                 summary: jitter,
                 samples: Vec::new(),
             });
@@ -887,6 +889,7 @@ impl BenchmarkModule for NetworkTransfer {
                 summary,
                 samples: outcome.samples,
                 measures_dispersion: false,
+                tail_quantile: false,
             });
         }
 
@@ -1056,6 +1059,7 @@ fn push_latency_metric(metrics: &mut Vec<Metric>, key: &str, label: &str, sample
         summary,
         samples: Vec::new(),
         measures_dispersion: false,
+        tail_quantile: false,
     });
 }
 

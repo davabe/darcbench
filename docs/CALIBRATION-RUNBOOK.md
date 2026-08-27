@@ -8,6 +8,13 @@ Calibration is the single thing gating `dbs/1.0.0`, and through it every public
 score and the leaderboard in [PUBLIC-RESULTS.md](PUBLIC-RESULTS.md). It cannot
 be done by writing more code.
 
+[FIELD-EVIDENCE.md](FIELD-EVIDENCE.md) records what has actually been measured
+so far and what it showed. Read it before provisioning: it says which anchors
+are known to be wrong and by how much, which saves the calibration run from
+being the moment those are discovered. It also documents one gap calibration
+will *not* close - `crypto_sha256` is largely an instruction-set detector, and
+DARC-REF-1 has the instruction.
+
 ---
 
 ## 1. What to provision

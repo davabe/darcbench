@@ -669,6 +669,7 @@ fn push_metric(
             summary,
             samples: raw,
             measures_dispersion: false,
+            tail_quantile: false,
         }),
         _ => warnings.push(Warning {
             code: WarningCode::ValidationFailed,

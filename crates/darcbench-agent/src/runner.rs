@@ -2444,16 +2444,43 @@ mod tests {
             .start(Profile::Quick, None, true, None)
             .expect("run");
 
-        // Let the run get past preflight and into real work.
-        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        // Wait for the run to actually reach `Running` rather than sleeping a
+        // fixed interval and hoping. The fixed 400 ms this replaces was enough
+        // on an idle machine and not enough under the full suite, where dozens
+        // of tests compete for the same cores: preflight had not finished, the
+        // cancel landed on a run that was still in `Preflight`, and the test
+        // failed for a reason that had nothing to do with what it tests.
+        //
+        // Cancelling from `Preflight` is a legitimate thing to do and reaches a
+        // different path; this test is about cancelling work in progress, so it
+        // says so instead of timing it.
+        let deadline = Instant::now() + std::time::Duration::from_secs(30);
+        while handle.state() != RunState::Running && Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert_eq!(
+            handle.state(),
+            RunState::Running,
+            "run never reached Running, so this would not be testing cancellation of work"
+        );
         handle.cancel();
 
-        let deadline = Instant::now() + std::time::Duration::from_secs(30);
+        // A liveness bound, not a performance assertion: it exists so a run
+        // that never terminates fails the test instead of hanging it, and it
+        // costs nothing when the run terminates promptly. Generous because
+        // finalising - signing, rendering, writing - competes with the rest of
+        // the suite for the same cores, and this failed at 30 s having reached
+        // `Finalizing`, which is the run working correctly and slowly.
+        let deadline = Instant::now() + std::time::Duration::from_secs(120);
         while !handle.state().is_terminal() && Instant::now() < deadline {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
 
-        assert_eq!(handle.state(), RunState::Cancelled);
+        assert_eq!(
+            handle.state(),
+            RunState::Cancelled,
+            "a cancelled run must reach a terminal state"
+        );
         let bundle = handle
             .bundle()
             .expect("a cancelled run still produces a bundle");

@@ -1181,3 +1181,28 @@ Phase 2 modules ──► DARC-REF-1 calibration ──► dbs/1.0.0
 
 Calibration gates everything that claims comparability. Leaderboards must not
 ship before anti-replay.
+
+### Open questions the first field corpus raised
+
+Three bare-metal hosts, `quick` profile, recorded in
+[FIELD-EVIDENCE.md](FIELD-EVIDENCE.md). These are decisions, not defects: each
+one moves scores, and none of them is answered by running the calibration.
+
+- **`crypto_sha256` weight.** It is ~7x faster on a CPU with the SHA
+  extensions, which is a real property and also more than the spread between
+  three machines a decade apart. It currently carries weight 1.0 among ten
+  Compute metrics. Calibration will not change this, because DARC-REF-1 has the
+  instruction. Options: leave it and disclose (today's behaviour, via
+  `isa_dispatch`), reduce its weight, or split ISA-accelerated workloads into
+  their own facet the way single- and multi-core are split.
+- **An egress-free rankable profile.** `Quick` omits `network.transfer` on
+  purpose, so every `quick` run is `Partial` and unrankable. That is the first
+  thing a new user runs. Either the first run is not rankable - which is a
+  defensible answer, said plainly - or there is a profile that is.
+- **`scope: unknown` and rankability.** A host whose DMI reads `Default
+  string` cannot be attested as bare metal. Whether it may still be ranked, and
+  on what evidence, is unsettled.
+- **A minimum-passes floor for `memory.bandwidth`.** On the largest host the
+  calibrator sized one metric at a single pass per repetition, which leaves no
+  internal averaging - and that host is the one whose memory module tripped the
+  variance bound.

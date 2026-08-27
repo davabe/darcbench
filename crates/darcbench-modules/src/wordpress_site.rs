@@ -868,6 +868,7 @@ impl WordpressSite {
             samples: Vec::new(),
             outliers: Vec::new(),
             measures_dispersion: false,
+            tail_quantile: false,
         });
 
         if reporter.is_cancelled() {
@@ -983,6 +984,7 @@ impl WordpressSite {
                 samples: Vec::new(),
                 outliers: Vec::new(),
                 measures_dispersion: false,
+                tail_quantile: false,
             });
         } else {
             warnings.push(Warning {
@@ -1318,6 +1320,7 @@ fn push_distribution(
             })
             .collect(),
         measures_dispersion: false,
+        tail_quantile: false,
     });
 }
 

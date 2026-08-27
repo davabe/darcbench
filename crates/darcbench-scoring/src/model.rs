@@ -678,6 +678,7 @@ mod tests {
                 .collect(),
             outliers: vec![],
             measures_dispersion: false,
+            tail_quantile: false,
         }
     }
 

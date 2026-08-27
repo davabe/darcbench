@@ -724,6 +724,7 @@ impl BenchmarkModule for WebStatic {
                     summary,
                     samples: outcome.samples,
                     measures_dispersion: false,
+                    tail_quantile: false,
                 }),
                 _ => warnings.push(Warning {
                     code: WarningCode::ValidationFailed,
@@ -983,6 +984,7 @@ fn push_latency(
             summary,
             samples: raw,
             measures_dispersion: false,
+            tail_quantile: false,
         }),
         _ => warnings.push(Warning {
             code: WarningCode::ValidationFailed,

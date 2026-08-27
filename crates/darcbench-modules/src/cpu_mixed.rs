@@ -219,6 +219,7 @@ impl BenchmarkModule for CpuMixed {
                     samples: outcome.samples,
                     key: metric_key,
                     measures_dispersion: false,
+                    tail_quantile: false,
                 });
 
                 completed_units += 1.0;
@@ -241,6 +242,29 @@ impl BenchmarkModule for CpuMixed {
             )),
         );
         context.insert("calibration".into(), serde_json::Value::Object(calibration));
+
+        // Which hardware paths this CPU offered the workloads, and a warning
+        // for the one that moves a metric by more than the machine does.
+        let dispatch = isa_dispatch();
+        if dispatch
+            .get("sha")
+            .is_some_and(|v| v == &serde_json::Value::Bool(false))
+        {
+            let warning = Warning {
+                code: WarningCode::Informational,
+                message: "This CPU has no SHA extensions, so `crypto_sha256` ran in software. \
+                          Measured across three hosts without them, that is roughly a sevenfold \
+                          difference on this metric alone - larger than the gap between the \
+                          hosts themselves. It is a real property of the silicon and it is \
+                          scored as measured, but a Compute score compared against a machine \
+                          that has them is being compared partly on one instruction."
+                    .to_string(),
+                metric_key: Some("crypto_sha256.single".to_string()),
+            };
+            reporter.warn(warning.clone());
+            warnings.push(warning);
+        }
+        context.insert("isa_dispatch".into(), serde_json::Value::Object(dispatch));
 
         if let Some(efficiency) = scaling_efficiency(&metrics, threads) {
             context.insert("scaling_efficiency".into(), serde_json::json!(efficiency));
@@ -266,6 +290,51 @@ impl BenchmarkModule for CpuMixed {
             context,
         })
     }
+}
+
+/// Instruction-set extensions the running process can actually dispatch to,
+/// as reported by the CPU rather than by `/proc`.
+///
+/// Queried here and not taken from [`MachineFacts`] deliberately. The inventory
+/// records the flags the *kernel* advertises; what decides which code path a
+/// workload takes is what the CPU answers when the process asks, and on a
+/// machine where those differ - a hypervisor masking a feature, a kernel
+/// command line disabling one - the second is the one that explains the number.
+/// It is a question about this CPU, not a read of the host, so it keeps this
+/// crate's promise to touch nothing outside the workload.
+///
+/// Recorded because two of these move a metric further than the hardware does.
+/// `sha` is the sharpest: `sha2` dispatches to the SHA extensions when they are
+/// present, and three hosts without them measured 192-289 MiB/s single-threaded
+/// where the DARC-REF-1 anchor - set on a CPU that has them - is 1900. That is a
+/// ~7x step on one instruction, inside a metric weighted like any other in
+/// Compute. `docs/FIELD-EVIDENCE.md` has the corpus and the arithmetic.
+///
+/// Disclosed, not corrected. A CPU with SHA extensions really does hash seven
+/// times faster, and normalising that away would be inventing a machine nobody
+/// owns. What was wrong was that nothing in the bundle said which path had run,
+/// so a reader could not tell a slow CPU from a CPU missing one instruction.
+fn isa_dispatch() -> serde_json::Map<String, serde_json::Value> {
+    let mut map = serde_json::Map::new();
+    #[cfg(target_arch = "x86_64")]
+    {
+        for feature in ["sha", "aes", "avx2", "avx512f", "vaes", "pclmulqdq", "bmi2"] {
+            // `is_x86_feature_detected!` needs a literal, so the arms are
+            // written out rather than looped over the string.
+            let present = match feature {
+                "sha" => std::arch::is_x86_feature_detected!("sha"),
+                "aes" => std::arch::is_x86_feature_detected!("aes"),
+                "avx2" => std::arch::is_x86_feature_detected!("avx2"),
+                "avx512f" => std::arch::is_x86_feature_detected!("avx512f"),
+                "vaes" => std::arch::is_x86_feature_detected!("vaes"),
+                "pclmulqdq" => std::arch::is_x86_feature_detected!("pclmulqdq"),
+                "bmi2" => std::arch::is_x86_feature_detected!("bmi2"),
+                _ => continue,
+            };
+            map.insert(feature.to_string(), serde_json::Value::Bool(present));
+        }
+    }
+    map
 }
 
 /// Finds an iteration count whose single-shape execution takes approximately

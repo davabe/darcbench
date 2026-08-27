@@ -551,6 +551,7 @@ mod comparability_tests {
             samples: vec![],
             outliers: vec![],
             measures_dispersion: false,
+            tail_quantile: false,
         });
         let meta = BundleMeta::new("0.1.0");
         let missing = comparability_not_recorded(

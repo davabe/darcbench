@@ -668,6 +668,7 @@ impl DatabaseOltp {
                 samples: Vec::new(),
                 outliers: Vec::new(),
                 measures_dispersion: false,
+                tail_quantile: false,
             });
             notes.push((
                 format!("{key}.note"),
@@ -737,6 +738,7 @@ impl DatabaseOltp {
                 samples: Vec::new(),
                 outliers: Vec::new(),
                 measures_dispersion: false,
+                tail_quantile: false,
             });
             notes.push((
                 format!("{prefix}.latency_mean.note"),
@@ -763,6 +765,7 @@ impl DatabaseOltp {
                     samples: Vec::new(),
                     outliers: Vec::new(),
                     measures_dispersion: false,
+                    tail_quantile: false,
                 });
                 notes.push((
                     format!("{prefix}.latency_estimated_p95.note"),

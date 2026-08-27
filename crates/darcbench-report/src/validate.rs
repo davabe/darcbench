@@ -107,12 +107,7 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
         }
 
         for metric in &module.metrics {
-            // A metric that measures dispersion is exempt: its variation
-            // between repetitions is what it reports, not noise in reporting
-            // it. Without this, `tcp_connect.jitter` downgraded an otherwise
-            // healthy standard run to `Partial` - and `Partial` is not
-            // rankable, so ordinary internet jitter made a machine unrankable.
-            if metric.measures_dispersion {
+            if !cv_is_evidence_of_instability(metric) {
                 continue;
             }
             if let Some(cv) = metric.summary.cv {
@@ -252,6 +247,41 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
         recomputation_matched,
         mismatch_field,
     }
+}
+
+/// Whether this metric's variation between repetitions is evidence that the
+/// *machine* was unsteady, which is the only thing [`MAX_ACCEPTABLE_CV`] is
+/// entitled to conclude from it.
+///
+/// True for a central estimator - a median throughput, a mean latency. Those
+/// move between repetitions because the machine moved, so a wide spread means
+/// the number cannot be compared with another machine's.
+///
+/// False for two kinds of metric, for two different reasons, and both were
+/// found the same way: by a healthy run being downgraded to `Partial`, which
+/// is not rankable.
+///
+/// A metric that *measures* dispersion reports a spread as its value.
+/// `network.transfer/tcp_connect.jitter` is that: a jitter figure steady across
+/// repetitions would describe a suspiciously quiet network, not a good
+/// measurement. Ordinary internet jitter made every host unrankable.
+///
+/// A tail quantile is an extreme order statistic. `storage.mixed`'s
+/// `latency_write_4k.p99` is estimated from the slowest 1% of a finite sample,
+/// where a few operations decide the answer; it moves on a machine behaving
+/// perfectly. On a 2013 SATA SSD it varied 65% between repetitions while every
+/// throughput metric in the same module held within 4.4% - so the run was
+/// unrankable on the strength of the one metric whose job is to describe an
+/// erratic tail. `docs/FIELD-EVIDENCE.md` records that corpus.
+///
+/// One function rather than a chain of `||` at the call site, so that the next
+/// exempt kind is added with its reasoning next to the others instead of as
+/// another clause nobody can date. Properties of the metric rather than a list
+/// of keys here, for the reason [`Metric::measures_dispersion`] gives: only the
+/// module knows what it measured, and a second list is a second thing to keep
+/// in step.
+fn cv_is_evidence_of_instability(metric: &darcbench_protocol::metrics::Metric) -> bool {
+    !metric.measures_dispersion && !metric.tail_quantile
 }
 
 /// Reasons that make a run unrankable.
@@ -543,7 +573,8 @@ mod tests {
     use darcbench_inventory::Inventory;
     use darcbench_protocol::{Profile, RunId};
 
-    /// A metric that *measures* dispersion must not be judged for varying.
+    /// A metric whose variation is not evidence about the machine must not be
+    /// judged for varying - for either reason it can have.
     ///
     /// The regression: `network.transfer/tcp_connect.jitter` is a spread, the
     /// module deliberately exempts it from its own stability warning, and the
@@ -558,7 +589,7 @@ mod tests {
         use darcbench_protocol::stats::summarize;
         use darcbench_protocol::{Direction, ModuleId, ModuleRef};
 
-        let noisy = |key: &str, measures_dispersion: bool| {
+        let noisy = |key: &str, measures_dispersion: bool, tail_quantile: bool| {
             // Samples spread far beyond MAX_ACCEPTABLE_CV.
             let samples = [1.0, 9.0, 2.0, 8.0, 3.0];
             Metric {
@@ -571,6 +602,7 @@ mod tests {
                 samples: vec![],
                 outliers: vec![],
                 measures_dispersion,
+                tail_quantile,
             }
         };
 
@@ -592,7 +624,7 @@ mod tests {
         };
 
         let mut flagged = bundle_with(RunState::Completed, Profile::Standard);
-        flagged.modules = vec![module(noisy("ttfb.mean", false))];
+        flagged.modules = vec![module(noisy("ttfb.mean", false, false))];
         let reasons = validate_bundle(&flagged, false).verdict.reasons;
         assert!(
             reasons
@@ -602,13 +634,47 @@ mod tests {
         );
 
         let mut exempt = bundle_with(RunState::Completed, Profile::Standard);
-        exempt.modules = vec![module(noisy("tcp_connect.jitter", true))];
+        exempt.modules = vec![module(noisy("tcp_connect.jitter", true, false))];
         let reasons = validate_bundle(&exempt, false).verdict.reasons;
         assert!(
             !reasons
                 .iter()
                 .any(|r| matches!(r, VerdictReason::ExcessiveVariance { .. })),
             "a dispersion metric must not be flagged for dispersing: {reasons:?}"
+        );
+
+        // The same bound, the same fix, a different reason - and this half was
+        // found in the field rather than reasoned about. `latency_write_4k.p99`
+        // varied 65% between repetitions on a 2013 Intel SATA SSD whose
+        // throughput metrics held within 4.4%, and that one metric took the
+        // whole run to `Partial`. A p99 is estimated from the slowest 1% of a
+        // finite sample: a few operations decide it, so it moves on a machine
+        // behaving perfectly. The tail is still reported, and `storage.mixed`
+        // still remarks on an erratic one - informationally, because a
+        // `HighVariance` warning degrades the module and would put the run back
+        // in `Partial` through the other door.
+        let mut tail = bundle_with(RunState::Completed, Profile::Standard);
+        tail.modules = vec![module(noisy("latency_write_4k.p99", false, true))];
+        let reasons = validate_bundle(&tail, false).verdict.reasons;
+        assert!(
+            !reasons
+                .iter()
+                .any(|r| matches!(r, VerdictReason::ExcessiveVariance { .. })),
+            "a tail quantile must not be flagged for having a moving tail: {reasons:?}"
+        );
+
+        // Both exemptions are properties the module declares. A metric that
+        // claims neither is judged, whatever its key looks like: the validator
+        // must not grow a list of names it treats specially, because that list
+        // is a second thing to keep in step with the modules.
+        let mut lookalike = bundle_with(RunState::Completed, Profile::Standard);
+        lookalike.modules = vec![module(noisy("latency_write_4k.p99", false, false))];
+        let reasons = validate_bundle(&lookalike, false).verdict.reasons;
+        assert!(
+            reasons
+                .iter()
+                .any(|r| matches!(r, VerdictReason::ExcessiveVariance { .. })),
+            "exemption comes from the declared property, not from the key: {reasons:?}"
         );
     }
 
@@ -677,6 +743,7 @@ mod tests {
             samples: vec![],
             outliers: vec![],
             measures_dispersion: false,
+            tail_quantile: false,
         };
         let module_ref = darcbench_protocol::ModuleRef {
             id: darcbench_protocol::ModuleId::new("cpu.mixed").expect("id"),

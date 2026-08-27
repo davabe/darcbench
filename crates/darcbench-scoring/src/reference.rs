@@ -133,6 +133,32 @@ pub fn provisional_reference() -> ReferenceProfile {
 
     // --- cpu.mixed -------------------------------------------------------
     // Single-thread anchors: one core of DARC-REF-1 at its sustained boost.
+    //
+    // These are provisional and, as of the first field corpus, demonstrably
+    // incoherent with each other. Three unrelated hosts measured every anchored
+    // metric; if the anchors agreed, each host's measured/anchor ratios would
+    // cluster around one number - the machine being that much faster or slower
+    // than the reference. They span 76x, 94x and 20x within a single host.
+    // `crypto_sha256.multi` reads 0.09x of what the rest of the same machine
+    // says, `integer_sort.single` 4.06x, and those factors repeat across all
+    // three hosts - which makes it a statement about the anchors, not about the
+    // machines. See `docs/FIELD-EVIDENCE.md`.
+    //
+    // Two consequences, kept apart because their fixes differ:
+    //
+    // `integer_sort.single` at 24 Melem/s and `float_matmul.single` at 4800
+    // MFLOP/s look simply too low, and calibration against real DARC-REF-1
+    // hardware is what corrects them. That is the ordinary uncalibrated gap.
+    //
+    // `crypto_sha256` is not that. Its anchor was set on a CPU with the SHA
+    // extensions, and a CPU without them hashes ~7x slower whatever else it is
+    // worth. Re-measuring the anchor on real DARC-REF-1 hardware will not
+    // change that, because DARC-REF-1's Ryzen 7 7700 has them too: the ~7x step
+    // survives calibration and lands on every pre-Ice-Lake Intel part. Whether
+    // one instruction should carry that much of Compute is a question about the
+    // metric's weight, not about the number below, and it is on the roadmap as
+    // one. `cpu.mixed` now records `isa_dispatch` in its context so a reader can
+    // see which path ran.
     points.insert(
         "cpu.mixed/crypto_sha256.single".into(),
         point(1_900.0, 1.0, CategoryKey::Compute, Some(Facet::SingleCore)),

@@ -77,6 +77,36 @@ pub struct Metric {
     /// and a second list elsewhere is a second thing to keep in step.
     #[serde(default)]
     pub measures_dispersion: bool,
+    /// True when this metric is an extreme order statistic - a tail quantile
+    /// such as a p99 - rather than a central estimator.
+    ///
+    /// A sibling of [`Metric::measures_dispersion`], and exempt from the same
+    /// check for a different reason. A dispersion metric is exempt because its
+    /// value *is* a spread. A tail quantile is exempt because it is estimated
+    /// from a finite sample at the far end of a distribution, where a handful of
+    /// operations decide the answer: it moves between repetitions on a machine
+    /// that is behaving perfectly. Its coefficient of variation is therefore not
+    /// evidence about the machine, which is the only thing the validator's bound
+    /// is entitled to conclude from it.
+    ///
+    /// Measured, not supposed. `storage.mixed/latency_write_4k.p99` varied 65%
+    /// between repetitions on a 2013 SATA SSD whose throughput metrics were
+    /// steady to within 4.4%, and the blanket bound made the whole run
+    /// `Partial` - unrankable - on the strength of it. `docs/FIELD-EVIDENCE.md`
+    /// records the corpus.
+    ///
+    /// Exempting it does not discard the observation: the module that produced
+    /// the quantile is the thing that knows how many operations went into it,
+    /// and it warns. What changes is that an erratic tail is reported as a
+    /// property of the device instead of disqualifying the machine - which
+    /// matters most for exactly the tired hardware whose tail is worth knowing.
+    ///
+    /// Skipped when false so that adding it leaves the canonical form of every
+    /// bundle written before it unchanged. Signatures are verified by
+    /// re-serialising the parsed bundle, so a field that always appeared would
+    /// invalidate every signature already in the field.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tail_quantile: bool,
 }
 
 /// Why a module did not produce a usable result.
@@ -234,6 +264,61 @@ mod tests {
     fn direction_serialises_as_snake_case() {
         let json = serde_json::to_string(&Direction::LowerIsBetter).expect("json");
         assert_eq!(json, "\"lower_is_better\"");
+    }
+
+    /// Adding a metric property must not invalidate signatures already issued.
+    ///
+    /// Bundles are signed over the canonical form of the bundle, and `verify`
+    /// re-serialises the parsed struct to check it - so any field that always
+    /// appears changes the bytes of every bundle written before it existed and
+    /// breaks every signature in the field at once. Once real bundles exist,
+    /// that is not a schema change, it is data loss.
+    ///
+    /// `tail_quantile` is skipped when false for exactly that reason, and this
+    /// pins it: a metric that is not a tail quantile must serialise as though
+    /// the field had never been added. The three field bundles in
+    /// `docs/FIELD-EVIDENCE.md` were signed before it existed and still verify.
+    #[test]
+    fn an_added_metric_property_defaults_to_absent_from_the_canonical_form() {
+        let metric = Metric {
+            key: "k".into(),
+            label: "k".into(),
+            unit: "ms".into(),
+            direction: Direction::LowerIsBetter,
+            value: 1.0,
+            summary: crate::stats::Summary::default(),
+            samples: vec![],
+            outliers: vec![],
+            measures_dispersion: false,
+            tail_quantile: false,
+        };
+        let json = serde_json::to_string(&metric).expect("ser");
+        assert!(
+            !json.contains("tail_quantile"),
+            "a false tail_quantile must not appear, or every signature already \
+             issued becomes invalid: {json}"
+        );
+
+        let tail = Metric {
+            tail_quantile: true,
+            ..metric
+        };
+        let json = serde_json::to_string(&tail).expect("ser");
+        assert!(json.contains("\"tail_quantile\":true"), "{json}");
+        let back: Metric = serde_json::from_str(&json).expect("de");
+        assert!(back.tail_quantile);
+    }
+
+    /// A bundle written before the field existed parses with it false.
+    #[test]
+    fn a_metric_without_the_property_reads_as_not_a_tail_quantile() {
+        let json = r#"{"key":"k","label":"k","unit":"ms","direction":"lower_is_better",
+            "value":1.0,"summary":{"n":0,"min":0.0,"max":0.0,"mean":0.0,"median":0.0,
+            "stddev":0.0,"cv":null,"ci95":null},"samples":[],"outliers":[],
+            "measures_dispersion":false}"#;
+        let metric: Metric = serde_json::from_str(json).expect("de");
+        assert!(!metric.tail_quantile);
+        assert!(!metric.measures_dispersion);
     }
 
     #[test]
