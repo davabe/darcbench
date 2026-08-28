@@ -1182,6 +1182,19 @@ Phase 2 modules ──► DARC-REF-1 calibration ──► dbs/1.0.0
 Calibration gates everything that claims comparability. Leaderboards must not
 ship before anti-replay.
 
+### Where rankability stands
+
+A `standard` run on `dbs/0.2.0-dev` came back `Local` with an **empty reason
+list** - every module completed, nothing degraded. That is the first run the
+project has produced with nothing wrong with it, and it means the local half of
+the ladder works end to end. `Validated` and above need the control plane in
+Phase 5, which is a server that recomputes and attests, not a scoring question.
+
+Nothing here claims the *scores* are right. They are still uncalibrated, and the
+anchors below are still known to be wrong by the amounts recorded in
+FIELD-EVIDENCE.md. What is settled is that a healthy machine can now produce a
+run that is not disqualified by the suite's own judgement of itself.
+
 ### Open questions the field corpora raised
 
 Three bare-metal hosts, `quick` profile, recorded in

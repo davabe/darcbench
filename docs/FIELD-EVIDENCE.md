@@ -549,6 +549,53 @@ This also happens to be what blocks rankability — `ttfb.mean` degrading
 the argument. The argument is that a scored metric must respond to the thing it
 claims to score, and these do not.
 
+### The first run with nothing wrong with it
+
+A `standard` run on the same host under `dbs/0.2.0-dev`, started at load 4.89:
+
+```
+VERDICT: Local        reasons: []
+model: dbs/0.2.0-dev  total: 427  total_is_standard: true
+unreferenced: dns_resolve.mean, tcp_connect.mean, tcp_connect.jitter,
+              tls_handshake.mean, ttfb.mean
+```
+
+**An empty reason list.** Every module completed, nothing degraded, nothing
+flagged — the first run this project has produced with no fault of any kind
+against it. The five latency metrics are measured and published and sit in
+`unreferenced_metrics`, exactly as intended.
+
+It also produced two results worth more than the clean verdict.
+
+**The Network score got more honest, not better.** It fell from 241–251 on the
+earlier runs to 107. That is correct: this host is on a 100 Mbit link against a
+1 Gbit reference, so a tenth of the anchor is the true answer. The geography
+metrics had been holding the number up to roughly a quarter of reference on a
+link doing a tenth of it.
+
+**The weak-link cap fired for the first time on real hardware.**
+
+| | |
+|---|---|
+| uncapped total | 990 |
+| weakest category (Network) | 107 |
+| 4 × weakest | 427 |
+| **published total** | **427** |
+| `weak_link_applied` | true |
+| balance index | 0.138 |
+
+A machine with a fast CPU, a fast disk and a 100 Mbit link is a machine
+bottlenecked by its link, and the cap says so instead of averaging it away. The
+mechanism was written against a hypothetical — "a cloud instance whose burst
+credits are exhausted" — and this is it happening: `docs/SCORING-SYSTEM.md`
+argues a geometric mean alone would report such a machine as above average, and
+without the cap this run would have published 990.
+
+Note what had to be true for the cap to mean anything here. It only bites
+because Network now measures the link. While four sevenths of that category was
+distance to a CDN, a bottlenecked link could be masked by good transit — and the
+cap would have been reading a number that was mostly geography.
+
 ### Reproducing this
 
 Every bundle argued from above is published in
