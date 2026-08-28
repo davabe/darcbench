@@ -881,7 +881,7 @@ impl BenchmarkModule for MemoryBandwidth {
                     .ok_or_else(|| ModuleError::NoSamples(metric_key.clone()))?;
 
                 if let Some(cv) = summary.cv {
-                    if cv > self.manifest.stability_cv_bound {
+                    if summary.is_unstable(self.manifest.stability_cv_bound) {
                         let warning = Warning {
                             code: WarningCode::HighVariance,
                             message: format!(

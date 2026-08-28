@@ -300,7 +300,9 @@ list of which anchors to check first and what to expect.
 
 ### What it left open
 
-**A tail dominates `ttfb.mean`, and the stability check is not robust to it.**
+**A tail dominates `ttfb.mean`, and the stability check was not robust to it.**
+*Half of this is now fixed — see "Stability asks the wrong question" below. The
+half that remains is not a statistics problem.*
 All three hosts exceeded the 30% bound — 53%, 79%, 79%. The distributions are
 tight with one long-tailed exception: H3 ran 46–61 ms with a single 271 ms
 repetition out of eleven; H2 32–45 ms with a single 201 ms. The module's own
@@ -331,6 +333,67 @@ modules deliberately, so that a machine without PHP is not told its missing PHP
 is a fault. It is the rankable profile for a bare server. What remains is that
 the calibration runbook asks for `deep`, which on an unprovisioned host reports
 six failures for software nobody promised.
+
+#### 8. Stability asked a different question than the metric answered
+
+Every metric reports its **median**. Every stability check judged it by the
+**coefficient of variation**, which is `stddev / mean`. Those are not the same
+question, and on a distribution with a tail they disagree violently.
+
+`storage.mixed/latency_read_4k.p99` on H2 is the clearest case: eleven
+repetitions, two of them slow, a CV of **137%** — and a median determined to
+within **5.3%**. The run was downgraded to `Partial`, and therefore made
+unrankable, on the strength of the 137%, while the number it actually publishes
+was solid to a twentieth.
+
+`Summary` already carried what was needed: `ci95`, a non-parametric confidence
+interval for the median, computed for every metric with six or more
+repetitions. `Summary::is_unstable` now requires **both** to agree — the spread
+is wide *and* the median is genuinely poorly determined. Below `n = 6` there is
+no interval and the CV decides alone, which is the old behaviour kept where
+there is not enough evidence to do better rather than kept everywhere.
+
+Replayed over this corpus, with each module's own bound:
+
+| | flagged |
+|---|---|
+| before | 16 |
+| after | 12 |
+| cleared | 4 |
+| newly flagged | **0** |
+
+| cleared metric | CV | rel. CI | bound |
+|---|---|---|---|
+| `storage.mixed/latency_read_4k.p99` | 137.4% | **5.3%** | 20% |
+| `network.transfer/ttfb.mean` (H3) | 78.5% | **13.6%** | 30% |
+| `memory.bandwidth/sequential_write.multi` | 36.3% | **10.2%** | 15% |
+| `web.static/throughput.medium` | 22.9% | **1.7%** | 20% |
+
+Never flagging anything the CV bound did not is the property that made it safe
+to apply to eight modules and the validator in one change, and a test sweeps
+the parameter space to assert it rather than trusting the argument.
+
+### What it left open
+
+**TTFB over the public internet is not reproducible to 30%, and that is not a
+statistics problem.** The rule above clears H3's `ttfb.mean`, where one
+repetition was slow. It does not clear H1's or H2's, and it should not: on H1
+the samples run 29–129 ms with *no* flagged outlier and a median determined only
+to within 56%. The whole distribution is wide. That is a true description of
+what a request to a third-party CDN costs from that host, and it is genuinely
+not comparable between machines.
+
+So `network.transfer` still degrades on two of three hosts, and `deep` and
+`standard` both contain it. **Rankability is still blocked**, now for an honest
+reason rather than a defect.
+
+The remaining choice is not which statistic to use. It is whether latency to
+somebody else's network is a *comparable* measurement at all, or a diagnostic
+one that should be reported without bearing on the verdict — the way
+`tcp_connect.jitter` already is. `ttfb.mean` is anchored and scored today, so
+this is a scoring-model decision and it is on the roadmap as one. Raising the
+bound until the three hosts pass would be fitting a threshold to three
+measurements, which is what calibration exists to avoid.
 
 ### Reproducing this
 

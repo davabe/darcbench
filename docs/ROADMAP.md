@@ -1206,12 +1206,20 @@ one moves scores, and none of them is answered by running the calibration.
   calibrator sized one metric at a single pass per repetition, which leaves no
   internal averaging - and that host is the one whose memory module tripped the
   variance bound.
-- **Robust stability judgement.** `ttfb.mean` reports a median and is judged by
-  a mean-based coefficient of variation. One slow repetition in eleven against
-  a public CDN - flagged as an outlier by the module's own MAD detector -
-  exceeded the bound on all three hosts and degraded the module. The same shape
-  appears on `web.static` over loopback. Changing it moves which runs are
-  rankable and what `median_cv` contributes to `stability_multiplier`.
+- **~~Robust stability judgement.~~ Done.** `Summary::is_unstable` now requires
+  the spread to be wide *and* the median to be poorly determined, using the
+  `ci95` every metric already carried. Over the published corpus that cleared 4
+  of 16 flags and added none. What it did *not* clear is the real question
+  below.
+- **Is latency to somebody else's network a comparable measurement?**
+  `ttfb.mean` on H1 runs 29-129 ms with no outlier and a median determined only
+  to within 56%: genuinely irreproducible, honestly measured. It is anchored and
+  scored, so it degrades `network.transfer`, which is in both `deep` and
+  `standard` - so **this is what blocks rankability today**. Either it becomes
+  diagnostic-only the way `tcp_connect.jitter` already is, or the Network
+  category is scored on throughput alone and latency is reported beside it.
+  Raising the bound until three hosts pass would be fitting a threshold to three
+  measurements.
 - **The Web anchors, as a group.** Measured 3-6x too low on three hosts, with
   `connections.tls` at 4.42x agreeing to within 0.13 across a decade of
   hardware. Calibration corrects most of it; `throughput.large` and

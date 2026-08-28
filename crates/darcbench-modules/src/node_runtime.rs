@@ -514,7 +514,7 @@ impl NodeRuntime {
         // --- variance sweep -------------------------------------------------
         for metric in &metrics {
             if let Some(cv) = metric.summary.cv {
-                if cv > self.manifest.stability_cv_bound {
+                if metric.summary.is_unstable(self.manifest.stability_cv_bound) {
                     let warning = Warning {
                         code: WarningCode::HighVariance,
                         message: format!(

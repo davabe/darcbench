@@ -131,6 +131,12 @@ rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/darcbench/scratch"
 to be compiled per host is a benchmark whose compiler version is part of the
 measurement.
 
+Build it with [`scripts/build-static.sh`](../scripts/build-static.sh), which
+fetches a checksum-pinned Zig, builds the C cross-compiler shim that `rusqlite`
+needs, links statically and prints the sha256. It needs no root and no system
+packages, so the binary a calibration ships is reproducible by anyone. Run
+`scripts/build-static.sh --check` to verify the toolchain without building.
+
 ```bash
 scp darcbench root@<host>:/usr/local/bin/darcbench
 ssh root@<host> 'chmod +x /usr/local/bin/darcbench && darcbench --version'

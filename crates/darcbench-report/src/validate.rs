@@ -110,13 +110,14 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
             if !cv_is_evidence_of_instability(metric) {
                 continue;
             }
-            if let Some(cv) = metric.summary.cv {
-                if cv > MAX_ACCEPTABLE_CV {
-                    reasons.push(VerdictReason::ExcessiveVariance {
-                        module: module.module.id.clone(),
-                    });
-                    break;
-                }
+            // `Summary::is_unstable` and not a bare `cv > bound`, so the
+            // validator asks the same question the modules ask - and asks it
+            // about the value the metric reports, which is the median.
+            if metric.summary.is_unstable(MAX_ACCEPTABLE_CV) {
+                reasons.push(VerdictReason::ExcessiveVariance {
+                    module: module.module.id.clone(),
+                });
+                break;
             }
         }
     }

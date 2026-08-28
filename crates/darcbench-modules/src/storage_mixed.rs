@@ -1028,7 +1028,7 @@ impl BenchmarkModule for StorageMixed {
                 .ok_or_else(|| ModuleError::NoSamples(workload.key.to_string()))?;
 
             if let Some(cv) = summary.cv {
-                if cv > self.manifest.stability_cv_bound {
+                if summary.is_unstable(self.manifest.stability_cv_bound) {
                     let warning = Warning {
                         code: WarningCode::HighVariance,
                         message: format!(

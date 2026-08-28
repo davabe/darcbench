@@ -23,3 +23,4 @@ darcbench-run-*.json
 # Build/test scratch
 /tmp-e2e/
 coverage/
+.toolchain/

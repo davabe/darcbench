@@ -531,7 +531,7 @@ impl DeploymentContainer {
             let Some(cv) = metric.summary.cv else {
                 continue;
             };
-            if cv > self.manifest.stability_cv_bound {
+            if metric.summary.is_unstable(self.manifest.stability_cv_bound) {
                 warnings.push(Warning {
                     code: WarningCode::HighVariance,
                     message: format!(

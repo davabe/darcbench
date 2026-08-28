@@ -32,6 +32,63 @@ pub struct Summary {
 
 /// Computes descriptive statistics. Returns `None` for an empty sample set;
 /// callers must treat that as a module failure, never as a zero score.
+impl Summary {
+    /// Half-width of the median's confidence interval, relative to the median.
+    ///
+    /// "How well determined is the number this metric reports?" - which is the
+    /// question that matters, because the number it reports is the median.
+    /// `None` when there is no interval (`n < 6`) or the median is zero.
+    pub fn relative_ci(&self) -> Option<f64> {
+        let (lo, hi) = self.ci95?;
+        if self.median.abs() <= f64::EPSILON {
+            return None;
+        }
+        Some(((hi - lo) / 2.0 / self.median).abs())
+    }
+
+    /// Whether these repetitions were too unsteady for the value to be compared
+    /// against another machine's.
+    ///
+    /// The coefficient of variation alone was answering a different question.
+    /// It is `stddev / mean`, so a single slow repetition out of eleven moves it
+    /// enormously - while the median the metric actually reports does not move
+    /// at all. Measured on the published corpus: `latency_read_4k.p99` came back
+    /// with a CV of 137% and a median determined to within 5.3%, and that run
+    /// was downgraded to `Partial` on the strength of the 137%.
+    ///
+    /// So a metric is unstable only when *both* say so: the spread is wide and
+    /// the median is genuinely poorly determined. A wide spread around a
+    /// well-determined median is a distribution with a tail, which is a fact
+    /// about the device or the network and not a reason to refuse the
+    /// measurement.
+    ///
+    /// This is deliberately a narrowing: every metric it clears was already
+    /// being flagged, and each is cleared for the stated reason that the
+    /// reported value is solid. It never flags anything the CV bound did not.
+    ///
+    /// The interval needs `n >= 6`, so short profiles fall back to the CV alone
+    /// - the old behaviour, applied where there is not enough evidence to do
+    /// better rather than everywhere.
+    ///
+    /// Checked against the corpus in `docs/FIELD-EVIDENCE.md`: it clears
+    /// `latency_read_4k.p99` (CV 137%, CI 5.3%) and `throughput.medium`
+    /// (CV 23%, CI 1.7%), and still flags `ttfb.mean` on a host where the whole
+    /// distribution is wide (CV 53%, CI 56%) rather than one repetition being
+    /// slow.
+    pub fn is_unstable(&self, bound: f64) -> bool {
+        let Some(cv) = self.cv else {
+            return false;
+        };
+        if cv <= bound {
+            return false;
+        }
+        match self.relative_ci() {
+            Some(relative) => relative > bound,
+            None => true,
+        }
+    }
+}
+
 pub fn summarize(samples: &[f64]) -> Option<Summary> {
     if samples.is_empty() || samples.iter().any(|v| !v.is_finite()) {
         return None;
@@ -168,6 +225,154 @@ pub fn outlier_indices(samples: &[f64], threshold: f64) -> Vec<usize> {
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
+
+    /// A wide spread around a well-determined median is not instability.
+    ///
+    /// Every case below is taken from the published corpus, so this is a
+    /// regression test against measured hardware rather than a constructed
+    /// example. See `corpus/2026-08/` and `docs/FIELD-EVIDENCE.md`.
+    #[test]
+    fn stability_asks_about_the_value_the_metric_reports() {
+        // `storage.mixed/latency_read_4k.p99` on the E5-1620 v2: eleven
+        // repetitions, two of them slow. The CV came out at 137% and the run
+        // was downgraded to `Partial` - while the median it reports was
+        // determined to within 5.3%.
+        let tail = Summary {
+            n: 11,
+            min: 0.10,
+            max: 4.0,
+            mean: 0.55,
+            median: 0.19,
+            stddev: 0.755,
+            cv: Some(1.374),
+            ci95: Some((0.18, 0.20)),
+        };
+        assert!(tail.cv.expect("cv") > 0.20, "the CV really is that wide");
+        assert!(
+            tail.relative_ci().expect("ci") < 0.06,
+            "and the median really is that solid"
+        );
+        assert!(
+            !tail.is_unstable(0.20),
+            "a solid median with a long tail must not be called unstable"
+        );
+
+        // `network.transfer/ttfb.mean` on the E-2274G: no single outlier, the
+        // whole distribution is wide. That is genuine irreproducibility and
+        // must still be caught.
+        let spread = Summary {
+            n: 11,
+            min: 29.31,
+            max: 128.87,
+            mean: 60.8,
+            median: 53.91,
+            stddev: 32.30,
+            cv: Some(0.531),
+            ci95: Some((23.9, 83.9)),
+        };
+        assert!(
+            spread.relative_ci().expect("ci") > 0.30,
+            "the median is genuinely poorly determined"
+        );
+        assert!(
+            spread.is_unstable(0.30),
+            "a wide distribution must still be flagged"
+        );
+
+        // A steady metric is untouched.
+        let steady = Summary {
+            n: 11,
+            min: 288.9,
+            max: 289.6,
+            mean: 289.0,
+            median: 289.0,
+            stddev: 0.30,
+            cv: Some(0.001),
+            ci95: Some((288.9, 289.1)),
+        };
+        assert!(!steady.is_unstable(0.20));
+    }
+
+    /// Below `n = 6` there is no interval, so the CV decides alone.
+    ///
+    /// The old behaviour, kept where there is not enough evidence to do better
+    /// rather than kept everywhere. A short profile must not become *harder* to
+    /// flag than a long one just because it collected fewer repetitions.
+    #[test]
+    fn without_an_interval_the_coefficient_of_variation_still_decides() {
+        let short = Summary {
+            n: 5,
+            min: 1.0,
+            max: 9.0,
+            mean: 4.0,
+            median: 3.0,
+            stddev: 3.2,
+            cv: Some(0.80),
+            ci95: None,
+        };
+        assert!(short.relative_ci().is_none());
+        assert!(
+            short.is_unstable(0.20),
+            "no interval means the CV is all there is, and it is over the bound"
+        );
+
+        // A metric with no CV at all - a zero mean - is not evidence of
+        // instability either way.
+        let empty = Summary {
+            n: 11,
+            min: 0.0,
+            max: 0.0,
+            mean: 0.0,
+            median: 0.0,
+            stddev: 0.0,
+            cv: None,
+            ci95: None,
+        };
+        assert!(!empty.is_unstable(0.20));
+    }
+
+    /// The rule may only ever remove flags, never add one.
+    ///
+    /// This is what makes it safe to apply to eight modules and the validator
+    /// at once: it is a narrowing of an existing bound, so no run that passed
+    /// before can start failing.
+    #[test]
+    fn the_rule_is_strictly_a_narrowing_of_the_coefficient_of_variation_bound() {
+        let mut checked = 0;
+        for n in [5usize, 6, 11, 30] {
+            for spread in [0.0, 0.05, 0.2, 0.9, 3.0] {
+                for width in [0.0, 0.01, 0.5, 2.0] {
+                    let median = 10.0;
+                    let summary = Summary {
+                        n,
+                        min: median - spread * median,
+                        max: median + spread * median,
+                        mean: median,
+                        median,
+                        stddev: spread * median,
+                        cv: Some(spread),
+                        ci95: if n >= 6 {
+                            Some((median - width * median, median + width * median))
+                        } else {
+                            None
+                        },
+                    };
+                    for bound in [0.15, 0.20, 0.30] {
+                        let cv_alone = summary.cv.is_some_and(|cv| cv > bound);
+                        if summary.is_unstable(bound) {
+                            assert!(
+                                cv_alone,
+                                "flagged something the CV bound did not: n={n} \
+                                 spread={spread} width={width} bound={bound}"
+                            );
+                        }
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 100, "the sweep must actually cover something");
+    }
     use super::*;
 
     fn approx(a: f64, b: f64) {

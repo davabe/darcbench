@@ -47,6 +47,12 @@ fmt ─► clippy -D warnings ─► test --release ─► web build ─► e2e
 **Build matrix:** linux/amd64 and linux/arm64, gnu and musl. Static musl builds
 are the default download — one file, no libc version to match.
 
+The amd64 musl build is produced by
+[`scripts/build-static.sh`](../scripts/build-static.sh), which pins the C
+cross-compiler by checksum. Pinning it matters beyond reproducibility: SQLite is
+compiled from C into the same process the benchmark measures, so the compiler is
+part of the measurement in the same way the libc is. arm64 is not wired up yet.
+
 **Reproducible builds** (Phase 8): `--locked`, no build timestamps. Two
 independent builds of a tag must produce identical binaries, so the build-hash
 attestation that gates `Verified` results means something.
