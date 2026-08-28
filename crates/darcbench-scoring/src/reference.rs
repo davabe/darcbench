@@ -123,7 +123,7 @@ fn latency_point(
     }
 }
 
-/// The provisional DARC-REF-1 anchors shipped with `dbs/0.1.0-dev`.
+/// The provisional DARC-REF-1 anchors shipped with the current scoring model.
 ///
 /// Only modules this build actually implements are populated: inventing anchors
 /// for a module that does not exist yet would be fabricated data, and a test
@@ -348,10 +348,33 @@ pub fn provisional_reference() -> ReferenceProfile {
     // score for a machine with a slow disk" - so the weights below only
     // distribute that 8%.
     //
-    // Throughput carries the most weight, then time to first byte: those are
-    // what a visitor to a site hosted on the machine actually experiences. DNS
-    // is weighted lowest because it says more about the resolver configured on
-    // the box than about the machine or its link.
+    // **Only throughput is scored.** The latency metrics are still measured and
+    // still published; they are simply not anchored, so they land in
+    // `ScoreCard::unreferenced_metrics` - reported, and not part of any score.
+    //
+    // They were scored, at 4.0 of the category's 7.0 weight, until a machine's
+    // NIC renegotiated from 1000 to 100 Mbit/s between two runs. Throughput
+    // moved by four to five times, as it should. Not one latency metric moved:
+    // `tcp_connect.mean` 24.3 ms to 24.3 ms, `ttfb.mean` 61.4 to 59.5, DNS 0.29
+    // to 0.37. They cannot be measuring this machine's networking, because its
+    // networking got ten times slower and they did not notice.
+    //
+    // What they measure is where the machine is. `tcp_connect.mean` reads 2.09,
+    // 4.92 and 24.32 ms across three hosts, and the second and third have the
+    // *same* 1 Gbit link - that twelvefold spread is distance and transit to
+    // Cloudflare, Google and Quad9.
+    //
+    // Which breaks comparability at its root. `docs/BENCHMARK-METHODOLOGY.md`
+    // says two runs may be compared when their profile and scoring model match.
+    // Location is not in that key and cannot be, for a leaderboard that ranks
+    // hardware: two identical machines in Frankfurt and Sao Paulo would rank
+    // differently, and the difference would be reported as a property of the
+    // machines. A scored metric has to respond to the thing it claims to score.
+    //
+    // The measurements stay because they are genuinely useful to the operator
+    // who ran them - a machine that cannot resolve DNS or reach a CDN has a
+    // problem worth seeing - and `docs/FIELD-EVIDENCE.md` records the
+    // experiment. What they are not is comparable between machines.
     points.insert(
         "network.transfer/download.single".into(),
         point(800.0, 1.5, CategoryKey::Network, None),
@@ -359,26 +382,6 @@ pub fn provisional_reference() -> ReferenceProfile {
     points.insert(
         "network.transfer/download.multi".into(),
         point(940.0, 1.5, CategoryKey::Network, None),
-    );
-    points.insert(
-        "network.transfer/ttfb.mean".into(),
-        latency_point(25.0, 1.0, CategoryKey::Network, None),
-    );
-    points.insert(
-        "network.transfer/tcp_connect.mean".into(),
-        latency_point(5.0, 1.0, CategoryKey::Network, None),
-    );
-    points.insert(
-        "network.transfer/tcp_connect.jitter".into(),
-        latency_point(0.5, 0.75, CategoryKey::Network, None),
-    );
-    points.insert(
-        "network.transfer/tls_handshake.mean".into(),
-        latency_point(10.0, 0.75, CategoryKey::Network, None),
-    );
-    points.insert(
-        "network.transfer/dns_resolve.mean".into(),
-        latency_point(5.0, 0.5, CategoryKey::Network, None),
     );
 
     // --- web.static ---------------------------------------------------------
@@ -808,6 +811,47 @@ pub fn provisional_reference() -> ReferenceProfile {
     }
 }
 
+/// The anchors as `dbs/0.1.0-dev` shipped them.
+///
+/// Expressed as the difference from the current set rather than a second copy
+/// of it. A duplicated table of fifty-odd anchors would drift from this one
+/// within a release, and the thing worth reading here is precisely *what
+/// changed between the two models* - which a diff shows and a copy hides.
+///
+/// It exists because a verifier that cannot reproduce a model it once published
+/// cannot check any bundle produced by it. The corpus in `corpus/2026-08/` was
+/// signed under this model; without this function every one of those bundles
+/// would fail score recomputation the moment the model moved, and the evidence
+/// they exist to provide would evaporate.
+///
+/// What `dbs/0.2.0-dev` changed: the five `network.transfer` latency metrics
+/// are no longer anchored, so they are reported and not scored. See the
+/// reasoning beside the network anchors above.
+pub fn reference_dbs_0_1_0_dev() -> ReferenceProfile {
+    let mut profile = provisional_reference();
+    profile.points.insert(
+        "network.transfer/ttfb.mean".into(),
+        latency_point(25.0, 1.0, CategoryKey::Network, None),
+    );
+    profile.points.insert(
+        "network.transfer/tcp_connect.mean".into(),
+        latency_point(5.0, 1.0, CategoryKey::Network, None),
+    );
+    profile.points.insert(
+        "network.transfer/tcp_connect.jitter".into(),
+        latency_point(0.5, 0.75, CategoryKey::Network, None),
+    );
+    profile.points.insert(
+        "network.transfer/tls_handshake.mean".into(),
+        latency_point(10.0, 0.75, CategoryKey::Network, None),
+    );
+    profile.points.insert(
+        "network.transfer/dns_resolve.mean".into(),
+        latency_point(5.0, 0.5, CategoryKey::Network, None),
+    );
+    profile
+}
+
 #[cfg(test)]
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
@@ -1084,11 +1128,10 @@ mod tests {
     fn every_inverted_anchor_is_declared() {
         const LOWER_IS_BETTER: &[&str] = &[
             "memory.bandwidth/latency_random.single",
-            "network.transfer/dns_resolve.mean",
-            "network.transfer/tcp_connect.jitter",
-            "network.transfer/tcp_connect.mean",
-            "network.transfer/tls_handshake.mean",
-            "network.transfer/ttfb.mean",
+            // The `network.transfer` latencies were here until they stopped
+            // being scored at all. They are still measured and published; they
+            // are simply not anchored, so there is no anchor to declare a
+            // direction for. See the reasoning beside the network anchors.
             "storage.mixed/latency_fsync.mean",
             "storage.mixed/latency_read_4k.p99",
             "storage.mixed/latency_write_4k.p99",
@@ -1157,22 +1200,45 @@ mod tests {
         }
     }
 
+    /// Network is scored on throughput, and deliberately not on latency.
+    ///
+    /// The second half is the part worth a test. Anchoring a latency metric
+    /// again would be a one-line change that looks like an improvement -
+    /// "network.transfer measures five latencies and scores none of them" reads
+    /// like an oversight - and it would silently put geography back into the
+    /// score.
+    ///
+    /// The evidence is in `docs/FIELD-EVIDENCE.md`: a machine whose link
+    /// renegotiated from 1000 to 100 Mbit/s moved every throughput metric by
+    /// four to five times and not one latency metric at all. They do not
+    /// measure this machine's networking. Across hosts they track distance to
+    /// the endpoint - 2.09, 4.92 and 24.32 ms, with the last two on identical
+    /// 1 Gbit links.
     #[test]
-    fn the_network_category_has_anchors_for_every_shipped_metric() {
+    fn the_network_category_is_scored_on_throughput_and_not_on_latency() {
         let r = provisional_reference();
+
+        for key in ["download.single", "download.multi"] {
+            let point = r
+                .get("network.transfer", key)
+                .unwrap_or_else(|| panic!("no anchor for network.transfer/{key}"));
+            assert_eq!(point.category, CategoryKey::Network);
+        }
+
         for key in [
-            "download.single",
-            "download.multi",
             "ttfb.mean",
             "tcp_connect.mean",
             "tcp_connect.jitter",
             "tls_handshake.mean",
             "dns_resolve.mean",
         ] {
-            let point = r
-                .get("network.transfer", key)
-                .unwrap_or_else(|| panic!("no anchor for network.transfer/{key}"));
-            assert_eq!(point.category, CategoryKey::Network);
+            assert!(
+                r.get("network.transfer", key).is_none(),
+                "network.transfer/{key} is anchored again, which puts where the \
+                 machine is back into what it scores. It is still measured and \
+                 still published - as an unreferenced metric - which is the \
+                 point."
+            );
         }
     }
 

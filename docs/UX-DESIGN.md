@@ -101,7 +101,7 @@ that someone read it. Print styles switch to a light theme.
 
 Plain, specific, never reassuring about something we do not know.
 
-> **Provisional scoring model.** `dbs/0.1.0-dev` has not been calibrated against
+> **Provisional scoring model.** `dbs/0.2.0-dev` has not been calibrated against
 > a physical DARC-REF-1 reference machine — its reference values are declared
 > targets, not measurements. The raw measurements below are real and
 > reproducible; the scores derived from them are development output.

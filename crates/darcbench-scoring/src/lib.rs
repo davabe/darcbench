@@ -44,7 +44,7 @@ pub use sustained::SustainedOutcome;
 /// `-dev` marks a model whose reference profile has not been calibrated. It is
 /// part of the version string on purpose: a bundle produced today can never be
 /// mistaken for one produced by a calibrated release.
-pub const SCORING_MODEL_VERSION: &str = "dbs/0.1.0-dev";
+pub const SCORING_MODEL_VERSION: &str = "dbs/0.2.0-dev";
 
 #[cfg(test)]
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.

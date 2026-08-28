@@ -13,7 +13,7 @@ category scores, in `(0, 1]`. 1.0 is a perfectly balanced machine.
 scores, verdict and telemetry summary. Schema `darcbench.bundle/1`.
 
 **Calibrated** — a scoring model whose reference anchors are measurements from
-physical DARC-REF-1 hardware, not declared targets. `dbs/0.1.0-dev` is **not**
+physical DARC-REF-1 hardware, not declared targets. `dbs/0.2.0-dev` is **not**
 calibrated.
 
 **Category** — a top-level score group: compute, memory, storage, network, web,

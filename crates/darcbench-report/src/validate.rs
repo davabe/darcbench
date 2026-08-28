@@ -171,8 +171,11 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
             fatal = true;
         }
 
-        let model = ScoringModel::current();
-        if model.version == bundle.scores.scoring_model {
+        // The model the *bundle* declares, not whichever is newest. A score can
+        // only be recomputed by the model that produced it, so verifying
+        // against `current()` alone would have made every bundle ever signed
+        // unverifiable the first time the model moved.
+        if let Some(model) = ScoringModel::for_version(&bundle.scores.scoring_model) {
             let recomputed = model.score_run(bundle.run.profile, &bundle.modules);
             match scores_match(&recomputed, &bundle.scores) {
                 Ok(()) => recomputation_matched = Some(true),
@@ -190,9 +193,14 @@ pub fn validate_bundle(bundle: &Bundle, server_side: bool) -> ValidationOutcome 
             // anything. Falling through to `Validated` here would make
             // arbitrary numbers rankable simply by naming an unknown model, so
             // an unrecognised model is fatal rather than merely unchecked.
+            //
+            // Unchanged by version selection: knowing an older model and
+            // declining to check it are different things, and only the second
+            // is dangerous. `for_version` returning `None` still means nobody
+            // here can say whether these numbers follow from those metrics.
             reasons.push(VerdictReason::IncompatibleBenchmarkVersion {
                 found: bundle.scores.scoring_model.clone(),
-                expected: model.version.clone(),
+                expected: ScoringModel::current().version.clone(),
             });
             fatal = true;
         }

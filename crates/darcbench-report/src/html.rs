@@ -85,7 +85,7 @@ pub fn render(bundle: &Bundle) -> String {
         html.push_str(
             r#"<div class="banner">
   <strong>Provisional scores.</strong> The DARCBench scoring model
-  (<code>dbs/0.1.0-dev</code>) has not yet been calibrated against a physical
+  (<code>dbs/0.2.0-dev</code>) has not yet been calibrated against a physical
   DARC-REF-1 reference machine. The reference values are declared targets, not
   measurements. Raw metrics below are real; the scores derived from them are
   development output and are not comparable with any future calibrated release.

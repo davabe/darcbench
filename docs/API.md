@@ -60,7 +60,7 @@ that an agent is here and which protocol it speaks, and nothing else.
 {
   "product": "DARCBench", "agent_version": "0.1.0",
   "protocol": "darcbench.events/1", "bundle_schema": "darcbench.bundle/1",
-  "scoring_model": "dbs/0.1.0-dev", "scoring_calibrated": false,
+  "scoring_model": "dbs/0.2.0-dev", "scoring_calibrated": false,
   "authentication_required": true, "loopback_only": true
 }
 ```

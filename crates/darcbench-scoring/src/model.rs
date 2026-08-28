@@ -228,6 +228,34 @@ impl ScoringModel {
         }
     }
 
+    /// The model a bundle declares, when this build still implements it.
+    ///
+    /// Recomputing a score is the anti-tamper check, and it can only be done
+    /// with the model that produced the score. A verifier that only implements
+    /// the newest model cannot check anything published under an older one -
+    /// so every bundle ever signed would become unverifiable the first time the
+    /// model moved, which is the moment the evidence is most needed.
+    ///
+    /// `None` for a version this build does not know, and callers must keep
+    /// treating that as fatal. The reason is unchanged: if an unrecognised
+    /// model fell through to "not checked, therefore fine", any set of numbers
+    /// could be made rankable by naming a model nobody implements. Knowing a
+    /// model and declining to check it are different things, and only the
+    /// second is dangerous.
+    pub fn for_version(version: &str) -> Option<Self> {
+        match version {
+            SCORING_MODEL_VERSION => Some(Self::current()),
+            "dbs/0.1.0-dev" => Some(Self {
+                version: "dbs/0.1.0-dev".to_string(),
+                reference: crate::reference::reference_dbs_0_1_0_dev(),
+                stability_penalty_span: 0.10,
+                cv_ceiling: 0.20,
+                weak_link_cap_factor: 4.0,
+            }),
+            _ => None,
+        }
+    }
+
     /// Scores a run.
     ///
     /// Pure: identical inputs always yield identical outputs, which is what
@@ -653,6 +681,61 @@ impl ScoreCard {
 // In tests, `unwrap`/`expect` panicking *is* the failure signal.
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic_in_result_fn)]
 mod tests {
+
+    /// A published model must stay recomputable after the model moves on.
+    ///
+    /// Recomputing the score from the raw metrics is the anti-tamper check, and
+    /// it needs the model that produced the score. When `dbs/0.2.0-dev` stopped
+    /// anchoring the network latency metrics, every bundle in
+    /// `corpus/2026-08/` (signed under `dbs/0.1.0-dev`, and published precisely
+    /// so the claims in `docs/FIELD-EVIDENCE.md` could be checked) would have
+    /// failed recomputation against the newest model and been reported
+    /// `Invalid`.
+    ///
+    /// So this is not a nicety. Deleting `for_version`'s older arm silently
+    /// destroys the evidence the project rests on.
+    #[test]
+    fn a_superseded_model_is_still_recomputable_and_differs_from_the_current_one() {
+        let current = ScoringModel::for_version(SCORING_MODEL_VERSION)
+            .expect("the current model must be selectable by its own version");
+        assert_eq!(current.version, SCORING_MODEL_VERSION);
+
+        let old = ScoringModel::for_version("dbs/0.1.0-dev")
+            .expect("a model this build has published must stay recomputable");
+        assert_eq!(old.version, "dbs/0.1.0-dev");
+
+        // The two must actually differ, or the arm is decoration. The five
+        // network latency metrics are anchored in the old model and not in the
+        // new one; that is the whole difference between them.
+        for key in [
+            "ttfb.mean",
+            "tcp_connect.mean",
+            "tcp_connect.jitter",
+            "tls_handshake.mean",
+            "dns_resolve.mean",
+        ] {
+            assert!(
+                old.reference.get("network.transfer", key).is_some(),
+                "dbs/0.1.0-dev scored network.transfer/{key} and must still say so"
+            );
+            assert!(
+                current.reference.get("network.transfer", key).is_none(),
+                "the current model must not score network.transfer/{key}"
+            );
+        }
+
+        // Throughput is scored by both, so the two models agree about what a
+        // link is worth and disagree only about geography.
+        for key in ["download.single", "download.multi"] {
+            assert!(old.reference.get("network.transfer", key).is_some());
+            assert!(current.reference.get("network.transfer", key).is_some());
+        }
+
+        // An unknown model stays unrecomputable, which callers treat as fatal.
+        // Version selection must not become a way to wave anything through.
+        assert!(ScoringModel::for_version("dbs/99.0.0-fictional").is_none());
+        assert!(ScoringModel::for_version("").is_none());
+    }
     use super::*;
     use darcbench_protocol::metrics::{Metric, MetricSample};
     use darcbench_protocol::stats::summarize;

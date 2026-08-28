@@ -489,6 +489,66 @@ time** — `triad.multi`, `sequential_read.multi`, `sequential_copy.single`,
 not one bad metric; it is a contended machine, and it is what drove the move
 from the confidence interval to the MAD above.
 
+### An accidental controlled experiment
+
+The primary interface renegotiated from 1000 Mbit/s to 100 Mbit/s between the
+`deep` run in `corpus/2026-08` and these five. Nothing else about the machine
+changed. That is a controlled experiment nobody designed:
+
+| metric | at 1000 Mbit/s | at 100 Mbit/s | change |
+|---|---|---|---|
+| `download.single` | 305 Mbit/s | 76 Mbit/s | **4.0×** |
+| `download.multi` | 539 Mbit/s | 105 Mbit/s | **5.1×** |
+| `tcp_connect.mean` | 24.3 ms | 24.3 ms | — |
+| `ttfb.mean` | 61.4 ms | 59.5 ms | — |
+| `dns_resolve.mean` | 0.29 ms | 0.37 ms | — |
+
+It settles two things that had been left open.
+
+#### 9. The environment digest covered three of the five scored subsystems
+
+`environment_digest` came out **byte-identical** across that change:
+`1dac9b9663ee…` on both sides of a fourfold move in a scored category. It exists
+to say "this is no longer the same environment" and it said the opposite.
+
+`Inventory::performance_digest` hashed CPU, memory, kernel, virtualisation,
+scope and cgroup limits — and nothing at all from storage or network, two of the
+five subsystems that are measured and scored. It now includes the primary
+interface's link speed, block devices by model, size, transport and rotational
+flag, and the root filesystem type. Only the primary interface, because
+secondary ones flap and veth pairs come and go; not free space or the I/O
+scheduler, because those change without the hardware changing. A digest that
+moves on its own is worse than one that misses something.
+
+#### 10. The network latency metrics do not measure the machine
+
+`download.*` tracked the link exactly as it should. **Not one latency metric
+moved.** They cannot be measuring anything about this machine's networking,
+because its networking got ten times slower and they did not notice.
+
+What they do measure is visible across hosts: `tcp_connect.mean` is 2.09 ms,
+4.92 ms and 24.32 ms on the three hosts — and the 4.92 ms and 24.32 ms hosts
+have the *same* 1 Gbit link. That twelvefold spread is distance and transit to
+Cloudflare, Google and Quad9. Move a machine between datacentres and it changes;
+change the machine and it does not.
+
+They are nonetheless anchored and scored into Network today, at weights 1.0
+(`ttfb.mean`), 1.0 (`tcp_connect.mean`), 0.75, 0.75 and 0.5 — together **4.0 of
+the category's 7.0 weight**, against 3.0 for the two throughput metrics. The
+majority of the Network score is geography.
+
+That breaks the comparability rule directly. `docs/BENCHMARK-METHODOLOGY.md`
+says two runs may be compared when their profile and scoring model match;
+location is not in that key and cannot be, for a leaderboard that ranks
+hardware. Two identical machines in Frankfurt and São Paulo would rank
+differently, and DARCBench would be reporting where they are as though it were
+what they are.
+
+This also happens to be what blocks rankability — `ttfb.mean` degrading
+`network.transfer` on two of three hosts — but that is a consequence and not
+the argument. The argument is that a scored metric must respond to the thing it
+claims to score, and these do not.
+
 ### Reproducing this
 
 Every bundle argued from above is published in

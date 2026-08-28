@@ -9,10 +9,22 @@ Four things version independently, on purpose:
 | Agent | `0.1.0` | Any code change |
 | Event protocol | `darcbench.events/1` | Breaking wire change (major only) |
 | Bundle schema | `darcbench.bundle/1` | Breaking result-format change |
-| Scoring model | `dbs/0.1.0-dev` | Any change to how scores are computed |
+| Scoring model | `dbs/0.2.0-dev` | Any change to how scores are computed |
 
 An agent bug fix must not invalidate comparability, and a scoring change must not
 hide inside a patch release. See [ADR-0007](adr/0007-scoring-versioning.md).
+
+**Every model version this project has published stays recomputable.**
+`ScoringModel::for_version` selects the model a bundle declares, not whichever
+is newest, because recomputing the score from the raw metrics is the anti-tamper
+check and it needs the model that produced the score. Verifying only against the
+current model would make every bundle ever signed unverifiable the moment the
+model moved — which is when the evidence matters most. `dbs/0.1.0-dev` is kept
+as a diff from the current anchors rather than a second copy of them.
+
+An unknown model is still fatal. Knowing an older model and declining to check
+it are different things, and only the second lets arbitrary numbers become
+rankable by naming a model nobody implements.
 
 ## Channels
 

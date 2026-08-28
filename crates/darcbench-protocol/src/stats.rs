@@ -98,9 +98,9 @@ impl Summary {
     /// being flagged, and each is cleared for the stated reason that the
     /// reported value is solid. It never flags anything the CV bound did not.
     ///
-    /// The interval needs `n >= 6`, so short profiles fall back to the CV alone
-    /// - the old behaviour, applied where there is not enough evidence to do
-    /// better rather than everywhere.
+    /// The interval needs `n >= 6`, so short profiles fall back to the CV
+    /// alone: the old behaviour, applied where there is not enough evidence to
+    /// do better rather than everywhere.
     ///
     /// Checked against the corpus in `docs/FIELD-EVIDENCE.md`: it clears
     /// `latency_read_4k.p99` (CV 137%, CI 5.3%) and `throughput.medium`

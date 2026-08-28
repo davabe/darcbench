@@ -296,7 +296,7 @@ early would publish numbers we would then have to retract at scale.
 
 ### 7.1 The blocker that is not about security
 
-`dbs/0.1.0-dev` reports itself **uncalibrated** in every bundle, report and API
+`dbs/0.2.0-dev` reports itself **uncalibrated** in every bundle, report and API
 response. [ROADMAP.md](ROADMAP.md) is explicit: *"Calibration gates everything
 that claims comparability."*
 

@@ -1,6 +1,15 @@
 # DARCBench scoring system
 
-**Model version implemented today:** `dbs/0.1.0-dev`
+**Model version implemented today:** `dbs/0.2.0-dev`
+
+`dbs/0.1.0-dev` remains recomputable: a bundle is verified against the model it
+declares, so nothing signed under the earlier model became unverifiable when the
+model moved. The difference between them is that `dbs/0.2.0-dev` no longer
+scores the `network.transfer` latency metrics — they are measured and published,
+but a machine whose link renegotiated from 1000 to 100 Mbit/s moved every
+throughput metric by four to five times and moved none of them, so they describe
+where a machine is rather than what it is. See
+[FIELD-EVIDENCE.md](FIELD-EVIDENCE.md).
 **Reference profile:** `DARC-REF-1` — **uncalibrated**
 **Authoritative implementation:** `crates/darcbench-scoring/`
 
@@ -12,7 +21,7 @@ bug.
 
 ## 0. The one thing to read first
 
-`dbs/0.1.0-dev` is **not calibrated**. Its reference values are *declared
+`dbs/0.2.0-dev` is **not calibrated**. Its reference values are *declared
 targets* for a specified machine, not measurements taken from one. Every score
 this build produces carries `uncalibrated: true`, every report renders a banner
 saying so, and a unit test (`shipped_model_is_marked_uncalibrated`) fails the

@@ -92,6 +92,37 @@ const PARALLEL_STREAMS: usize = 4;
 /// Largest download this module will request from one stream.
 const MAX_DOWNLOAD_BYTES: u64 = 8 << 20;
 
+/// The metrics that describe the *path* to a third party rather than this
+/// machine, and are therefore neither scored nor allowed to degrade a run.
+///
+/// A machine whose link renegotiated from 1000 to 100 Mbit/s moved every
+/// throughput metric here by four to five times and moved not one of these:
+/// `tcp_connect.mean` 24.3 ms to 24.3 ms, `ttfb.mean` 61.4 to 59.5. They cannot
+/// be describing this machine's networking. Across hosts they track distance to
+/// the endpoint - 2.09, 4.92 and 24.32 ms, the last two on identical 1 Gbit
+/// links. `docs/FIELD-EVIDENCE.md` has the experiment.
+///
+/// So they are measured, published, and excluded from both the score - by
+/// having no anchor, which puts them in `unreferenced_metrics` - and from the
+/// stability judgement here. Degrading a run because somebody else's CDN was
+/// slow makes the machine unrankable for a fact about the machine's postcode.
+///
+/// A list of keys rather than a property on the metric, because this module
+/// owns every one of them and knows exactly which of its own measurements point
+/// outwards. The objection to a list is that it lives somewhere that does not
+/// know what it names; this one is twenty lines from where they are built.
+///
+/// `tcp_connect.jitter` was already here alone, for a narrower reason that is
+/// still true: it summarises one value per path, so its spread is endpoint
+/// diversity rather than instability.
+const PATH_LATENCY_METRICS: &[&str] = &[
+    "dns_resolve.mean",
+    "tcp_connect.mean",
+    "tcp_connect.jitter",
+    "tls_handshake.mean",
+    "ttfb.mean",
+];
+
 /// Smallest download still worth timing.
 const MIN_DOWNLOAD_BYTES: u64 = 1 << 20;
 
@@ -920,7 +951,7 @@ impl BenchmarkModule for NetworkTransfer {
         // on it would tell an operator their network was congested when what
         // varied was geography.
         for metric in &metrics {
-            if metric.key == "tcp_connect.jitter" {
+            if PATH_LATENCY_METRICS.contains(&metric.key.as_str()) {
                 continue;
             }
             let Some(cv) = metric.summary.cv else {

@@ -246,7 +246,7 @@ hardware lands within the CV targets in BENCHMARK-METHODOLOGY.md.
 **Where the phase stands.** Every deliverable except calibration is now closed.
 Calibration is not close to closing, and no amount of further coding moves it:
 it needs three physical DARC-REF-1-class machines, which is the assumption
-stated at the top of this document. Until then `dbs/0.1.0-dev` reports itself
+stated at the top of this document. Until then `dbs/0.2.0-dev` reports itself
 uncalibrated in every bundle, report and API response, and none of the exit
 criteria above can be met — a `Validated`-eligible total requires a calibrated
 model by definition.
@@ -1220,15 +1220,16 @@ one moves scores, and none of them is answered by running the calibration.
   of 36% around a median the other six repetitions agreed on to 0.3%. The first
   attempt used `ci95` and only ever helped `deep`: that interval trims nothing
   at n = 6 or 7. What none of it clears is the real question below.
-- **Is latency to somebody else's network a comparable measurement?**
-  `ttfb.mean` on H1 runs 29-129 ms with no outlier and a median determined only
-  to within 56%: genuinely irreproducible, honestly measured. It is anchored and
-  scored, so it degrades `network.transfer`, which is in both `deep` and
-  `standard` - so **this is what blocks rankability today**. Either it becomes
-  diagnostic-only the way `tcp_connect.jitter` already is, or the Network
-  category is scored on throughput alone and latency is reported beside it.
-  Raising the bound until three hosts pass would be fitting a threshold to three
-  measurements.
+- **~~Is latency to somebody else's network a comparable measurement?~~
+  Answered: no.** A machine whose link renegotiated from 1000 to 100 Mbit/s
+  moved `download.single` by 4x and `download.multi` by 5x, and moved not one
+  latency metric - `tcp_connect.mean` 24.3 ms to 24.3 ms. They cannot be
+  measuring the machine's networking. Across hosts they track distance to the
+  endpoint: 2.09, 4.92 and 24.32 ms, the last two on identical 1 Gbit links.
+  Location is not in the comparability key and cannot be for a hardware
+  leaderboard. The five latency metrics are no longer anchored, so they are
+  measured and published but not scored, and no longer degrade a run. Network is
+  scored on throughput. `dbs/0.2.0-dev`.
 - **The Web anchors, as a group.** Measured 3-6x too low on three hosts, with
   `connections.tls` at 4.42x agreeing to within 0.13 across a decade of
   hardware. Calibration corrects most of it; `throughput.large` and
