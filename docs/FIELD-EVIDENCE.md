@@ -183,6 +183,155 @@ open.
 H3 is also the host whose `memory.bandwidth` tripped the variance bound. A
 minimum-passes floor is worth investigating.
 
+---
+
+## Corpus 2026-08b — the same three hosts, `deep` profile
+
+The same three machines, `deep` instead of `quick`, run as an ordinary user
+rather than root. All three completed, ~5 minutes each, and all three verified.
+
+The important structural difference: **all five required categories were
+measured**, so `total_is_standard` is true and
+`missing_required_categories` is empty. These are the first runs that produce
+a standard total. They are still not rankable, for reasons below that are
+about the suite rather than the hardware.
+
+| | H1 E-2274G | H2 E5-1620 v2 | H3 2×E5-2699 v3 |
+|---|---|---|---|
+| Total | 1185 | 649 | 1146 |
+| Compute | 474 | 340 | 716 |
+| Memory | 842 | 534 | 616 |
+| Storage | 1184 | 417 | 978 |
+| Network | 2666 | 1135 | 486 |
+| Web | 3951 | 2496 | 6400 |
+| single-core facet | 853 | 582 | 570 |
+| multi-core facet | 263 | 198 | 900 |
+| balance index | 0.34 | 0.46 | 0.46 |
+
+### What it disproved
+
+#### 5. `network.transfer` disqualified every run it completed
+
+All three hosts came back `Partial` with the same two reasons, and one of them
+was the module failing itself for succeeding.
+
+`download_bytes` deliberately sizes every transfer so the whole run fits
+*exactly* inside the 512 MiB ceiling — that is what stops a fast link pulling
+more from a third party than a slow one. The module then warned on
+`budget.exhausted()`, which is `spent() >= ceiling`, with the text "some
+measurements were cut short". Measured on all three hosts: `bytes_spent` equal
+to `ceiling_bytes` **to the byte**, all seven metrics present, nothing skipped.
+
+`ValidationFailed` degrades a module, a degraded module makes the run
+`Partial`, and `Partial` is not rankable. `network.transfer` is in both `deep`
+and `standard`, so **no profile could produce a rankable result at all** — the
+quick corpus could not see this because `Quick` omits the module.
+
+The warning now fires only when the ceiling actually stopped a shape from being
+measured, which each affected metric already reported by name. The volume that
+crossed the wire is disclosed in `context.transfer`, where it always belonged.
+
+Verified against the reproduced condition rather than the unit test alone: a
+`deep` run after the fix reported `bytes_spent` 536870912 against a
+`ceiling_bytes` of 536870912 — the same exact exhaustion — and the warning did
+not fire.
+
+That leaves `ttfb.mean` as the **only** thing between a `standard` or `deep`
+run and rankability, and it is marginal rather than reliable: the same machine
+produced a `standard` run with `network.transfer` completed and no warnings at
+all, then a `deep` run at exactly 30.0% against the 30% bound. Whether a run is
+rankable currently turns on whether one request to a public CDN stalled. See
+the open question below.
+
+#### 6. The agent created a scratch directory its own check refused
+
+`node.runtime` failed on H2 — a host with Node.js installed — with "the scratch
+directory `/home/ubuntu/.local/state/darcbench/scratch` is group-writable (mode
+775)".
+
+Nobody made it 775. `create_dir_all` applies the process umask, Ubuntu ships
+002 for a user with a private group, and the security check immediately below
+the creation refused what the creation had just produced. The check is right —
+whoever can write that directory chooses what the interpreter executes — so the
+fix is on the creation side: `DirBuilder` with an explicit `0700`, which the
+umask cannot loosen.
+
+A pre-existing scratch from an older agent is still refused rather than
+repaired. Tightening the mode would close the window from now on but says
+nothing about what was planted while it stood open, and an interpreter reads
+more from its working directory than the one script that function writes. The
+refusal now names the command that clears it.
+
+#### 7. The Web anchors are uniformly 3–6× too low
+
+With Web and Network measured for the first time, the anchor-coherence table
+extends to all five categories. Host medians are sane — 0.92×, 0.53× and 0.90×
+of DARC-REF-1, which is about right for a 2019 quad, a 2013 quad and a 2014
+dual-socket. The spread within each host is 171×, 73× and 136×.
+
+| metric | H1 | H2 | H3 | geo-mean |
+|---|---|---|---|---|
+| `cpu.mixed/crypto_sha256.multi` | 0.05 | 0.06 | 0.19 | **0.08** |
+| `cpu.mixed/crypto_sha256.single` | 0.17 | 0.22 | 0.12 | **0.16** |
+| `cpu.mixed/compress_deflate.multi` | 0.12 | 0.17 | 0.56 | **0.22** |
+| `cpu.mixed/compress_deflate.single` | 0.31 | 0.39 | 0.24 | **0.31** |
+| … 24 metrics between 0.39 and 2.3 … | | | | |
+| `web.static/requests.small_keepalive` | 1.80 | 1.95 | 8.67 | **3.13** |
+| `cpu.mixed/integer_sort.single` | 3.60 | 4.19 | 2.40 | **3.31** |
+| `web.static/connections.tls` | 4.32 | 4.35 | 4.58 | **4.42** |
+| `web.static/throughput.medium` | 2.91 | 3.17 | 12.60 | **4.88** |
+| `web.static/throughput.large` | 3.77 | 4.07 | 16.46 | **6.33** |
+
+`connections.tls` is the cleanest signal in the corpus: 4.32, 4.35, 4.58 on
+three unrelated machines. Agreement that tight across a decade of hardware is
+not three machines behaving alike, it is one anchor being about 4.4× too low.
+
+`throughput.large` and `throughput.medium` disagree between hosts as well as
+with the anchor — 3.77 and 16.46 — which is the loopback-memcpy shape already
+recorded under "known conditions" in the runbook. They need the metric looked
+at, not just the anchor moved.
+
+The whole Web module reading 3–6× high explains Web scoring 2496–6400 against a
+1000 reference on machines that are otherwise at 0.5–0.9× of it.
+
+**No anchor value is changed on this evidence either.** Three `deep` runs, one
+per machine class, is still not a calibration set. What this buys is a ranked
+list of which anchors to check first and what to expect.
+
+### What it left open
+
+**A tail dominates `ttfb.mean`, and the stability check is not robust to it.**
+All three hosts exceeded the 30% bound — 53%, 79%, 79%. The distributions are
+tight with one long-tailed exception: H3 ran 46–61 ms with a single 271 ms
+repetition out of eleven; H2 32–45 ms with a single 201 ms. The module's own
+MAD detector flags those samples, and the metric's reported *value* is the
+median, which is robust. Its *stability verdict* is a mean-based coefficient of
+variation, which is not — so one slow repetition out of eleven, on a public
+CDN, degrades the module. Whether a robust dispersion measure should judge a
+robustly-estimated metric is a decision that changes which runs are rankable
+and what `median_cv` feeds into `stability_multiplier`, so it is on the roadmap
+rather than changed here.
+
+**`web.static` loopback bounds.** Two of three hosts exceeded the module's 20%
+bound on a loopback HTTP measurement — `throughput.medium` at 23%,
+`connections.plaintext` at 26%. Same question as above, different subsystem.
+
+**Six of eleven modules need software the host may not have.** `php.runtime`,
+`node.runtime`, `database.oltp`, `database.cache`, `wordpress.site` and
+`deployment.container` all failed on all three hosts for want of PHP, Node or a
+container runtime. That is the modules being honest rather than a defect — but
+it means a `deep` run on a bare host measures five modules and reports six
+failures, and a failed module makes the run `Partial`. The runbook now lists
+the prerequisites.
+
+`standard` already answers most of this: it is `cpu.mixed`,
+`memory.bandwidth`, `storage.mixed`, `network.transfer` and `web.static` — the
+five required categories and nothing else — and it omits the interpreter
+modules deliberately, so that a machine without PHP is not told its missing PHP
+is a fault. It is the rankable profile for a bare server. What remains is that
+the calibration runbook asks for `deep`, which on an unprovisioned host reports
+six failures for software nobody promised.
+
 ### Reproducing this
 
 The analysis is arithmetic over the bundles and needs no special tooling: for

@@ -290,16 +290,46 @@ impl ScriptFile {
         name: &str,
         content: &str,
     ) -> Result<Self, ModuleError> {
-        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 
-        std::fs::create_dir_all(scratch).map_err(|error| {
-            ModuleError::Precondition(format!("scratch directory unusable: {error}"))
-        })?;
+        // Created `0700` explicitly, because `create_dir_all` applies the
+        // process umask and Ubuntu ships 002 for a user with a private group.
+        // That produced a 775 directory - group-writable - which the check
+        // immediately below then refused. The agent manufactured the condition
+        // and then declined to proceed because of it: on a `deep` run as a
+        // normal user, `node.runtime` failed on a host that had Node installed.
+        //
+        // The mode goes on the `DirBuilder` rather than a `chmod` afterwards so
+        // there is no window in which the directory exists and is writable by
+        // anyone else - the same reasoning that puts `.mode(0o600)` on the file
+        // below instead of a `set_permissions` call after it.
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(scratch)
+            .map_err(|error| {
+                ModuleError::Precondition(format!("scratch directory unusable: {error}"))
+            })?;
+
+        // `create_dir_all` is a no-op on a directory that already exists, so a
+        // scratch left behind by an older agent still carries whatever mode its
+        // umask gave it, and that is still refused below.
+        //
+        // Deliberately not repaired here. Tightening the mode would close the
+        // window from now on but says nothing about what was planted while the
+        // directory stood open, and an interpreter reads more from its working
+        // directory than the one script this function writes - a `package.json`
+        // or an include left behind earlier is still there afterwards. The
+        // refusal is the right answer; what it was missing is the one command
+        // that fixes it.
         if let Some(problem) = directory_is_writable_by_others(scratch) {
             return Err(ModuleError::Precondition(format!(
                 "the scratch directory `{}` {problem}. The workload script would be written \
                  there and then executed, so another user being able to replace it is another \
-                 user choosing what this agent runs. See docs/THREAT-MODEL.md, T-EXEC.",
+                 user choosing what this agent runs. See docs/THREAT-MODEL.md, T-EXEC. \
+                 A scratch this agent creates is `0700` whatever the umask, so this one predates \
+                 that: `rm -rf {}` is enough, and the next run recreates it correctly.",
+                scratch.display(),
                 scratch.display()
             )));
         }
@@ -888,6 +918,36 @@ mod tests {
             refusal.contains("writable") && refusal.contains("T-EXEC"),
             "the refusal must say why and point at the reasoning: {refusal}"
         );
+
+        // The agent must not create a directory its own check then refuses.
+        //
+        // Found in the field: a `deep` run as an ordinary user failed
+        // `node.runtime` on a host that had Node installed, with "the scratch
+        // directory `/home/ubuntu/.local/state/darcbench/scratch` is
+        // group-writable (mode 775)". Nobody set it to 775 - `create_dir_all`
+        // applies the process umask, Ubuntu ships 002 for a user with a private
+        // group, and the check refused what the creation had just produced.
+        //
+        // The umask is set here because that is the actual mechanism. Asserting
+        // `0700` alone would have passed against the broken code on any machine
+        // whose umask happened to be 022, which is every developer's.
+        //
+        // `umask` is process-wide and these tests run as threads in one
+        // process, so it is restored on the next line rather than at the end of
+        // the test. Nothing else here depends on it: every other directory in
+        // this file is either chmod-ed explicitly after creation or created by
+        // the function under test, which now sets its own mode.
+        let umask_dir = dir.join("umask");
+        let previous = rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o002));
+        let created = ScriptFile::write(&umask_dir, "probe.txt", "content");
+        rustix::process::umask(previous);
+        let created = created.expect("a scratch directory the agent creates must be usable");
+        let mode = std::fs::metadata(&umask_dir).unwrap().mode() & 0o777;
+        assert_eq!(
+            mode, 0o700,
+            "scratch must be created 0700 whatever the umask, got {mode:o}"
+        );
+        drop(created);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

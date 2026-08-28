@@ -812,6 +812,9 @@ impl BenchmarkModule for NetworkTransfer {
         }
 
         // --- download shapes ------------------------------------------------
+        // Whether the ceiling actually stopped work, as distinct from the
+        // ceiling being reached. See where this is read, below.
+        let mut curtailed = false;
         let per_stream = download_bytes(params);
         for (key, label, streams) in [
             ("download.single", "Download (1 stream)", 1usize),
@@ -821,6 +824,7 @@ impl BenchmarkModule for NetworkTransfer {
                 return Err(ModuleError::Cancelled);
             }
             if budget.exhausted() {
+                curtailed = true;
                 warnings.push(Warning {
                     code: WarningCode::ValidationFailed,
                     message: format!(
@@ -940,13 +944,36 @@ impl BenchmarkModule for NetworkTransfer {
             }
         }
 
-        if budget.exhausted() {
+        // Reaching the ceiling is the designed outcome, not a fault.
+        //
+        // `download_bytes` sizes every transfer so that the whole run fits
+        // *exactly* inside the ceiling - that is what the sizing comment above
+        // it promises, and what stops a fast link pulling more from a third
+        // party than a slow one. A run that finishes having spent its budget to
+        // the byte has therefore done precisely what it was built to do.
+        //
+        // This warned on `budget.exhausted()`, which is `spent() >= ceiling`,
+        // and said "some measurements were cut short". `ValidationFailed`
+        // degrades a module, a degraded module makes the run `Partial`, and
+        // `Partial` is not rankable - so the module disqualified every run it
+        // completed successfully. Measured on three hosts: `bytes_spent` equal
+        // to `ceiling_bytes` to the byte, all seven metrics present, nothing
+        // skipped, and all three unrankable.
+        //
+        // The real signal is reported where it happens and kept: a shape the
+        // ceiling actually stopped raises its own `ValidationFailed` naming the
+        // metric, and that is what `curtailed` records. The volume that crossed
+        // the wire is disclosed unconditionally in `context.transfer`, which is
+        // what the methodology asks for - a warning was never the right place
+        // for it.
+        if curtailed {
             let warning = Warning {
                 code: WarningCode::ValidationFailed,
                 message: format!(
-                    "The run reached its {} MiB transfer ceiling, so some measurements were cut \
-                     short. The ceiling is a hard bound on what this suite will pull from a \
-                     third party.",
+                    "The run reached its {} MiB transfer ceiling before every shape had been \
+                     measured, so the ones named above were skipped. The ceiling is a hard bound \
+                     on what this suite will pull from a third party, and it wins over \
+                     completeness.",
                     TRANSFER_CEILING_BYTES >> 20
                 ),
                 metric_key: None,
@@ -1230,6 +1257,63 @@ mod tests {
         assert_eq!(budget.reserve(1), 0);
         assert!(budget.exhausted());
         assert_eq!(budget.spent(), 1000);
+    }
+
+    /// Spending the whole budget is the design working, not a fault.
+    ///
+    /// Found in the field, on all three hosts of the first `deep` corpus:
+    /// `bytes_spent` equal to `ceiling_bytes` to the byte, all seven metrics
+    /// present, nothing skipped - and every run `Partial`, because the module
+    /// raised `ValidationFailed` saying "some measurements were cut short" on
+    /// `budget.exhausted()`. `ValidationFailed` degrades a module, a degraded
+    /// module makes the run `Partial`, and `Partial` is not rankable, so
+    /// `network.transfer` disqualified every run it completed. `deep` and
+    /// `standard` both contain it, so no profile could produce a rankable
+    /// result at all.
+    ///
+    /// The confusion is between two different facts that `exhausted()` cannot
+    /// tell apart: the budget is gone, and the budget ran out *before the work
+    /// was done*. `download_bytes` sizes every transfer so the whole run fits
+    /// exactly inside the ceiling - reaching it precisely is the intended
+    /// outcome of that arithmetic, which this pins.
+    #[test]
+    fn a_run_that_spends_its_whole_budget_has_not_been_cut_short() {
+        for profile in [
+            Profile::Quick,
+            Profile::Standard,
+            Profile::Deep,
+            Profile::Endurance,
+        ] {
+            let params = ModuleParams::for_profile(profile);
+            let reps = (params.warmup_reps + params.measured_reps).max(1) as u64;
+            let per_stream = download_bytes(&params);
+            let planned = reps * (1 + PARALLEL_STREAMS as u64) * per_stream;
+
+            let budget = Budget::new(TRANSFER_CEILING_BYTES);
+            let mut granted = 0u64;
+            let mut short = false;
+            for _ in 0..(reps * (1 + PARALLEL_STREAMS as u64)) {
+                let got = budget.reserve(per_stream);
+                if got < per_stream {
+                    short = true;
+                }
+                granted += got;
+            }
+
+            assert!(
+                !short,
+                "{profile:?} planned {planned} bytes and the ceiling trimmed a transfer, so a \
+                 shape really would be cut short"
+            );
+            assert_eq!(
+                granted, planned,
+                "{profile:?} must receive every byte its own sizing asked for"
+            );
+            assert!(
+                granted <= TRANSFER_CEILING_BYTES,
+                "{profile:?} overshot the ceiling"
+            );
+        }
     }
 
     /// Four streams reserve concurrently; the ceiling must still hold exactly.

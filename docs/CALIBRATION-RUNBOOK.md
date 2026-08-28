@@ -87,14 +87,38 @@ sudo systemctl stop unattended-upgrades apt-daily.timer apt-daily-upgrade.timer
 sudo systemctl disable --now man-db.timer 2>/dev/null || true
 ```
 
-`deep` needs a container runtime for the database and WordPress modules. Without
-it those modules report themselves *not measured*, which is honest but leaves
-four categories unanchored — so install it:
+### 2.1 What `deep` needs installed
+
+Six of the eleven modules measure software the machine already has, so a host
+without that software measures nothing for them. **This is the step that cost
+the most in practice**: the first `deep` corpus lost `php.runtime`,
+`node.runtime`, `database.oltp`, `database.cache`, `wordpress.site` and
+`deployment.container` on all three hosts — six of eleven modules — because
+none of it was installed. The runs were otherwise perfect.
 
 ```bash
+# PHP and Node are measured as the host has them: the module runs the
+# interpreter that is there, so the version is part of the result.
+sudo apt-get install -y php-cli nodejs
+
+# Databases, WordPress and the container module all need a runtime.
 sudo apt-get install -y docker.io
 sudo systemctl enable --now docker
 sudo docker info >/dev/null && echo "daemon reachable"
+
+# Confirm all three before starting a ten-run sequence rather than after it.
+php --version && node --version && docker info >/dev/null && echo "all present"
+```
+
+`node.runtime` also needs a scratch directory writable only by its owner,
+because it writes a script there and then executes it. The agent now creates
+one `0700` whatever the umask, but a scratch left behind by an agent older
+than that carries whatever `umask 002` gave it and is refused:
+
+```bash
+# Only if a run reports the scratch directory is group-writable. It is
+# recreated correctly on the next run.
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/darcbench/scratch"
 ```
 
 ---

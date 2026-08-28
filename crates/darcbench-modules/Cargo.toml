@@ -13,7 +13,13 @@ darcbench-protocol.workspace = true
 chrono.workspace = true
 # For `O_DIRECT` and `statvfs` through safe wrappers; the workspace forbids
 # `unsafe_code`, so raw libc calls are not an option.
-rustix = { version = "1", features = ["fs"] }
+#
+# `process` is for `umask` in one test, which sets it to reproduce the umask
+# that made `ScriptFile::write` create a directory its own check refused. A
+# feature rather than a dev-dependency because rustix is already a normal
+# dependency here and cargo would unify them anyway. Both are `linux_raw`
+# syscalls on x86_64, so neither reaches libc and the musl build is unaffected.
+rustix = { version = "1", features = ["fs", "process"] }
 rcgen.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true

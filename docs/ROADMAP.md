@@ -1206,3 +1206,22 @@ one moves scores, and none of them is answered by running the calibration.
   calibrator sized one metric at a single pass per repetition, which leaves no
   internal averaging - and that host is the one whose memory module tripped the
   variance bound.
+- **Robust stability judgement.** `ttfb.mean` reports a median and is judged by
+  a mean-based coefficient of variation. One slow repetition in eleven against
+  a public CDN - flagged as an outlier by the module's own MAD detector -
+  exceeded the bound on all three hosts and degraded the module. The same shape
+  appears on `web.static` over loopback. Changing it moves which runs are
+  rankable and what `median_cv` contributes to `stability_multiplier`.
+- **The Web anchors, as a group.** Measured 3-6x too low on three hosts, with
+  `connections.tls` at 4.42x agreeing to within 0.13 across a decade of
+  hardware. Calibration corrects most of it; `throughput.large` and
+  `throughput.medium` also disagree *between* hosts, which is the loopback
+  shape and needs the metric revisited rather than the anchor moved.
+- **A missing interpreter: failure or declared absence?** Six of eleven modules
+  measure software the host may not have, and a failed module makes the run
+  `Partial`. `standard` already answers most of this by excluding them - it is
+  the five required categories and nothing else, so it is the rankable profile
+  for a bare server. What is left is narrower: `deep` on an unprovisioned host
+  reports six failures for software nobody promised, and the calibration
+  runbook asks for `deep`. Either the runbook provisions the software (it now
+  says how) or `deep` distinguishes "absent" from "failed".
