@@ -421,7 +421,7 @@ impl DeploymentContainer {
         let context_bytes = write_context(context).map_err(|error| {
             ModuleError::Precondition(format!(
                 "could not generate the build context in {}: {error}",
-                context.display()
+                crate::runtime_exec::elide_home(context)
             ))
         })?;
 

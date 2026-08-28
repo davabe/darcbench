@@ -1,0 +1,5508 @@
+{
+  "meta": {
+    "schema": "darcbench.bundle/1",
+    "protocol": "darcbench.events/1",
+    "agent_version": "0.1.0",
+    "build_target": "x86_64-unknown-linux-musl",
+    "build_profile": "release",
+    "generated_at": "2026-08-28T13:44:44.500113684Z",
+    "agent_build_hash": "sha256:2e8308c5717b1f2ec8093318ecf9704574d2f5d88ad5a150e921aeb74e0e248a"
+  },
+  "run": {
+    "run_id": "run_74bbe75ac71300e484bfb5516d334761",
+    "profile": "deep",
+    "state": "completed",
+    "started_at": "2026-08-28T13:39:48.589246542Z",
+    "finished_at": "2026-08-28T13:44:44.500110160Z",
+    "duration_ms": 295979,
+    "modules": [
+      {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      },
+      {
+        "id": "network.transfer",
+        "version": "1.0.0"
+      },
+      {
+        "id": "web.static",
+        "version": "1.0.0"
+      },
+      {
+        "id": "php.runtime",
+        "version": "1.0.0"
+      },
+      {
+        "id": "node.runtime",
+        "version": "1.0.0"
+      },
+      {
+        "id": "database.oltp",
+        "version": "1.0.0"
+      },
+      {
+        "id": "database.cache",
+        "version": "1.0.0"
+      },
+      {
+        "id": "wordpress.site",
+        "version": "1.0.0"
+      },
+      {
+        "id": "deployment.container",
+        "version": "1.0.0"
+      }
+    ],
+    "environment_digest": "sha256:4a03e413a39c8d1353c9ac00d59d501bc8b747f61ab6f5ddebac6919b71658c4",
+    "events_digest": "sha256:bc4d0c4bdb931803b6039a785dd558b8aa828db8a0551d06d3cc5a44a67e5199",
+    "event_count": 951,
+    "guards_not_enforced": [
+      "The runtime load ceiling was suspended while the container-based modules ran. Their workload executes in a container this process did not fork, so its CPU cannot be told apart from a competing tenant's, and enforcing the ceiling would have degraded every such module on an idle machine. Nothing here reports on whether those measurements had the CPU to themselves."
+    ],
+    "comparability_not_recorded": [
+      "network.transfer/endpoint.host",
+      "network.transfer/endpoint.operator",
+      "network.transfer/network.address_family",
+      "web.static/web.connections",
+      "web.static/web.object_sizes"
+    ]
+  },
+  "environment": {
+    "schema": "darcbench.inventory/1",
+    "collected_at": "2026-08-28T13:39:48.593026425Z",
+    "platform": {
+      "os": "linux",
+      "distribution": "ubuntu",
+      "distribution_version": "26.04",
+      "kernel_release": "7.0.0-29-generic",
+      "architecture": "x86_64",
+      "scope": "bare_metal",
+      "virtualization": null,
+      "virtualization_evidence": [
+        "DMI identifies `supermicro\n` and no container or hypervisor marker was found"
+      ],
+      "container_runtime": null,
+      "cgroup_cpu_limit": null,
+      "cgroup_mem_limit_bytes": null,
+      "uptime_seconds": 643338,
+      "load1": 0.0,
+      "load5": 0.02,
+      "load15": 0.0,
+      "running_as_root": false,
+      "hostname": "[redacted]",
+      "dmi_vendor": "Supermicro",
+      "dmi_product": "X9SRE/X9SRE-3F/X9SRi/X9SRi-3F",
+      "cloud_hint": null,
+      "security_modules": [
+        "lockdown",
+        "capability",
+        "landlock",
+        "yama",
+        "apparmor",
+        "ima",
+        "evm"
+      ]
+    },
+    "cpu": {
+      "vendor": "GenuineIntel",
+      "model": "Intel(R) Xeon(R) CPU E5-1620 v2 @ 3.70GHz",
+      "family": "6",
+      "stepping": "4",
+      "microcode": "0x42e",
+      "logical_cpus": 8,
+      "physical_cores": 4,
+      "sockets": 1,
+      "numa_nodes": 1,
+      "smt_enabled": true,
+      "base_mhz": 3067.493,
+      "max_mhz": 3900.0,
+      "min_mhz": 1200.0,
+      "governor": "schedutil",
+      "scaling_driver": "intel_cpufreq",
+      "caches": [
+        {
+          "level": "L1d",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L1i",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L2",
+          "size_bytes": 262144,
+          "shared_by": 2
+        },
+        {
+          "level": "L3",
+          "size_bytes": 10485760,
+          "shared_by": 8
+        }
+      ],
+      "instruction_sets": [
+        "aes",
+        "avx",
+        "constant_tsc",
+        "nonstop_tsc",
+        "pclmulqdq",
+        "sse4_2"
+      ],
+      "mitigations": [
+        "spectre_v2: Mitigation: Retpolines; IBPB: conditional; IBRS_FW; STIBP: conditional; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected",
+        "itlb_multihit: KVM: Mitigation: Split huge pages",
+        "vmscape: Mitigation: IBPB before exit to userspace",
+        "mds: Mitigation: Clear CPU buffers; SMT vulnerable",
+        "l1tf: Mitigation: PTE Inversion; VMX: conditional cache flushes, SMT vulnerable",
+        "spec_store_bypass: Mitigation: Speculative Store Bypass disabled via prctl",
+        "spectre_v1: Mitigation: usercopy/swapgs barriers and __user pointer sanitization",
+        "meltdown: Mitigation: PTI"
+      ]
+    },
+    "memory": {
+      "total_bytes": 33601916928,
+      "available_bytes": 26903625728,
+      "free_bytes": 4548182016,
+      "buffers_bytes": 754352128,
+      "cached_bytes": 25239056384,
+      "swap_total_bytes": 536866816,
+      "swap_free_bytes": 536821760,
+      "hugepages_total": 0,
+      "swappiness": 60,
+      "psi_available": true
+    },
+    "storage": {
+      "devices": [
+        {
+          "name": "sda",
+          "model": "INTEL SSDSC2BB12",
+          "size_bytes": 120034123776,
+          "rotational": false,
+          "transport": "scsi",
+          "scheduler": "mq-deadline",
+          "queue_depth": 64,
+          "physical_block_size": 4096
+        }
+      ],
+      "mounts": [
+        {
+          "source": "tmpfs",
+          "target": "/run",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "size=3281440k",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/sda3",
+          "target": "/",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/dev/shm",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "inode64",
+            "usrquota"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/tmp",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "size=16407188k",
+            "nr_inodes=1048576",
+            "inode64",
+            "usrquota"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/sda2",
+          "target": "/boot",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/getty@tty1.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/user/1000",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "relatime",
+            "size=3281436k",
+            "nr_inodes=820359",
+            "mode=700",
+            "uid=1000",
+            "gid=1000",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-resolved.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-journald.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-networkd.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/systemd/nspawn/unix-export/ondatest",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=4096k",
+            "nr_inodes=64",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/systemd/nspawn/unix-export/ondafresh",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=4096k",
+            "nr_inodes=64",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        }
+      ],
+      "complex_stack": false,
+      "stack_indicators": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eno1",
+          "speed_mbps": 1000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "eno2",
+          "speed_mbps": null,
+          "mtu": 1500,
+          "operstate": "down",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "lo",
+          "speed_mbps": null,
+          "mtu": 65536,
+          "operstate": "unknown",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "ve-ondafresh",
+          "speed_mbps": 10000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "ve-ondatest",
+          "speed_mbps": 10000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        }
+      ],
+      "primary_interface": "eno1",
+      "ipv6_enabled": true
+    },
+    "software": {
+      "panels": [],
+      "web_servers": [],
+      "container_runtimes": [],
+      "databases": [
+        {
+          "name": "PostgreSQL",
+          "evidence": "path exists: /etc/postgresql"
+        }
+      ],
+      "runtimes": [
+        {
+          "name": "Node.js",
+          "evidence": "path exists: /usr/bin/node"
+        },
+        {
+          "name": "Python 3",
+          "evidence": "path exists: /usr/bin/python3"
+        }
+      ],
+      "firewalls": [
+        {
+          "name": "ufw",
+          "evidence": "path exists: /etc/ufw/ufw.conf"
+        },
+        {
+          "name": "nftables",
+          "evidence": "path exists: /etc/nftables.conf"
+        }
+      ],
+      "listening_tcp_ports": [
+        22,
+        53,
+        5432
+      ],
+      "production_likelihood": "unlikely",
+      "production_signals": []
+    },
+    "gaps": []
+  },
+  "modules": [
+    {
+      "module": {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:39:48.593320644Z",
+      "finished_at": "2026-08-28T13:41:00.564743827Z",
+      "duration_ms": 71971.422997,
+      "metrics": [
+        {
+          "key": "crypto_sha256.single",
+          "label": "SHA-256 hashing (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 217.60869710070847,
+          "summary": {
+            "n": 11,
+            "min": 216.82250837992896,
+            "max": 217.66436271357227,
+            "mean": 217.48903798467964,
+            "median": 217.60869710070847,
+            "stddev": 0.2979696209225849,
+            "cv": 0.001370044318939764,
+            "ci95": [
+              217.55630731913726,
+              217.65485774324367
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 217.49602334197934,
+              "duration_ms": 496.560803,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 217.71235996206806,
+              "duration_ms": 496.06738,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 217.49289822251876,
+              "duration_ms": 496.56793799999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 217.66436271357227,
+              "duration_ms": 496.176768,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 216.82250837992896,
+              "duration_ms": 498.103268,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 217.5954713579192,
+              "duration_ms": 496.33385899999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 216.9648378607403,
+              "duration_ms": 497.77651099999997,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 217.6364480628179,
+              "duration_ms": 496.240409,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 217.55630731913726,
+              "duration_ms": 496.423208,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 217.65591707556237,
+              "duration_ms": 496.196021,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 217.60869710070847,
+              "duration_ms": 496.303693,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 217.6379383358812,
+              "duration_ms": 496.237011,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 217.58207188196454,
+              "duration_ms": 496.364425,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 217.65485774324367,
+              "duration_ms": 496.198436,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1,
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "crypto_sha256.multi",
+          "label": "SHA-256 hashing (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 758.0653353286688,
+          "summary": {
+            "n": 11,
+            "min": 749.2679398154432,
+            "max": 761.2035862009604,
+            "mean": 757.7397919664213,
+            "median": 758.0653353286688,
+            "stddev": 3.2996738672141057,
+            "cv": 0.00435462661747125,
+            "ci95": [
+              756.3520527368561,
+              759.80818092824
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 759.3062834818353,
+              "duration_ms": 495.18884299999996,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 757.7240505478843,
+              "duration_ms": 496.222866,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 759.1798446877547,
+              "duration_ms": 495.271315,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 758.0563104751393,
+              "duration_ms": 496.005369,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 756.3520527368561,
+              "duration_ms": 497.122998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 755.7058910047805,
+              "duration_ms": 497.54806,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 758.8633268782186,
+              "duration_ms": 495.47789,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 759.4632821277065,
+              "duration_ms": 495.086476,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 761.2035862009604,
+              "duration_ms": 493.954583,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 759.80818092824,
+              "duration_ms": 494.861742,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 760.9371212642915,
+              "duration_ms": 494.127556,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 758.0653353286688,
+              "duration_ms": 495.999464,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 749.2679398154432,
+              "duration_ms": 501.82315300000005,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 757.4146848703282,
+              "duration_ms": 496.425548,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.single",
+          "label": "DEFLATE compression (level 6) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 17.82751935636285,
+          "summary": {
+            "n": 11,
+            "min": 17.292054105546157,
+            "max": 17.8608407953892,
+            "mean": 17.752494988966934,
+            "median": 17.82751935636285,
+            "stddev": 0.17183127604094942,
+            "cv": 0.009679274724355168,
+            "ci95": [
+              17.748182293781113,
+              17.855789218264977
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 17.684829631867377,
+              "duration_ms": 508.91075500000005,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 17.677137651719654,
+              "duration_ms": 509.132201,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 17.629872601486685,
+              "duration_ms": 510.49716599999994,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 17.586080056443972,
+              "duration_ms": 511.768397,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 17.292054105546157,
+              "duration_ms": 520.470266,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 17.748182293781113,
+              "duration_ms": 507.094183,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 17.855789218264977,
+              "duration_ms": 504.038208,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 17.790338055146684,
+              "duration_ms": 505.89257899999996,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 17.83720920959053,
+              "duration_ms": 504.56323599999996,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 17.788493742096843,
+              "duration_ms": 505.94503000000003,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 17.832988604821335,
+              "duration_ms": 504.682653,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 17.8608407953892,
+              "duration_ms": 503.895651,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 17.857949441192616,
+              "duration_ms": 503.977236,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 17.82751935636285,
+              "duration_ms": 504.83748299999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            1
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.multi",
+          "label": "DEFLATE compression (level 6) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 92.48223937357588,
+          "summary": {
+            "n": 11,
+            "min": 90.04935931813154,
+            "max": 95.06446527363214,
+            "mean": 92.51582459513007,
+            "median": 92.48223937357588,
+            "stddev": 1.3512511168909687,
+            "cv": 0.014605621501017211,
+            "ci95": [
+              91.46407917784663,
+              93.36870772814427
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 93.71272850772614,
+              "duration_ms": 512.2036330000001,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 94.91722567342794,
+              "duration_ms": 505.703782,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 93.56771091045572,
+              "duration_ms": 512.997481,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 93.8308488377636,
+              "duration_ms": 511.55883800000004,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 91.19478205343837,
+              "duration_ms": 526.345904,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 92.48223937357588,
+              "duration_ms": 519.018574,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 90.04935931813154,
+              "duration_ms": 533.0409940000001,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 92.86741708905348,
+              "duration_ms": 516.865888,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 92.39118302163261,
+              "duration_ms": 519.5300940000001,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 93.36870772814427,
+              "duration_ms": 514.090868,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 91.46407917784663,
+              "duration_ms": 524.7961869999999,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 92.8188566395723,
+              "duration_ms": 517.136299,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 95.06446527363214,
+              "duration_ms": 504.920528,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 92.14213203363988,
+              "duration_ms": 520.934332,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.single",
+          "label": "JSON serialise + parse (single)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 8313.790955453813,
+          "summary": {
+            "n": 11,
+            "min": 6998.596072951821,
+            "max": 8327.425011359574,
+            "mean": 8171.184352205434,
+            "median": 8313.790955453813,
+            "stddev": 394.07045340878,
+            "cv": 0.04822684649164951,
+            "ci95": [
+              8224.014324271619,
+              8321.25803274334
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 7565.235879745136,
+              "duration_ms": 447.837986,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 7191.234447262766,
+              "duration_ms": 471.129126,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 6813.121688681841,
+              "duration_ms": 497.275721,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 6998.596072951821,
+              "duration_ms": 484.097091,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 8224.014324271619,
+              "duration_ms": 411.964263,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8311.921548649745,
+              "duration_ms": 407.607312,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 8327.425011359574,
+              "duration_ms": 406.848455,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 8309.885479746381,
+              "duration_ms": 407.707183,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 8316.094680249951,
+              "duration_ms": 407.402769,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 8321.701230042989,
+              "duration_ms": 407.128291,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 8117.714722419681,
+              "duration_ms": 417.35884,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 8321.25803274334,
+              "duration_ms": 407.149975,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 8313.790955453813,
+              "duration_ms": 407.51565899999997,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 8320.625816370846,
+              "duration_ms": 407.180911,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            1,
+            7
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.multi",
+          "label": "JSON serialise + parse (multi)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 33634.63347526148,
+          "summary": {
+            "n": 11,
+            "min": 32877.994794672166,
+            "max": 34033.57063709964,
+            "mean": 33527.51709140323,
+            "median": 33634.63347526148,
+            "stddev": 344.4497261085423,
+            "cv": 0.01027364254768697,
+            "ci95": [
+              33242.79962939718,
+              33791.940073458034
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 34146.26755825562,
+              "duration_ms": 486.846768,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 33539.681665124466,
+              "duration_ms": 495.651693,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 33824.11622741132,
+              "duration_ms": 491.483647,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 33791.940073458034,
+              "duration_ms": 491.95162999999997,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 33751.54366767878,
+              "duration_ms": 492.540435,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 34033.57063709964,
+              "duration_ms": 488.458886,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 33504.738569492336,
+              "duration_ms": 496.16862299999997,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 33634.63347526148,
+              "duration_ms": 494.25245,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 33808.222876072476,
+              "duration_ms": 491.714695,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 33704.74452001332,
+              "duration_ms": 493.224329,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 33268.63700129282,
+              "duration_ms": 499.689843,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 33242.79962939718,
+              "duration_ms": 500.07821799999994,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 32877.994794672166,
+              "duration_ms": 505.626943,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 33183.86276099735,
+              "duration_ms": 500.96639200000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.single",
+          "label": "Integer sort (single)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 53.37645789418427,
+          "summary": {
+            "n": 11,
+            "min": 53.21110289111993,
+            "max": 53.418385643040565,
+            "mean": 53.32671057380723,
+            "median": 53.37645789418427,
+            "stddev": 0.08232080416996812,
+            "cv": 0.0015437067706629193,
+            "ci95": [
+              53.246049039721726,
+              53.39910541636695
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 53.457118275772885,
+              "duration_ms": 495.285658,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 53.47001395836368,
+              "duration_ms": 495.16620700000004,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 53.45398897375241,
+              "duration_ms": 495.314653,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 53.39910541636695,
+              "duration_ms": 495.823737,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 53.213936330218374,
+              "duration_ms": 497.54906,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 53.268025077345044,
+              "duration_ms": 497.043845,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 53.21110289111993,
+              "duration_ms": 497.57555399999995,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 53.37645789418427,
+              "duration_ms": 496.03411400000005,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 53.389525696420804,
+              "duration_ms": 495.912703,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 53.40045274932832,
+              "duration_ms": 495.81122700000003,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 53.39052102354971,
+              "duration_ms": 495.903458,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 53.418385643040565,
+              "duration_ms": 495.64478,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 53.28025455058379,
+              "duration_ms": 496.929758,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 53.246049039721726,
+              "duration_ms": 497.248988,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.multi",
+          "label": "Integer sort (multi)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 207.4663700475409,
+          "summary": {
+            "n": 11,
+            "min": 197.75726582438824,
+            "max": 210.61587323913102,
+            "mean": 205.41797947200232,
+            "median": 207.4663700475409,
+            "stddev": 4.341036428030351,
+            "cv": 0.021132699480290708,
+            "ci95": [
+              201.2430865665883,
+              209.11262994396324
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 212.2435334808937,
+              "duration_ms": 464.401164,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 205.81486983889573,
+              "duration_ms": 478.906816,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 208.52787775815193,
+              "duration_ms": 472.67609999999996,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 205.0552820668527,
+              "duration_ms": 480.680834,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 209.11262994396324,
+              "duration_ms": 471.354332,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 210.61587323913102,
+              "duration_ms": 467.99010200000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 199.16897560436396,
+              "duration_ms": 494.887036,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 208.14685463681684,
+              "duration_ms": 473.541357,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 201.2430865665883,
+              "duration_ms": 489.78648499999997,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 209.24937216416814,
+              "duration_ms": 471.046307,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 197.75726582438824,
+              "duration_ms": 498.41983600000003,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 207.4663700475409,
+              "duration_ms": 475.094561,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 204.2013905479908,
+              "duration_ms": 482.690856,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 207.58067355022152,
+              "duration_ms": 474.832952,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.single",
+          "label": "Double-precision matrix multiply (single)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 6832.180820490429,
+          "summary": {
+            "n": 11,
+            "min": 6806.2988078913295,
+            "max": 6840.664834381693,
+            "mean": 6827.127583061679,
+            "median": 6832.180820490429,
+            "stddev": 12.53011894959296,
+            "cv": 0.0018353427260800845,
+            "ci95": [
+              6810.097427193613,
+              6835.833668028266
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 6831.4802812165635,
+              "duration_ms": 499.155236,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 6821.6178681785605,
+              "duration_ms": 499.876894,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 6831.082942577498,
+              "duration_ms": 499.18426999999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 6832.180820490429,
+              "duration_ms": 499.104055,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6835.2668547198555,
+              "duration_ms": 498.878716,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 6826.565328824263,
+              "duration_ms": 499.514615,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 6832.010001095256,
+              "duration_ms": 499.116534,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 6810.097427193613,
+              "duration_ms": 500.72252100000003,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 6832.765249219403,
+              "duration_ms": 499.06136499999997,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 6809.024676685764,
+              "duration_ms": 500.80140900000004,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 6840.664834381693,
+              "duration_ms": 498.48505,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 6837.695745148585,
+              "duration_ms": 498.701504,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 6835.833668028266,
+              "duration_ms": 498.83735,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 6806.2988078913295,
+              "duration_ms": 501.00197599999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.multi",
+          "label": "Double-precision matrix multiply (multi)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 30215.592254394196,
+          "summary": {
+            "n": 11,
+            "min": 29635.575172352786,
+            "max": 30289.494270693747,
+            "mean": 30149.44689324064,
+            "median": 30215.592254394196,
+            "stddev": 186.49306704848775,
+            "cv": 0.00618562150439644,
+            "ci95": [
+              30129.23352423492,
+              30254.34037744864
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 30052.490361963977,
+              "duration_ms": 497.971266,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 30219.621063337097,
+              "duration_ms": 495.217218,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 29897.87968536888,
+              "duration_ms": 500.546421,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 30187.999197322697,
+              "duration_ms": 495.735957,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 29635.575172352786,
+              "duration_ms": 504.97675799999996,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 30010.674281642063,
+              "duration_ms": 498.665126,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 30289.494270693747,
+              "duration_ms": 494.074828,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 30228.143614077013,
+              "duration_ms": 495.077596,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 30129.23352423492,
+              "duration_ms": 496.70286699999997,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 30204.770250375983,
+              "duration_ms": 495.46070199999997,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 30229.270103759947,
+              "duration_ms": 495.059147,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 30215.592254394196,
+              "duration_ms": 495.283248,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 30258.82277934509,
+              "duration_ms": 494.575641,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 30254.34037744864,
+              "duration_ms": 494.648916,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1,
+            2
+          ],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "compress_deflate.multi.iterations": 12,
+          "compress_deflate.single.iterations": 18,
+          "crypto_sha256.multi.iterations": 47,
+          "crypto_sha256.single.iterations": 108,
+          "float_matmul.multi.iterations": 446,
+          "float_matmul.single.iterations": 813,
+          "integer_sort.multi.iterations": 47,
+          "integer_sort.single.iterations": 101,
+          "json_roundtrip.multi.iterations": 2078,
+          "json_roundtrip.single.iterations": 3388
+        },
+        "scaling_efficiency": 0.5256565749307031,
+        "shape_single_threads": 1,
+        "threads": 8,
+        "workload_version": "1.0.1"
+      }
+    },
+    {
+      "module": {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:41:00.565096670Z",
+      "finished_at": "2026-08-28T13:42:37.063178523Z",
+      "duration_ms": 96498.08138100001,
+      "metrics": [
+        {
+          "key": "sequential_read.single",
+          "label": "Sequential read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 16430.785885745154,
+          "summary": {
+            "n": 11,
+            "min": 16407.32973800818,
+            "max": 16466.81653494759,
+            "mean": 16433.998055299893,
+            "median": 16430.785885745154,
+            "stddev": 20.0932127707217,
+            "cv": 0.0012226612600968227,
+            "ci95": [
+              16416.42686165259,
+              16456.817018556885
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 16447.38939919565,
+              "duration_ms": 500.991361,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 16463.051255806047,
+              "duration_ms": 500.514751,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 16422.517150035656,
+              "duration_ms": 501.750123,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 16407.32973800818,
+              "duration_ms": 502.214567,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 16425.74389537876,
+              "duration_ms": 501.65155699999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 16416.42686165259,
+              "duration_ms": 501.936266,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 16439.4702287349,
+              "duration_ms": 501.232697,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 16456.817018556885,
+              "duration_ms": 500.704358,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 16427.19019749689,
+              "duration_ms": 501.60739,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 16466.81653494759,
+              "duration_ms": 500.400304,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 16430.785885745154,
+              "duration_ms": 501.497619,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 16432.62333372327,
+              "duration_ms": 501.44154299999997,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 16410.295857061687,
+              "duration_ms": 502.123793,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 16460.4790569929,
+              "duration_ms": 500.592964,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_read.multi",
+          "label": "Sequential read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 22724.60655044305,
+          "summary": {
+            "n": 11,
+            "min": 22696.473199025462,
+            "max": 22746.671883076564,
+            "mean": 22721.59653541537,
+            "median": 22724.60655044305,
+            "stddev": 18.803054770052402,
+            "cv": 0.0008275410902902323,
+            "ci95": [
+              22699.774909151893,
+              22741.597740857687
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 22680.96438190737,
+              "duration_ms": 500.860537,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 22710.263837369755,
+              "duration_ms": 500.21435599999995,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 22732.272471939425,
+              "duration_ms": 499.730065,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 22746.671883076564,
+              "duration_ms": 499.41371899999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 22744.0884915623,
+              "duration_ms": 499.470445,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 22697.550851145366,
+              "duration_ms": 500.49452800000006,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 22724.73610770168,
+              "duration_ms": 499.895794,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 22724.60655044305,
+              "duration_ms": 499.898644,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 22741.597740857687,
+              "duration_ms": 499.525149,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 22709.8099720067,
+              "duration_ms": 500.224353,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 22733.755149488217,
+              "duration_ms": 499.697473,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 22696.473199025462,
+              "duration_ms": 500.518292,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 22718.497035110147,
+              "duration_ms": 500.033078,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 22699.774909151893,
+              "duration_ms": 500.445491,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.single",
+          "label": "Sequential write (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 8320.6875384113,
+          "summary": {
+            "n": 11,
+            "min": 8295.267924132771,
+            "max": 8331.705846753748,
+            "mean": 8317.573385091619,
+            "median": 8320.6875384113,
+            "stddev": 11.841595232633285,
+            "cv": 0.0014236838900463574,
+            "ci95": [
+              8305.028757200202,
+              8328.97825542635
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 8324.358867385012,
+              "duration_ms": 499.738186,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 8318.703463515583,
+              "duration_ms": 500.07792900000004,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 8323.830643509804,
+              "duration_ms": 499.769899,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 8329.082598042522,
+              "duration_ms": 499.454766,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 8320.6875384113,
+              "duration_ms": 499.958685,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8323.952762152352,
+              "duration_ms": 499.762567,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 8305.028757200202,
+              "duration_ms": 500.90133599999996,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 8295.267924132771,
+              "duration_ms": 501.490734,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 8317.436865385815,
+              "duration_ms": 500.154082,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 8328.97825542635,
+              "duration_ms": 499.461023,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 8323.321721172417,
+              "duration_ms": 499.800457,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 8331.705846753748,
+              "duration_ms": 499.297512,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 8303.826388228856,
+              "duration_ms": 500.973865,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 8314.018579101488,
+              "duration_ms": 500.359719,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.multi",
+          "label": "Sequential write (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 9592.067060687958,
+          "summary": {
+            "n": 11,
+            "min": 9545.291816094601,
+            "max": 9621.902276317905,
+            "mean": 9587.432816676293,
+            "median": 9592.067060687958,
+            "stddev": 24.77812101947858,
+            "cv": 0.0025844375124464748,
+            "ci95": [
+              9567.27519789547,
+              9606.999663183838
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 9593.5305551056,
+              "duration_ms": 496.167701,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 9581.533007397895,
+              "duration_ms": 496.78897900000004,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 9604.564211593497,
+              "duration_ms": 495.597707,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 9573.485897745424,
+              "duration_ms": 497.20656099999997,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 9560.918109818462,
+              "duration_ms": 497.860137,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 9606.999663183838,
+              "duration_ms": 495.47206900000003,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 9592.067060687958,
+              "duration_ms": 496.243403,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 9599.012911723014,
+              "duration_ms": 495.884321,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 9567.27519789547,
+              "duration_ms": 497.529328,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 9545.291816094601,
+              "duration_ms": 498.675168,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 9575.236609980575,
+              "duration_ms": 497.115653,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 9619.408117818512,
+              "duration_ms": 494.83294,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 9600.163322173466,
+              "duration_ms": 495.824898,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 9621.902276317905,
+              "duration_ms": 494.70467099999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.single",
+          "label": "Sequential copy (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11532.596871040689,
+          "summary": {
+            "n": 11,
+            "min": 11513.190822630917,
+            "max": 11551.224415048151,
+            "mean": 11531.849122053085,
+            "median": 11532.596871040689,
+            "stddev": 9.892159150778543,
+            "cv": 0.0008578120513093724,
+            "ci95": [
+              11527.654870050528,
+              11533.817929096504
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11528.100334981378,
+              "duration_ms": 499.64867000000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11524.023981741993,
+              "duration_ms": 499.825409,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 11518.302478653906,
+              "duration_ms": 500.07368799999995,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 11532.930929751194,
+              "duration_ms": 499.439391,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 11532.596871040689,
+              "duration_ms": 499.45385799999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11527.654870050528,
+              "duration_ms": 499.667978,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 11533.817929096504,
+              "duration_ms": 499.400982,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 11521.488829829568,
+              "duration_ms": 499.935389,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 11533.611368389182,
+              "duration_ms": 499.409926,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11513.190822630917,
+              "duration_ms": 500.295712,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 11530.898567151527,
+              "duration_ms": 499.52741899999995,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 11530.221933771834,
+              "duration_ms": 499.55673299999995,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 11542.703805823827,
+              "duration_ms": 499.01653,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 11551.224415048151,
+              "duration_ms": 498.648437,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            6,
+            10
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.multi",
+          "label": "Sequential copy (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 13670.676972340943,
+          "summary": {
+            "n": 11,
+            "min": 13602.964574738517,
+            "max": 13688.375901615816,
+            "mean": 13664.304085190344,
+            "median": 13670.676972340943,
+            "stddev": 22.294562030719316,
+            "cv": 0.0016315914730617438,
+            "ci95": [
+              13658.993410129291,
+              13675.714438504048
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 13679.521868102545,
+              "duration_ms": 502.94155500000005,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 13631.122453569866,
+              "duration_ms": 504.727327,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 13677.189785824572,
+              "duration_ms": 503.027311,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 13602.964574738517,
+              "duration_ms": 505.77210299999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 13688.375901615816,
+              "duration_ms": 502.616238,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 13656.347503070841,
+              "duration_ms": 503.79503000000005,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 13678.470679221917,
+              "duration_ms": 502.98020600000007,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 13668.647046342357,
+              "duration_ms": 503.34169699999995,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 13675.714438504048,
+              "duration_ms": 503.081578,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 13670.676972340943,
+              "duration_ms": 503.266957,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 13672.959362684922,
+              "duration_ms": 503.18294799999995,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 13672.393400974017,
+              "duration_ms": 503.20377699999995,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 13658.993410129291,
+              "duration_ms": 503.697439,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 13661.8016474711,
+              "duration_ms": 503.59390199999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.single",
+          "label": "Triad (a = b + k*c) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11879.137379808373,
+          "summary": {
+            "n": 11,
+            "min": 11845.019434064161,
+            "max": 11892.25875200377,
+            "mean": 11874.420736146527,
+            "median": 11879.137379808373,
+            "stddev": 15.61285229482165,
+            "cv": 0.001314830646626415,
+            "ci95": [
+              11872.48530496488,
+              11885.078799379799
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11875.635941541714,
+              "duration_ms": 505.2361010000001,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11890.25322432505,
+              "duration_ms": 504.61498900000004,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 11878.71943864593,
+              "duration_ms": 505.10495099999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 11845.59555230107,
+              "duration_ms": 506.51737799999995,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 11879.137379808373,
+              "duration_ms": 505.08718,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11885.078799379799,
+              "duration_ms": 504.834684,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 11872.733979886543,
+              "duration_ms": 505.359592,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 11887.727899260066,
+              "duration_ms": 504.72218499999997,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 11875.82739384279,
+              "duration_ms": 505.227956,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11883.067737758067,
+              "duration_ms": 504.92012100000005,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 11879.69586434227,
+              "duration_ms": 505.06343499999997,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 11845.019434064161,
+              "duration_ms": 506.542014,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 11892.25875200377,
+              "duration_ms": 504.52989,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 11872.48530496488,
+              "duration_ms": 505.37017699999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            8
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.multi",
+          "label": "Triad (a = b + k*c) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 15417.977175487571,
+          "summary": {
+            "n": 11,
+            "min": 15401.732750685516,
+            "max": 15431.285099279254,
+            "mean": 15417.574499414271,
+            "median": 15417.977175487571,
+            "stddev": 8.381222840713633,
+            "cv": 0.0005436148754158472,
+            "ci95": [
+              15412.255993735047,
+              15422.583579513814
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 15434.536029225326,
+              "duration_ms": 497.585414,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 15403.796443739957,
+              "duration_ms": 498.57838799999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 15408.706891667147,
+              "duration_ms": 498.41950099999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 15409.486734535678,
+              "duration_ms": 498.394277,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 15427.204481834311,
+              "duration_ms": 497.821884,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 15417.977175487571,
+              "duration_ms": 498.119819,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 15431.285099279254,
+              "duration_ms": 497.69024099999996,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 15416.718662962912,
+              "duration_ms": 498.160482,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 15412.302418873567,
+              "duration_ms": 498.303225,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 15420.062871933222,
+              "duration_ms": 498.052444,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 15421.709724716096,
+              "duration_ms": 497.999258,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 15422.583579513814,
+              "duration_ms": 497.971041,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 15401.732750685516,
+              "duration_ms": 498.645193,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 15412.255993735047,
+              "duration_ms": 498.30472599999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.single",
+          "label": "Random read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 763.5587800252572,
+          "summary": {
+            "n": 11,
+            "min": 760.544654547546,
+            "max": 764.1788854890358,
+            "mean": 763.1400223286672,
+            "median": 763.5587800252572,
+            "stddev": 1.0717253053365507,
+            "cv": 0.0014043625992334378,
+            "ci95": [
+              762.815613148253,
+              764.0369416063471
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 760.5576737424796,
+              "duration_ms": 525.9298719999999,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 763.4981388921648,
+              "duration_ms": 523.904355,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 761.177832724922,
+              "duration_ms": 525.5013779999999,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 762.9809385254184,
+              "duration_ms": 524.259493,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 763.5587800252572,
+              "duration_ms": 523.862747,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 762.9176942667344,
+              "duration_ms": 524.302953,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 762.815613148253,
+              "duration_ms": 524.373116,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 760.544654547546,
+              "duration_ms": 525.938875,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 764.1788854890358,
+              "duration_ms": 523.43765,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 763.5883462162172,
+              "duration_ms": 523.8424630000001,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 764.0369416063471,
+              "duration_ms": 523.5348949999999,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 763.6377060420293,
+              "duration_ms": 523.808603,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 764.155797497682,
+              "duration_ms": 523.453465,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 762.1248882508183,
+              "duration_ms": 524.8483630000001,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.multi",
+          "label": "Random read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 2467.676468136304,
+          "summary": {
+            "n": 11,
+            "min": 2460.5953123024083,
+            "max": 2473.5715585550493,
+            "mean": 2467.7489682374367,
+            "median": 2467.676468136304,
+            "stddev": 4.770472534996269,
+            "cv": 0.0019331271520715207,
+            "ci95": [
+              2462.0927953164446,
+              2472.119441918159
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 2462.2099080132875,
+              "duration_ms": 503.612627,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 2467.573237021456,
+              "duration_ms": 502.518013,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 2466.694428251513,
+              "duration_ms": 502.697045,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 2462.0927953164446,
+              "duration_ms": 503.63658200000003,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 2467.676468136304,
+              "duration_ms": 502.496991,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 2466.4703446444364,
+              "duration_ms": 502.742716,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 2460.5953123024083,
+              "duration_ms": 503.943088,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 2471.998758019979,
+              "duration_ms": 501.61837499999996,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 2466.4768108076114,
+              "duration_ms": 502.74139799999995,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 2473.5715585550493,
+              "duration_ms": 501.29942500000004,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 2470.3432503695913,
+              "duration_ms": 501.95453599999996,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 2472.119441918159,
+              "duration_ms": 501.59388699999994,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 2461.3761646239523,
+              "duration_ms": 503.783216,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 2472.517745917871,
+              "duration_ms": 501.51308400000005,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.single",
+          "label": "Cache-resident read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 46314.19459235957,
+          "summary": {
+            "n": 11,
+            "min": 46133.31614248008,
+            "max": 46364.939688062506,
+            "mean": 46282.55011765728,
+            "median": 46314.19459235957,
+            "stddev": 79.2745300939961,
+            "cv": 0.0017128384216614728,
+            "ci95": [
+              46241.955663480316,
+              46346.71959645941
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 46296.42685892879,
+              "duration_ms": 500.327489,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 46330.986042053824,
+              "duration_ms": 499.95428499999997,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 46320.43522770628,
+              "duration_ms": 500.06816399999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 46257.00054909603,
+              "duration_ms": 500.753934,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 46346.71959645941,
+              "duration_ms": 499.784563,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 46356.55624582183,
+              "duration_ms": 499.678511,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 46316.06090156877,
+              "duration_ms": 500.115393,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 46291.82346727947,
+              "duration_ms": 500.37724299999996,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 46241.955663480316,
+              "duration_ms": 500.91685500000006,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 46133.31614248008,
+              "duration_ms": 502.096466,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 46333.601164269756,
+              "duration_ms": 499.926067,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 46314.19459235957,
+              "duration_ms": 500.135546,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 46364.939688062506,
+              "duration_ms": 499.588162,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 46151.88328335238,
+              "duration_ms": 501.89446999999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.multi",
+          "label": "Cache-resident read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 169314.33089258906,
+          "summary": {
+            "n": 11,
+            "min": 168452.9749637796,
+            "max": 172422.9803198741,
+            "mean": 170017.8464042814,
+            "median": 169314.33089258906,
+            "stddev": 1666.0622534572524,
+            "cv": 0.009799337473641223,
+            "ci95": [
+              168558.52168827644,
+              171953.40242879462
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 169237.54757034717,
+              "duration_ms": 489.164498,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 170659.07899311848,
+              "duration_ms": 485.089926,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 169070.04927395814,
+              "duration_ms": 489.64911500000005,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 172199.87639549657,
+              "duration_ms": 480.749474,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 168627.50364509682,
+              "duration_ms": 490.934149,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 171602.13988832323,
+              "duration_ms": 482.424054,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 171953.40242879462,
+              "duration_ms": 481.438569,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 168452.9749637796,
+              "duration_ms": 491.44279,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 169802.85124923795,
+              "duration_ms": 487.535983,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 169314.33089258906,
+              "duration_ms": 488.94266400000004,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 168464.65916797303,
+              "duration_ms": 491.408705,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 172422.9803198741,
+              "duration_ms": 480.127416,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 168558.52168827644,
+              "duration_ms": 491.135062,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 168797.06980765378,
+              "duration_ms": 490.44097800000003,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_random.single",
+          "label": "Random access latency (single)",
+          "unit": "ns",
+          "direction": "lower_is_better",
+          "value": 66.11277931614926,
+          "summary": {
+            "n": 11,
+            "min": 65.89999536882367,
+            "max": 66.45766730057566,
+            "mean": 66.12334877756415,
+            "median": 66.11277931614926,
+            "stddev": 0.1562448498949409,
+            "cv": 0.0023629300811811764,
+            "ci95": [
+              66.01186585008053,
+              66.2404082448859
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 66.08781312641345,
+              "duration_ms": 493.748925,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 66.35737128006785,
+              "duration_ms": 495.76282199999997,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 65.8606928775185,
+              "duration_ms": 492.052086,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 66.45766730057566,
+              "duration_ms": 496.512144,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 66.01792947869552,
+              "duration_ms": 493.226817,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 65.89999536882367,
+              "duration_ms": 492.34571900000003,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 66.11901400382058,
+              "duration_ms": 493.98203,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 66.27229121693394,
+              "duration_ms": 495.12718,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 66.00694328441955,
+              "duration_ms": 493.144738,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 66.01186585008053,
+              "duration_ms": 493.181515,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 66.11277931614926,
+              "duration_ms": 493.93545,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 66.2404082448859,
+              "duration_ms": 494.888979,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 66.04208962959156,
+              "duration_ms": 493.40731999999997,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 66.17585285922937,
+              "duration_ms": 494.406679,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "cache_cliff": 2.818744941015898,
+        "calibration": {
+          "cache_read.multi.passes": 82785,
+          "cache_read.single.passes": 185307,
+          "latency_random.single.passes": 114,
+          "random_read.multi.passes": 31,
+          "random_read.single.passes": 10,
+          "sequential_copy.multi.passes": 86,
+          "sequential_copy.single.passes": 72,
+          "sequential_read.multi.passes": 284,
+          "sequential_read.single.passes": 206,
+          "sequential_write.multi.passes": 119,
+          "sequential_write.single.passes": 104,
+          "triad.multi.passes": 64,
+          "triad.single.passes": 50
+        },
+        "numa_nodes": 1,
+        "plan": {
+          "cache_bytes": 131072,
+          "l2_multiple": 4,
+          "llc_assumed": false,
+          "llc_bytes": 10485760,
+          "llc_multiple": 4,
+          "memory_budget_fraction": 0.25,
+          "multi_bytes_aggregate": 41943040,
+          "multi_bytes_per_thread": 5242880,
+          "multi_contaminated": false,
+          "peak_alloc_bytes": 125829120,
+          "single_bytes": 41943040,
+          "single_contaminated": false
+        },
+        "threads": 8,
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:42:37.064869207Z",
+      "finished_at": "2026-08-28T13:43:49.936153705Z",
+      "duration_ms": 72871.284182,
+      "metrics": [
+        {
+          "key": "sequential_read.qd1",
+          "label": "Sequential read",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 345.5920698558603,
+          "summary": {
+            "n": 11,
+            "min": 338.5682864378809,
+            "max": 360.82300578619055,
+            "mean": 349.6651015337671,
+            "median": 345.5920698558603,
+            "stddev": 7.984933531103808,
+            "cv": 0.02283594644154874,
+            "ci95": [
+              344.08451331871186,
+              356.8593176424049
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 358.45990561086717,
+              "duration_ms": 490.98936100000003,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 360.59342006828916,
+              "duration_ms": 488.084336,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 358.9935812396416,
+              "duration_ms": 490.259462,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 360.82300578619055,
+              "duration_ms": 487.773776,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 338.5682864378809,
+              "duration_ms": 519.836048,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 345.5920698558603,
+              "duration_ms": 509.27094500000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 360.1509234544906,
+              "duration_ms": 488.68401700000004,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 356.8593176424049,
+              "duration_ms": 493.19155,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 344.0987508046192,
+              "duration_ms": 511.48107799999997,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 344.08451331871186,
+              "duration_ms": 511.502242,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 355.8600531410266,
+              "duration_ms": 494.576445,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 354.11923791109456,
+              "duration_ms": 497.00773399999997,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 341.56619983694986,
+              "duration_ms": 515.273467,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 344.5937586822086,
+              "duration_ms": 510.74633700000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.qd1",
+          "label": "Sequential write",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 138.26926016474368,
+          "summary": {
+            "n": 11,
+            "min": 124.29699197248652,
+            "max": 140.63718206805208,
+            "mean": 133.68562215101,
+            "median": 138.26926016474368,
+            "stddev": 6.494196325151214,
+            "cv": 0.04857812097261613,
+            "ci95": [
+              127.56234482040753,
+              138.8086115173086
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 139.07992040265418,
+              "duration_ms": 503.307737,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 138.76504411561785,
+              "duration_ms": 504.449809,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 139.32760719690944,
+              "duration_ms": 502.41299200000003,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 138.8086115173086,
+              "duration_ms": 504.29147900000004,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 138.4809807955822,
+              "duration_ms": 505.48457700000006,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 138.26926016474368,
+              "duration_ms": 506.258585,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 138.70403741277477,
+              "duration_ms": 504.671683,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 139.87013729129163,
+              "duration_ms": 500.46422599999994,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 140.63718206805208,
+              "duration_ms": 497.73466,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 129.47966867514174,
+              "duration_ms": 540.625418,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 129.73662222071002,
+              "duration_ms": 539.554667,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 124.69600672261113,
+              "duration_ms": 561.3652099999999,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 124.29699197248652,
+              "duration_ms": 563.167289,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 127.56234482040753,
+              "duration_ms": 548.75128,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            8,
+            9
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd1",
+          "label": "Random 4K read (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 7090.963395995361,
+          "summary": {
+            "n": 11,
+            "min": 5749.324108326474,
+            "max": 7220.227070122347,
+            "mean": 6934.962778450107,
+            "median": 7090.963395995361,
+            "stddev": 446.4116673204112,
+            "cv": 0.06437116990845329,
+            "ci95": [
+              6983.556507852255,
+              7174.9444921136865
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 5648.815968964665,
+              "duration_ms": 494.793956,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 5733.169006009188,
+              "duration_ms": 487.51397299999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 5747.4309384688595,
+              "duration_ms": 486.304234,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 5749.324108326474,
+              "duration_ms": 486.144101,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6451.889520216859,
+              "duration_ms": 433.20642599999996,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 7174.9444921136865,
+              "duration_ms": 389.550052,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 7125.901067640486,
+              "duration_ms": 392.231098,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 7114.773189380081,
+              "duration_ms": 392.844568,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 7220.227070122347,
+              "duration_ms": 387.106939,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 7090.963395995361,
+              "duration_ms": 394.16364799999997,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 6983.556507852255,
+              "duration_ms": 400.22587300000004,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 7072.7279633218195,
+              "duration_ms": 395.17991,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 7088.1008123409865,
+              "duration_ms": 394.322834,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 7212.182435640812,
+              "duration_ms": 387.53872700000005,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            1
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_read_4k.p99",
+          "label": "Random 4K read (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.16861,
+          "summary": {
+            "n": 11,
+            "min": 0.16055,
+            "max": 1.823515,
+            "mean": 0.3747979090909091,
+            "median": 0.16861,
+            "stddev": 0.5148006067470112,
+            "cv": 1.3735418321721313,
+            "ci95": [
+              0.1651,
+              0.182959
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            0,
+            1
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd16",
+          "label": "Random 4K read (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 68051.52022281768,
+          "summary": {
+            "n": 11,
+            "min": 67363.53739313998,
+            "max": 69021.91930049864,
+            "mean": 68103.4570647544,
+            "median": 68051.52022281768,
+            "stddev": 512.1418179522761,
+            "cv": 0.007520056103250667,
+            "ci95": [
+              67678.42809518919,
+              68301.7774905168
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 68557.89233249227,
+              "duration_ms": 504.09951099999995,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 68803.2440379177,
+              "duration_ms": 502.30189700000005,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 68392.55490046114,
+              "duration_ms": 505.31816,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 67511.82854705398,
+              "duration_ms": 511.91029399999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 67963.80451505618,
+              "duration_ms": 508.505965,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 68301.7774905168,
+              "duration_ms": 505.98975999999993,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 69021.91930049864,
+              "duration_ms": 500.71050399999996,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 68051.52022281768,
+              "duration_ms": 507.8505210000001,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 68018.03076909379,
+              "duration_ms": 508.10056699999996,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 68275.68269815257,
+              "duration_ms": 506.18314799999996,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 68879.15411902464,
+              "duration_ms": 501.748322,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 68072.34456175496,
+              "duration_ms": 507.695162,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 67363.53739313998,
+              "duration_ms": 513.037191,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 67678.42809518919,
+              "duration_ms": 510.65015800000003,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd1",
+          "label": "Random 4K write (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 27715.424373439706,
+          "summary": {
+            "n": 11,
+            "min": 26542.394734513553,
+            "max": 28338.153792739435,
+            "mean": 27622.56146766697,
+            "median": 27715.424373439706,
+            "stddev": 670.6660494771155,
+            "cv": 0.024279647282608098,
+            "ci95": [
+              26980.584393131063,
+              28256.818521176734
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 27005.13568064007,
+              "duration_ms": 470.577158,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 27889.19030390031,
+              "duration_ms": 455.660414,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 27017.12150760334,
+              "duration_ms": 470.36839200000003,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 27358.87602606926,
+              "duration_ms": 464.492766,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 28271.024999781763,
+              "duration_ms": 449.506164,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 26542.394734513553,
+              "duration_ms": 478.781215,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 28188.82537998683,
+              "duration_ms": 450.81694,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 28338.153792739435,
+              "duration_ms": 448.441352,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 26743.930727141633,
+              "duration_ms": 475.173232,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 28168.760203888447,
+              "duration_ms": 451.138066,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 26980.584393131063,
+              "duration_ms": 471.005365,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 27715.424373439706,
+              "duration_ms": 458.517244,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 28256.818521176734,
+              "duration_ms": 449.732159,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 27283.38299246824,
+              "duration_ms": 465.77801600000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_write_4k.p99",
+          "label": "Random 4K write (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.051092,
+          "summary": {
+            "n": 11,
+            "min": 0.043172,
+            "max": 0.10072,
+            "mean": 0.0659098181818182,
+            "median": 0.051092,
+            "stddev": 0.023810116109831057,
+            "cv": 0.36125294784077083,
+            "ci95": [
+              0.050748,
+              0.093589
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            2,
+            5,
+            7,
+            10
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd16",
+          "label": "Random 4K write (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 34955.132163826995,
+          "summary": {
+            "n": 11,
+            "min": 33128.88704847777,
+            "max": 36390.98409612319,
+            "mean": 34902.791012613496,
+            "median": 34955.132163826995,
+            "stddev": 938.3291463074809,
+            "cv": 0.0268840719920759,
+            "ci95": [
+              34182.95105486038,
+              35561.7501669855
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 34661.488020481025,
+              "duration_ms": 514.2306639999999,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 35570.98675056778,
+              "duration_ms": 501.0825290000001,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 34655.68680766108,
+              "duration_ms": 514.3167440000001,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 35546.51477142062,
+              "duration_ms": 501.42749900000007,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 34173.63215651511,
+              "duration_ms": 521.571717,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 35561.7501669855,
+              "duration_ms": 501.21267700000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 34211.00327630817,
+              "duration_ms": 521.001967,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 34182.95105486038,
+              "duration_ms": 521.429527,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 35716.4102836306,
+              "duration_ms": 499.04231300000004,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 34602.65994087041,
+              "duration_ms": 515.104909,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 35460.77617972973,
+              "duration_ms": 502.639872,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 34955.132163826995,
+              "duration_ms": 509.91081699999995,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 36390.98409612319,
+              "duration_ms": 489.791646,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 33128.88704847777,
+              "duration_ms": 538.0198849999999,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_mixed_4k.qd16",
+          "label": "Random 4K mixed 70/30 (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 39196.21900667964,
+          "summary": {
+            "n": 11,
+            "min": 37052.07240322701,
+            "max": 40102.11998101968,
+            "mean": 38845.63058155815,
+            "median": 39196.21900667964,
+            "stddev": 896.7832039858421,
+            "cv": 0.02308581919150483,
+            "ci95": [
+              38575.863934712674,
+              39359.4172023265
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 38197.33950104617,
+              "duration_ms": 497.626281,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 39244.24041375966,
+              "duration_ms": 484.351329,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 39834.10261442125,
+              "duration_ms": 477.179069,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 37052.07240322701,
+              "duration_ms": 513.007742,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 38805.15537676694,
+              "duration_ms": 489.831823,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 39359.4172023265,
+              "duration_ms": 482.93397999999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 38753.24459287495,
+              "duration_ms": 490.48796300000004,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 39196.21900667964,
+              "duration_ms": 484.944734,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 37422.956462938084,
+              "duration_ms": 507.92352600000004,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 40102.11998101968,
+              "duration_ms": 473.989904,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 39396.94078029198,
+              "duration_ms": 482.47401,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 39300.30634390309,
+              "duration_ms": 483.660352,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 39337.64031239922,
+              "duration_ms": 483.201327,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 38575.863934712674,
+              "duration_ms": 492.743339,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_fsync.mean",
+          "label": "fsync latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.09168140351570214,
+          "summary": {
+            "n": 11,
+            "min": 0.0906359871617618,
+            "max": 0.09592051826980053,
+            "mean": 0.09229773255166718,
+            "median": 0.09168140351570214,
+            "stddev": 0.0016662694720065352,
+            "cv": 0.01805320050602302,
+            "ci95": [
+              0.09141907485680427,
+              0.092392122852064
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 0.09115246415168872,
+              "duration_ms": 461.50492599999995,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 0.091225583843571,
+              "duration_ms": 461.875131,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 0.09165983468299427,
+              "duration_ms": 464.073743,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 0.09107340983606557,
+              "duration_ms": 461.104674,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 0.09233445684376851,
+              "duration_ms": 467.489355,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 0.09168140351570214,
+              "duration_ms": 464.18294599999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 0.09506278747777996,
+              "duration_ms": 481.302893,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 0.09159182836263086,
+              "duration_ms": 463.72942700000004,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 0.0906359871617618,
+              "duration_ms": 458.890003,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 0.09141907485680427,
+              "duration_ms": 462.854776,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 0.092392122852064,
+              "duration_ms": 467.781318,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 0.09173714398577917,
+              "duration_ms": 464.46515999999997,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 0.09592051826980053,
+              "duration_ms": 485.64558400000004,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 0.0914263249061821,
+              "duration_ms": 462.891483,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3,
+            9
+          ],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "latency_fsync.mean.operations": 5063,
+          "random_mixed_4k.qd16.operations": 19002,
+          "random_read_4k.qd1.operations": 2795,
+          "random_read_4k.qd16.operations": 34554,
+          "random_write_4k.qd1.operations": 12708,
+          "random_write_4k.qd16.operations": 17812,
+          "sequential_read.qd1.operations": 176,
+          "sequential_write.qd1.operations": 70
+        },
+        "filesystem": "ext4",
+        "plan": {
+          "constrained_by_free_space": false,
+          "deep_queue_depth": 16,
+          "direct_io": true,
+          "fixture_bytes": 2147483648,
+          "large_block_bytes": 1048576,
+          "mixed_read_share_pct": 70,
+          "small_block_bytes": 4096
+        },
+        "steady_state_ratio": {
+          "latency_fsync.mean": 0.9993923893021384,
+          "random_mixed_4k.qd16": 1.0127599274459445,
+          "random_write_4k.qd1": 1.0130322732202413,
+          "random_write_4k.qd16": 0.9833631338713101,
+          "sequential_write.qd1": 0.9004558315966892
+        },
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "network.transfer",
+        "version": "1.0.0"
+      },
+      "status": "degraded",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:43:49.936542530Z",
+      "finished_at": "2026-08-28T13:44:01.919268308Z",
+      "duration_ms": 11982.7253,
+      "metrics": [
+        {
+          "key": "dns_resolve.mean",
+          "label": "DNS resolution",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.829959,
+          "summary": {
+            "n": 11,
+            "min": 0.728324,
+            "max": 0.9298675,
+            "mean": 0.8290631363636364,
+            "median": 0.829959,
+            "stddev": 0.06536401503850987,
+            "cv": 0.07884081702776431,
+            "ci95": [
+              0.763869,
+              0.898652
+            ]
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "tcp_connect.mean",
+          "label": "TCP connect",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 4.92382,
+          "summary": {
+            "n": 11,
+            "min": 4.578113500000001,
+            "max": 5.407166,
+            "mean": 4.965200181818181,
+            "median": 4.92382,
+            "stddev": 0.23107984743322726,
+            "cv": 0.04653988539664665,
+            "ci95": [
+              4.811562,
+              5.149846
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 5.102551,
+              "duration_ms": 171.503759,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 4.862932499999999,
+              "duration_ms": 171.38119600000002,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 4.983496499999999,
+              "duration_ms": 142.450844,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 4.578113500000001,
+              "duration_ms": 178.828329,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 5.407166,
+              "duration_ms": 181.229491,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 5.149846,
+              "duration_ms": 163.37917399999998,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 4.811562,
+              "duration_ms": 205.429301,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 4.7403365,
+              "duration_ms": 162.09483799999998,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 4.8749585,
+              "duration_ms": 150.995997,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 4.886518000000001,
+              "duration_ms": 202.098388,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 5.2019525,
+              "duration_ms": 167.436302,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 4.92382,
+              "duration_ms": 320.14468400000004,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 5.053998,
+              "duration_ms": 151.933924,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 4.988931,
+              "duration_ms": 190.956448,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "tcp_connect.jitter",
+          "label": "TCP connect jitter",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.3061300288290553,
+          "summary": {
+            "n": 4,
+            "min": 0.24788977383363547,
+            "max": 0.5527646536160344,
+            "mean": 0.3532286212769451,
+            "median": 0.3061300288290553,
+            "stddev": 0.14033252874843416,
+            "cv": 0.39728527162131616,
+            "ci95": null
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": true
+        },
+        {
+          "key": "tls_handshake.mean",
+          "label": "TLS handshake",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 10.957891,
+          "summary": {
+            "n": 11,
+            "min": 10.283489,
+            "max": 21.555328,
+            "mean": 12.680017363636363,
+            "median": 10.957891,
+            "stddev": 3.552987459863974,
+            "cv": 0.2802036746458407,
+            "ci95": [
+              10.628179,
+              12.555449
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            3,
+            8
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "ttfb.mean",
+          "label": "Time to first byte",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 45.301258,
+          "summary": {
+            "n": 11,
+            "min": 32.344996,
+            "max": 200.805874,
+            "mean": 61.97776127272727,
+            "median": 45.301258,
+            "stddev": 48.740642379914384,
+            "cv": 0.7864214740741571,
+            "ci95": [
+              34.352016,
+              68.339459
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            8
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "download.single",
+          "label": "Download (1 stream)",
+          "unit": "Mbit/s",
+          "direction": "higher_is_better",
+          "value": 763.1024148812644,
+          "summary": {
+            "n": 11,
+            "min": 731.8415940279059,
+            "max": 773.8904853277994,
+            "mean": 759.5833653582714,
+            "median": 763.1024148812644,
+            "stddev": 14.661825308695805,
+            "cv": 0.019302457080244625,
+            "ci95": [
+              752.487602505169,
+              770.4212992862982
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 741.9501090572245,
+              "duration_ms": 140.57698900000003,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 743.9274206575527,
+              "duration_ms": 149.177403,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 763.9889563739516,
+              "duration_ms": 148.512415,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 760.3567733952697,
+              "duration_ms": 157.774452,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 763.1024148812644,
+              "duration_ms": 173.016865,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 733.2910815566453,
+              "duration_ms": 158.179178,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 731.8415940279059,
+              "duration_ms": 160.75619799999998,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 771.8134733588269,
+              "duration_ms": 158.100945,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 752.487602505169,
+              "duration_ms": 135.00309,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 766.9317011901522,
+              "duration_ms": 140.621805,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 762.0092830581617,
+              "duration_ms": 140.995315,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 773.8904853277994,
+              "duration_ms": 145.93184100000002,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 769.2713103534916,
+              "duration_ms": 163.277681,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 770.4212992862982,
+              "duration_ms": 423.486624,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "download.multi",
+          "label": "Download (4 streams)",
+          "unit": "Mbit/s",
+          "direction": "higher_is_better",
+          "value": 1179.9183340607153,
+          "summary": {
+            "n": 11,
+            "min": 1055.8968908136542,
+            "max": 1474.2809096183992,
+            "mean": 1211.9460455701972,
+            "median": 1179.9183340607153,
+            "stddev": 127.49924460395117,
+            "cv": 0.10520207980377975,
+            "ci95": [
+              1142.6493693350255,
+              1216.004373741278
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 1398.4838095389603,
+              "duration_ms": 336.128822,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 1107.398832691514,
+              "duration_ms": 373.866078,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 1647.5523896515429,
+              "duration_ms": 334.028942,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 1432.100889671212,
+              "duration_ms": 327.573842,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 1195.831334495528,
+              "duration_ms": 330.699785,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 1175.9383623853234,
+              "duration_ms": 1699.775619,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 1184.0625925123,
+              "duration_ms": 356.76861199999996,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 1474.2809096183992,
+              "duration_ms": 384.46930299999997,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 1055.8968908136542,
+              "duration_ms": 339.655508,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 1108.9200413340975,
+              "duration_ms": 862.0922410000001,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 1179.9183340607153,
+              "duration_ms": 384.352328,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 1142.6493693350255,
+              "duration_ms": 393.370029,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 1165.8034033046372,
+              "duration_ms": 397.981202,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 1216.004373741278,
+              "duration_ms": 402.613526,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            4
+          ],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "high_variance",
+          "message": "`ttfb.mean` varied by 79% between repetitions (bound 30%). The internet is shared; this usually means congestion on the path rather than a fault in the machine.",
+          "metric_key": "ttfb.mean"
+        },
+        {
+          "code": "validation_failed",
+          "message": "The run reached its 512 MiB transfer ceiling, so some measurements were cut short. The ceiling is a hard bound on what this suite will pull from a third party."
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "endpoints": [
+          {
+            "host": "speed.cloudflare.com",
+            "operator": "Cloudflare",
+            "role": "Throughput"
+          },
+          {
+            "host": "one.one.one.one",
+            "operator": "Cloudflare",
+            "role": "LatencyProbe"
+          },
+          {
+            "host": "dns.google",
+            "operator": "Google Public DNS",
+            "role": "LatencyProbe"
+          },
+          {
+            "host": "dns.quad9.net",
+            "operator": "Quad9",
+            "role": "LatencyProbe"
+          }
+        ],
+        "ipv6_available": true,
+        "probe_failures": 0,
+        "transfer": {
+          "bytes_spent": 536870912,
+          "ceiling_bytes": 536870912,
+          "download_bytes_per_stream": 7669584,
+          "parallel_streams": 4
+        },
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "web.static",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:01.919995221Z",
+      "finished_at": "2026-08-28T13:44:44.498500966Z",
+      "duration_ms": 42578.505295,
+      "metrics": [
+        {
+          "key": "requests.small_keepalive",
+          "label": "Small objects, keep-alive",
+          "unit": "req/s",
+          "direction": "higher_is_better",
+          "value": 124474.86715466599,
+          "summary": {
+            "n": 11,
+            "min": 117590.21983200777,
+            "max": 125708.87079672774,
+            "mean": 123029.57046055756,
+            "median": 124474.86715466599,
+            "stddev": 2821.5397454336335,
+            "cv": 0.022933833995122332,
+            "ci95": [
+              121360.96307660987,
+              125061.72578203047
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 118935.12400520357,
+              "duration_ms": 500.105535,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 118274.78247679361,
+              "duration_ms": 500.081892,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 118196.7779895448,
+              "duration_ms": 500.10734999999994,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 118305.60189713223,
+              "duration_ms": 500.06992400000007,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 117590.21983200777,
+              "duration_ms": 500.135761,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 121360.96307660987,
+              "duration_ms": 500.079084,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 122944.4558261536,
+              "duration_ms": 500.072013,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 122929.04439690633,
+              "duration_ms": 500.06958999999995,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 125061.72578203047,
+              "duration_ms": 500.105688,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 124474.86715466599,
+              "duration_ms": 500.05344299999996,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 124795.20477970212,
+              "duration_ms": 500.05990499999996,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 125708.87079672774,
+              "duration_ms": 500.10085100000003,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 125018.22945042775,
+              "duration_ms": 500.065286,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 125136.09207376922,
+              "duration_ms": 500.10415600000005,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "connections.plaintext",
+          "label": "New connection per request",
+          "unit": "conn/s",
+          "direction": "higher_is_better",
+          "value": 15009.587107831589,
+          "summary": {
+            "n": 11,
+            "min": 13479.614315634059,
+            "max": 15866.801445531124,
+            "mean": 14928.841236835467,
+            "median": 15009.587107831589,
+            "stddev": 866.8598211198695,
+            "cv": 0.05806611560587683,
+            "ci95": [
+              14253.962524668394,
+              15760.852782168764
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 15837.89452144817,
+              "duration_ms": 500.63547200000005,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 14514.69320120789,
+              "duration_ms": 501.768082,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 15249.259941907654,
+              "duration_ms": 500.549549,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 15009.587107831589,
+              "duration_ms": 502.945898,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 14459.81954868394,
+              "duration_ms": 500.56020599999994,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 15760.852782168764,
+              "duration_ms": 500.86185900000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 14279.821561922849,
+              "duration_ms": 500.56716599999993,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 15631.535561248986,
+              "duration_ms": 500.59127699999993,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 13479.614315634059,
+              "duration_ms": 500.608457,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 15781.421648121493,
+              "duration_ms": 500.52589300000005,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 13979.478676729761,
+              "duration_ms": 500.52014,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 15714.358432649171,
+              "duration_ms": 500.561978,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 14253.962524668394,
+              "duration_ms": 500.563187,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 15866.801445531124,
+              "duration_ms": 500.66865000000007,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "connections.tls",
+          "label": "New TLS connection per request",
+          "unit": "conn/s",
+          "direction": "higher_is_better",
+          "value": 6936.566409647819,
+          "summary": {
+            "n": 11,
+            "min": 6898.07752734962,
+            "max": 6980.517563118925,
+            "mean": 6939.2973422018995,
+            "median": 6936.566409647819,
+            "stddev": 26.61908101736133,
+            "cv": 0.0038359908366334488,
+            "ci95": [
+              6918.757715880396,
+              6961.059344794144
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 6989.691907437727,
+              "duration_ms": 500.88098700000006,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 6977.108715006908,
+              "duration_ms": 501.067695,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 7040.947468209403,
+              "duration_ms": 501.06946200000004,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 6980.517563118925,
+              "duration_ms": 500.96633599999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6961.059344794144,
+              "duration_ms": 500.78641899999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 6938.849395481792,
+              "duration_ms": 500.94823099999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 6974.423893323907,
+              "duration_ms": 500.973923,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 6906.17786660439,
+              "duration_ms": 500.856478,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 6929.2790770262545,
+              "duration_ms": 500.918501,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 6956.6025528151595,
+              "duration_ms": 500.819726,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 6936.566409647819,
+              "duration_ms": 500.96893,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 6898.07752734962,
+              "duration_ms": 501.00971100000004,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 6931.959418178497,
+              "duration_ms": 501.15751500000005,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 6918.757715880396,
+              "duration_ms": 500.66850500000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "throughput.medium",
+          "label": "64 KiB objects",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 5050.893533006466,
+          "summary": {
+            "n": 11,
+            "min": 4877.651513857867,
+            "max": 5080.72086344866,
+            "mean": 5038.03903095864,
+            "median": 5050.893533006466,
+            "stddev": 54.50996414292882,
+            "cv": 0.010819678809149013,
+            "ci95": [
+              5041.340002865474,
+              5061.876289781126
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 4950.091767345402,
+              "duration_ms": 500.10543799999994,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 4990.963666322398,
+              "duration_ms": 500.10498,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 4533.4002050647605,
+              "duration_ms": 500.0945449999999,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 5080.72086344866,
+              "duration_ms": 500.114223,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 5057.465161708472,
+              "duration_ms": 500.102874,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 5063.987922024013,
+              "duration_ms": 500.11286499999994,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 5037.793151795507,
+              "duration_ms": 500.095595,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 5046.766198499942,
+              "duration_ms": 500.06094999999993,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 5041.340002865474,
+              "duration_ms": 500.078542,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 5061.876289781126,
+              "duration_ms": 500.08740500000005,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 5050.893533006466,
+              "duration_ms": 500.159677,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 5052.376169654326,
+              "duration_ms": 500.11174300000005,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 4877.651513857867,
+              "duration_ms": 500.11316400000004,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 5047.558533903189,
+              "duration_ms": 500.118905,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            9
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "throughput.large",
+          "label": "1 MiB objects",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 10816.52326100818,
+          "summary": {
+            "n": 11,
+            "min": 10454.890153644566,
+            "max": 11129.094114248952,
+            "mean": 10792.72147540198,
+            "median": 10816.52326100818,
+            "stddev": 182.51004890269346,
+            "cv": 0.016910475204855203,
+            "ci95": [
+              10667.227873499589,
+              10915.398144440238
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 10421.015145409134,
+              "duration_ms": 500.52786800000007,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 10718.08350614087,
+              "duration_ms": 500.556711,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 10735.882173601249,
+              "duration_ms": 500.56514799999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 10819.655841268439,
+              "duration_ms": 500.66370400000005,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 10667.227873499589,
+              "duration_ms": 500.69313400000004,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 10816.52326100818,
+              "duration_ms": 500.623782,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 10811.960708759425,
+              "duration_ms": 500.557461,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 10454.890153644566,
+              "duration_ms": 500.72328300000004,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 10864.236386838753,
+              "duration_ms": 500.818522,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11129.094114248952,
+              "duration_ms": 500.67028300000004,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 10941.764012043443,
+              "duration_ms": 501.29117,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 10915.398144440238,
+              "duration_ms": 500.669605,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 10599.280713706483,
+              "duration_ms": 500.41205099999996,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 10699.905019963724,
+              "duration_ms": 500.566062,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency.small_mean",
+          "label": "Mean response time under load",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.09486149784690534,
+          "summary": {
+            "n": 11,
+            "min": 0.09298674137155341,
+            "max": 0.10670898328941429,
+            "mean": 0.09681946533137804,
+            "median": 0.09486149784690534,
+            "stddev": 0.004212605754699442,
+            "cv": 0.043509905165053486,
+            "ci95": [
+              0.09390973995758115,
+              0.10001084292049607
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 0.09906869451764197,
+              "duration_ms": 501.0466,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 0.09241933838935658,
+              "duration_ms": 501.365743,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 0.0938740907513326,
+              "duration_ms": 500.93049,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 0.09298674137155341,
+              "duration_ms": 500.871627,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 0.09390973995758115,
+              "duration_ms": 500.96203800000006,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 0.10001084292049607,
+              "duration_ms": 501.046034,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 0.09486149784690534,
+              "duration_ms": 501.298196,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 0.10043311710264177,
+              "duration_ms": 501.597447,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 0.0967903958480626,
+              "duration_ms": 501.14624900000007,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 0.09791188488977468,
+              "duration_ms": 501.126265,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 0.10670898328941429,
+              "duration_ms": 501.40092000000004,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 0.09396294042033564,
+              "duration_ms": 501.526006,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 0.09436888746063413,
+              "duration_ms": 501.56670699999995,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 0.0930690875377594,
+              "duration_ms": 501.073521,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            7
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency.small_p99",
+          "label": "99th percentile response time under load",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.13611499999999999,
+          "summary": {
+            "n": 11,
+            "min": 0.108272,
+            "max": 0.156554,
+            "mean": 0.1340457272727273,
+            "median": 0.13611499999999999,
+            "stddev": 0.013608414853250978,
+            "cv": 0.10152069096214843,
+            "ci95": [
+              0.125667,
+              0.138632
+            ]
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "connections": 8,
+        "latency_load_share": 0.25,
+        "latency_load_share_target": 0.25,
+        "latency_offered_rate_per_s": 31118.716788666497,
+        "measured_reps": 11,
+        "object_sizes": [
+          1024,
+          65536,
+          1048576
+        ],
+        "origin": "in-process, 127.0.0.1, OS-assigned port, destroyed with the module",
+        "protocol": "HTTP/1.1",
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "php.runtime",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499065236Z",
+      "finished_at": "2026-08-28T13:44:44.499213851Z",
+      "duration_ms": 0.148399,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no PHP CLI binary was found at any allow-listed path. This module measures the PHP the machine actually has; there is nothing to measure here, and reporting zeroes would be worse than saying so.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "node.runtime",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499282828Z",
+      "finished_at": "2026-08-28T13:44:44.499498920Z",
+      "duration_ms": 0.215811,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: the scratch directory `/home/ubuntu/.local/state/darcbench/scratch` is group-writable (mode 775). The workload script would be written there and then executed, so another user being able to replace it is another user choosing what this agent runs. See docs/THREAT-MODEL.md, T-EXEC.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "database.oltp",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499578391Z",
+      "finished_at": "2026-08-28T13:44:44.499632938Z",
+      "duration_ms": 0.054308999999999996,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "database.cache",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499691348Z",
+      "finished_at": "2026-08-28T13:44:44.499724316Z",
+      "duration_ms": 0.032799999999999996,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "wordpress.site",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499777730Z",
+      "finished_at": "2026-08-28T13:44:44.499805299Z",
+      "duration_ms": 0.027399999999999997,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "deployment.container",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:44.499865135Z",
+      "finished_at": "2026-08-28T13:44:44.499891656Z",
+      "duration_ms": 0.026363,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    }
+  ],
+  "scores": {
+    "scoring_model": "dbs/0.1.0-dev",
+    "reference_profile": "DARC-REF-1",
+    "uncalibrated": true,
+    "profile": "deep",
+    "total": 649.4374944151068,
+    "total_is_standard": true,
+    "categories": [
+      {
+        "key": "compute",
+        "label": "Compute Score",
+        "score": 339.5461947713359,
+        "weight": 0.26,
+        "metric_count": 10,
+        "modules": [
+          "cpu.mixed"
+        ]
+      },
+      {
+        "key": "memory",
+        "label": "Memory Score",
+        "score": 533.9975170510544,
+        "weight": 0.12,
+        "metric_count": 13,
+        "modules": [
+          "memory.bandwidth"
+        ]
+      },
+      {
+        "key": "storage",
+        "label": "Storage Score",
+        "score": 416.643097104087,
+        "weight": 0.2,
+        "metric_count": 10,
+        "modules": [
+          "storage.mixed"
+        ]
+      },
+      {
+        "key": "network",
+        "label": "Network Score",
+        "score": 1135.3029977969352,
+        "weight": 0.08,
+        "metric_count": 7,
+        "modules": [
+          "network.transfer"
+        ]
+      },
+      {
+        "key": "web",
+        "label": "Web Score",
+        "score": 2496.03371608799,
+        "weight": 0.18,
+        "metric_count": 7,
+        "modules": [
+          "web.static"
+        ]
+      }
+    ],
+    "facets": {
+      "multi_core": 198.23137080758895,
+      "single_core": 581.6012769018308
+    },
+    "composites": [
+      {
+        "key": "wordpress_hosting",
+        "label": "WordPress Hosting",
+        "score": 820.8168763269099,
+        "weight_coverage": 0.75
+      },
+      {
+        "key": "php_commerce",
+        "label": "PHP Commerce",
+        "score": 747.1339239146056,
+        "weight_coverage": 0.7000000000000001
+      },
+      {
+        "key": "node_nextjs",
+        "label": "Node / Next.js",
+        "score": 699.6588004379798,
+        "weight_coverage": 0.9500000000000001
+      },
+      {
+        "key": "database_server",
+        "label": "Database Server",
+        "score": 435.76681628250606,
+        "weight_coverage": 0.65
+      },
+      {
+        "key": "static_media_server",
+        "label": "Static / Media Server",
+        "score": 871.9949049757168,
+        "weight_coverage": 0.9999999999999999
+      },
+      {
+        "key": "build_server",
+        "label": "Build Server",
+        "score": 397.4491199874057,
+        "weight_coverage": 0.8999999999999999
+      },
+      {
+        "key": "general_purpose_vps",
+        "label": "General Purpose VPS",
+        "score": 618.2952762409298,
+        "weight_coverage": 1.0
+      }
+    ],
+    "stability_score": 926.971892494914,
+    "stability_index": 0.926971892494914,
+    "stability_multiplier": 0.9926971892494915,
+    "uncapped_total": 649.4374944151068,
+    "weak_link_applied": false,
+    "balance_index": 0.4621531974571077,
+    "efficiency_score": 339.54619477133593,
+    "median_cv": 0.014605621501017211,
+    "instability_flags": 1,
+    "missing_required_categories": [],
+    "unreferenced_metrics": []
+  },
+  "verdict": {
+    "state": "partial",
+    "reasons": [
+      {
+        "excessive_variance": {
+          "module": "storage.mixed"
+        }
+      },
+      {
+        "excessive_variance": {
+          "module": "network.transfer"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "php.runtime"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "node.runtime"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "database.oltp"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "database.cache"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "wordpress.site"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "deployment.container"
+        }
+      }
+    ],
+    "validator_version": "dbv/0.1.0"
+  },
+  "telemetry": {
+    "samples": 296,
+    "cpu_busy_pct_mean": 42.86912665498023,
+    "cpu_external_busy_pct_max": 4.135338345864661,
+    "cpu_steal_pct_max": 0.0,
+    "cpu_steal_pct_mean": 0.0,
+    "cpu_iowait_pct_mean": 8.334783622724235,
+    "load1_max": 8.59,
+    "mem_used_bytes_max": 8309915648,
+    "swap_used_bytes_max": 45056,
+    "cpu_freq_mhz_first": 3067.493,
+    "cpu_freq_mhz_last": 3699.82,
+    "cpu_temp_c_max": 53.0,
+    "psi_cpu_some_avg10_max": 54.76
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "canonicalization": "DCJ/1",
+    "public_key": "Cn1NBi8wC/9Jk6g2gO+w6Qu8fk70dD97ckn+ab+oRG0=",
+    "value": "Y+QrEvVNsQz2LxlRGuLtk5eHlo+mgb7/by4Ga7l4Lw1P6HaL41rkf46Ep/8LToI2mdAU92T2G4nrBqnjjTsZBQ==",
+    "key_id": "248ec70628eaac2b"
+  }
+}

@@ -1,7 +1,7 @@
 # Field evidence
 
 What DARCBench has actually been run on, and what those runs proved or
-disproved. Everything here is a measurement, not a design intention: this file
+disproved. The bundles are in [`../corpus/2026-08/`](../corpus/2026-08/). Everything here is a measurement, not a design intention: this file
 exists so that claims about the scoring model can be checked against numbers
 somebody can re-derive, and so that a finding is not rediscovered twice.
 
@@ -334,11 +334,18 @@ six failures for software nobody promised.
 
 ### Reproducing this
 
-The analysis is arithmetic over the bundles and needs no special tooling: for
-each anchored metric take `measured / anchor` (inverted where
-`direction` is `lower_is_better`), divide by the host's median ratio, and
-compare across hosts.
+Every bundle argued from above is published in
+[`../corpus/2026-08/`](../corpus/2026-08/), byte for byte as the agent wrote
+them. A claim about a scoring model that nobody can check against the
+measurement behind it is an assertion, not evidence.
 
 ```bash
-for b in run_*/bundle.json; do darcbench verify "$b"; done
+for b in corpus/2026-08/*.json; do darcbench verify "$b"; done
 ```
+
+The analysis is arithmetic over those files and needs no special tooling: for
+each anchored metric take `measured / anchor` (inverted where `direction` is
+`lower_is_better`), divide by the host's median ratio, and compare across hosts.
+A metric whose ratio agrees with the rest of its host reads 1.00; the tables
+above are that quantity, and the geometric mean across three unrelated machines
+is what separates a claim about an anchor from a claim about a machine.

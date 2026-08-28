@@ -1,2 +1,12 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Published bundles are evidence. Kept exactly as the agent wrote them, so a
+# checkout on any platform is the same file that was signed.
+#
+# Verification does not actually depend on this: a signature covers the
+# canonical re-serialisation of the parsed bundle, not the bytes of the file,
+# so a CRLF checkout still verifies (tested). The point is that
+# `corpus/2026-08/README.md` claims these are published unmodified, and
+# `text=auto` above would quietly make that claim false.
+corpus/** -text

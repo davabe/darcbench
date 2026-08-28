@@ -332,7 +332,7 @@ fn remove_fixture(path: &Path) {
         if error.kind() != io::ErrorKind::NotFound {
             eprintln!(
                 "darcbench: could not remove the storage fixture at {}: {error}",
-                path.display()
+                crate::runtime_exec::elide_home(path)
             );
         }
     }
@@ -888,7 +888,7 @@ impl BenchmarkModule for StorageMixed {
             return Err(ModuleError::Precondition(format!(
                 "a {} MiB fixture does not fit in the free space reported for {}",
                 plan.fixture_bytes >> 20,
-                scratch.display()
+                crate::runtime_exec::elide_home(scratch)
             )));
         }
         if reporter.is_cancelled() {

@@ -21,3 +21,9 @@ corpus and requires a major workload version bump.
 
 Captured inventories will be **redacted before commit** — no hostnames, MAC
 addresses, IPs or serial numbers. See [../docs/PRIVACY.md](../docs/PRIVACY.md).
+
+Not to be confused with [`../corpus/`](../corpus/), which holds real signed
+bundles from real hosts, published as the evidence behind
+[`../docs/FIELD-EVIDENCE.md`](../docs/FIELD-EVIDENCE.md). Those are measurements
+and must never be edited - a bundle is signed over its canonical form. Fixtures
+here are constructed to exercise a code path and may be anything a test needs.

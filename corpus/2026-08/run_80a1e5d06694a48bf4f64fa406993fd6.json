@@ -1,0 +1,2529 @@
+{
+  "meta": {
+    "schema": "darcbench.bundle/1",
+    "protocol": "darcbench.events/1",
+    "agent_version": "0.1.0",
+    "build_target": "x86_64-unknown-linux-musl",
+    "build_profile": "release",
+    "generated_at": "2026-08-27T15:39:01.634199039Z",
+    "agent_build_hash": "sha256:2e8308c5717b1f2ec8093318ecf9704574d2f5d88ad5a150e921aeb74e0e248a"
+  },
+  "run": {
+    "run_id": "run_80a1e5d06694a48bf4f64fa406993fd6",
+    "profile": "quick",
+    "state": "completed",
+    "started_at": "2026-08-27T15:38:04.451807047Z",
+    "finished_at": "2026-08-27T15:39:01.634017Z",
+    "duration_ms": 57242,
+    "modules": [
+      {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      }
+    ],
+    "environment_digest": "sha256:4a03e413a39c8d1353c9ac00d59d501bc8b747f61ab6f5ddebac6919b71658c4",
+    "events_digest": "sha256:e2b444ebf8c51f29e2dd1f58739dc9cbaf52884aa74be8a16d31cab3613e6d3a",
+    "event_count": 272
+  },
+  "environment": {
+    "schema": "darcbench.inventory/1",
+    "collected_at": "2026-08-27T15:38:04.456317625Z",
+    "platform": {
+      "os": "linux",
+      "distribution": "ubuntu",
+      "distribution_version": "26.04",
+      "kernel_release": "7.0.0-29-generic",
+      "architecture": "x86_64",
+      "scope": "bare_metal",
+      "virtualization": null,
+      "virtualization_evidence": [
+        "DMI identifies `supermicro\n` and no container or hypervisor marker was found"
+      ],
+      "container_runtime": null,
+      "cgroup_cpu_limit": null,
+      "cgroup_mem_limit_bytes": null,
+      "uptime_seconds": 564034,
+      "load1": 1.46,
+      "load5": 1.36,
+      "load15": 1.67,
+      "running_as_root": false,
+      "hostname": "[redacted]",
+      "dmi_vendor": "Supermicro",
+      "dmi_product": "X9SRE/X9SRE-3F/X9SRi/X9SRi-3F",
+      "cloud_hint": null,
+      "security_modules": [
+        "lockdown",
+        "capability",
+        "landlock",
+        "yama",
+        "apparmor",
+        "ima",
+        "evm"
+      ]
+    },
+    "cpu": {
+      "vendor": "GenuineIntel",
+      "model": "Intel(R) Xeon(R) CPU E5-1620 v2 @ 3.70GHz",
+      "family": "6",
+      "stepping": "4",
+      "microcode": "0x42e",
+      "logical_cpus": 8,
+      "physical_cores": 4,
+      "sockets": 1,
+      "numa_nodes": 1,
+      "smt_enabled": true,
+      "base_mhz": 3699.984,
+      "max_mhz": 3900.0,
+      "min_mhz": 1200.0,
+      "governor": "schedutil",
+      "scaling_driver": "intel_cpufreq",
+      "caches": [
+        {
+          "level": "L1d",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L1i",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L2",
+          "size_bytes": 262144,
+          "shared_by": 2
+        },
+        {
+          "level": "L3",
+          "size_bytes": 10485760,
+          "shared_by": 8
+        }
+      ],
+      "instruction_sets": [
+        "aes",
+        "avx",
+        "constant_tsc",
+        "nonstop_tsc",
+        "pclmulqdq",
+        "sse4_2"
+      ],
+      "mitigations": [
+        "spectre_v2: Mitigation: Retpolines; IBPB: conditional; IBRS_FW; STIBP: conditional; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected",
+        "itlb_multihit: KVM: Mitigation: Split huge pages",
+        "vmscape: Mitigation: IBPB before exit to userspace",
+        "mds: Mitigation: Clear CPU buffers; SMT vulnerable",
+        "l1tf: Mitigation: PTE Inversion; VMX: conditional cache flushes, SMT vulnerable",
+        "spec_store_bypass: Mitigation: Speculative Store Bypass disabled via prctl",
+        "spectre_v1: Mitigation: usercopy/swapgs barriers and __user pointer sanitization",
+        "meltdown: Mitigation: PTI"
+      ]
+    },
+    "memory": {
+      "total_bytes": 33601916928,
+      "available_bytes": 26535518208,
+      "free_bytes": 3035500544,
+      "buffers_bytes": 751058944,
+      "cached_bytes": 26357129216,
+      "swap_total_bytes": 536866816,
+      "swap_free_bytes": 536866816,
+      "hugepages_total": 0,
+      "swappiness": 60,
+      "psi_available": true
+    },
+    "storage": {
+      "devices": [
+        {
+          "name": "sda",
+          "model": "INTEL SSDSC2BB12",
+          "size_bytes": 120034123776,
+          "rotational": false,
+          "transport": "scsi",
+          "scheduler": "mq-deadline",
+          "queue_depth": 64,
+          "physical_block_size": 4096
+        }
+      ],
+      "mounts": [
+        {
+          "source": "tmpfs",
+          "target": "/run",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "size=3281440k",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/sda3",
+          "target": "/",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/dev/shm",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "inode64",
+            "usrquota"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/tmp",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "size=16407188k",
+            "nr_inodes=1048576",
+            "inode64",
+            "usrquota"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/sda2",
+          "target": "/boot",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/getty@tty1.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/user/1000",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "relatime",
+            "size=3281436k",
+            "nr_inodes=820359",
+            "mode=700",
+            "uid=1000",
+            "gid=1000",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-resolved.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-journald.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "none",
+          "target": "/run/credentials/systemd-networkd.service",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=1024k",
+            "nr_inodes=1024",
+            "mode=700",
+            "inode64",
+            "noswap"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/systemd/nspawn/unix-export/ondatest",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=4096k",
+            "nr_inodes=64",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/systemd/nspawn/unix-export/ondafresh",
+          "fstype": "tmpfs",
+          "options": [
+            "ro",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "nosymfollow",
+            "size=4096k",
+            "nr_inodes=64",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        }
+      ],
+      "complex_stack": false,
+      "stack_indicators": []
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eno1",
+          "speed_mbps": 1000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "eno2",
+          "speed_mbps": null,
+          "mtu": 1500,
+          "operstate": "down",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "lo",
+          "speed_mbps": null,
+          "mtu": 65536,
+          "operstate": "unknown",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "ve-ondafresh",
+          "speed_mbps": 10000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "ve-ondatest",
+          "speed_mbps": 10000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        }
+      ],
+      "primary_interface": "eno1",
+      "ipv6_enabled": true
+    },
+    "software": {
+      "panels": [],
+      "web_servers": [],
+      "container_runtimes": [],
+      "databases": [
+        {
+          "name": "PostgreSQL",
+          "evidence": "path exists: /etc/postgresql"
+        }
+      ],
+      "runtimes": [
+        {
+          "name": "Node.js",
+          "evidence": "path exists: /usr/bin/node"
+        },
+        {
+          "name": "Python 3",
+          "evidence": "path exists: /usr/bin/python3"
+        }
+      ],
+      "firewalls": [
+        {
+          "name": "ufw",
+          "evidence": "path exists: /etc/ufw/ufw.conf"
+        },
+        {
+          "name": "nftables",
+          "evidence": "path exists: /etc/nftables.conf"
+        }
+      ],
+      "listening_tcp_ports": [
+        22,
+        53,
+        5432
+      ],
+      "production_likelihood": "unlikely",
+      "production_signals": []
+    },
+    "gaps": []
+  },
+  "modules": [
+    {
+      "module": {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-27T15:38:04.456524620Z",
+      "finished_at": "2026-08-27T15:38:17.008469304Z",
+      "duration_ms": 12551.944479,
+      "metrics": [
+        {
+          "key": "crypto_sha256.single",
+          "label": "SHA-256 hashing (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 191.83288970963838,
+          "summary": {
+            "n": 5,
+            "min": 187.67197790875613,
+            "max": 206.6176457063228,
+            "mean": 195.65539280433683,
+            "median": 191.83288970963838,
+            "stddev": 8.735077243295207,
+            "cv": 0.04464521584657077,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 197.12691369665922,
+              "duration_ms": 207.98783500000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 191.83288970963838,
+              "duration_ms": 213.727688,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 187.67197790875613,
+              "duration_ms": 218.466286,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 203.3687608659061,
+              "duration_ms": 201.604218,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 188.78568983106067,
+              "duration_ms": 217.177478,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 206.6176457063228,
+              "duration_ms": 198.434165,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "crypto_sha256.multi",
+          "label": "SHA-256 hashing (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 564.510037217794,
+          "summary": {
+            "n": 5,
+            "min": 529.6637522360086,
+            "max": 631.274457117776,
+            "mean": 572.0026514096429,
+            "median": 564.510037217794,
+            "stddev": 38.47609806381634,
+            "cv": 0.06726559390764338,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 563.5981864772388,
+              "duration_ms": 170.33411800000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 551.2323911181234,
+              "duration_ms": 174.155223,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 564.510037217794,
+              "duration_ms": 170.058978,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 529.6637522360086,
+              "duration_ms": 181.24706400000002,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 631.274457117776,
+              "duration_ms": 152.07331599999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 583.3326193585128,
+              "duration_ms": 164.57163,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.single",
+          "label": "DEFLATE compression (level 6) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 17.624420122588013,
+          "summary": {
+            "n": 5,
+            "min": 17.419538801883323,
+            "max": 17.869491405070757,
+            "mean": 17.66269443015451,
+            "median": 17.624420122588013,
+            "stddev": 0.19632047338255904,
+            "cv": 0.011114978757000534,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 17.737358223712025,
+              "duration_ms": 197.323635,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 17.869491405070757,
+              "duration_ms": 195.864556,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 17.854974297636964,
+              "duration_ms": 196.02380499999998,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 17.624420122588013,
+              "duration_ms": 198.58809399999998,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 17.419538801883323,
+              "duration_ms": 200.92380400000002,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 17.545047523593492,
+              "duration_ms": 199.486493,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.multi",
+          "label": "DEFLATE compression (level 6) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 70.08862215651337,
+          "summary": {
+            "n": 5,
+            "min": 63.08744730870685,
+            "max": 89.87050312061469,
+            "mean": 72.9098947686012,
+            "median": 70.08862215651337,
+            "stddev": 10.393266346899665,
+            "cv": 0.14254946300341592,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 60.00431250994009,
+              "duration_ms": 199.985626,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 66.83610324331046,
+              "duration_ms": 179.54368100000002,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 63.08744730870685,
+              "duration_ms": 190.212166,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 70.08862215651337,
+              "duration_ms": 171.21181199999998,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 74.66679801386069,
+              "duration_ms": 160.714003,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 89.87050312061469,
+              "duration_ms": 133.525457,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.single",
+          "label": "JSON serialise + parse (single)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 8291.879622790242,
+          "summary": {
+            "n": 5,
+            "min": 7635.749666958647,
+            "max": 8375.554037608174,
+            "mean": 8167.647350094245,
+            "median": 8291.879622790242,
+            "stddev": 309.7852502293227,
+            "cv": 0.03792833320916434,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 7704.658510231458,
+              "duration_ms": 179.761374,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 8375.554037608174,
+              "duration_ms": 165.36219499999999,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 8373.219279244891,
+              "duration_ms": 165.40830400000002,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 8161.83414386927,
+              "duration_ms": 169.69225,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 7635.749666958647,
+              "duration_ms": 181.38363099999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8291.879622790242,
+              "duration_ms": 167.03088599999998,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.multi",
+          "label": "JSON serialise + parse (multi)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 32466.68536657011,
+          "summary": {
+            "n": 5,
+            "min": 31330.55161433332,
+            "max": 32938.55329891668,
+            "mean": 32328.320373866194,
+            "median": 32466.68536657011,
+            "stddev": 601.0501711462903,
+            "cv": 0.018592063064067247,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 32631.075484117864,
+              "duration_ms": 201.770855,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 32336.865743001228,
+              "duration_ms": 203.606622,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 31330.55161433332,
+              "duration_ms": 210.146316,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 32466.68536657011,
+              "duration_ms": 202.79249099999998,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 32938.55329891668,
+              "duration_ms": 199.88734599999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 32568.945846509643,
+              "duration_ms": 202.15576,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.single",
+          "label": "Integer sort (single)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 52.976832083697836,
+          "summary": {
+            "n": 5,
+            "min": 52.084593236292704,
+            "max": 53.181975097271966,
+            "mean": 52.808035994330986,
+            "median": 52.976832083697836,
+            "stddev": 0.44848438755111214,
+            "cv": 0.008492729924651193,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 53.012758060458125,
+              "duration_ms": 197.79691499999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 52.084593236292704,
+              "duration_ms": 201.32172200000002,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 52.976832083697836,
+              "duration_ms": 197.93105,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 53.118086584979565,
+              "duration_ms": 197.404701,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 52.678692969412864,
+              "duration_ms": 199.05125600000002,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 53.181975097271966,
+              "duration_ms": 197.167555,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.multi",
+          "label": "Integer sort (multi)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 199.95330841215474,
+          "summary": {
+            "n": 5,
+            "min": 192.6161673708992,
+            "max": 201.74409467913532,
+            "mean": 198.94798797097195,
+            "median": 199.95330841215474,
+            "stddev": 3.6665821897132633,
+            "cv": 0.0184298530842556,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 201.11350071548455,
+              "duration_ms": 187.698667,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 199.95330841215474,
+              "duration_ms": 188.787754,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 201.12231072817798,
+              "duration_ms": 187.690445,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 199.30405866449263,
+              "duration_ms": 189.402746,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 192.6161673708992,
+              "duration_ms": 195.979063,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 201.74409467913532,
+              "duration_ms": 187.111975,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.single",
+          "label": "Double-precision matrix multiply (single)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 6746.957738909512,
+          "summary": {
+            "n": 5,
+            "min": 6565.725913232963,
+            "max": 6816.156968803606,
+            "mean": 6724.435853507677,
+            "median": 6746.957738909512,
+            "stddev": 98.1120896382368,
+            "cv": 0.014590382267838639,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 6784.689473025436,
+              "duration_ms": 195.969819,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 6746.957738909512,
+              "duration_ms": 197.065762,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 6705.399293493221,
+              "duration_ms": 198.287128,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 6816.156968803606,
+              "duration_ms": 195.065104,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6787.939353099084,
+              "duration_ms": 195.875994,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 6565.725913232963,
+              "duration_ms": 202.505311,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.multi",
+          "label": "Double-precision matrix multiply (multi)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 29639.106236498268,
+          "summary": {
+            "n": 5,
+            "min": 29228.141314818797,
+            "max": 30012.456570074813,
+            "mean": 29655.087396678795,
+            "median": 29639.106236498268,
+            "stddev": 294.10237574893165,
+            "cv": 0.009917434125716638,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 30190.223641139,
+              "duration_ms": 193.389464,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 30012.456570074813,
+              "duration_ms": 194.534931,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 29228.141314818797,
+              "duration_ms": 199.75513,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 29571.229829381497,
+              "duration_ms": 197.43755,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 29824.503032620607,
+              "duration_ms": 195.760887,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 29639.106236498268,
+              "duration_ms": 196.985399,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "informational",
+          "message": "Multi-threaded throughput reached only 48% of 8x the single-thread result. Expected on SMT and on shared-vCPU plans; unexpected on dedicated cores."
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "compress_deflate.multi.iterations": 3,
+          "compress_deflate.single.iterations": 7,
+          "crypto_sha256.multi.iterations": 12,
+          "crypto_sha256.single.iterations": 41,
+          "float_matmul.multi.iterations": 174,
+          "float_matmul.single.iterations": 317,
+          "integer_sort.multi.iterations": 18,
+          "integer_sort.single.iterations": 40,
+          "json_roundtrip.multi.iterations": 823,
+          "json_roundtrip.single.iterations": 1385
+        },
+        "scaling_efficiency": 0.47505749926034435,
+        "shape_single_threads": 1,
+        "threads": 8,
+        "workload_version": "1.0.1"
+      }
+    },
+    {
+      "module": {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-27T15:38:17.008760529Z",
+      "finished_at": "2026-08-27T15:38:35.230921776Z",
+      "duration_ms": 18222.161,
+      "metrics": [
+        {
+          "key": "sequential_read.single",
+          "label": "Sequential read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 15971.986349006098,
+          "summary": {
+            "n": 5,
+            "min": 15928.675102859293,
+            "max": 16036.600231210221,
+            "mean": 15982.012606799468,
+            "median": 15971.986349006098,
+            "stddev": 42.166106260704645,
+            "cv": 0.0026383477036406094,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 15852.633994652213,
+              "duration_ms": 199.335959,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 15971.986349006098,
+              "duration_ms": 197.84640000000002,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 16010.360932814294,
+              "duration_ms": 197.37219,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 15962.440418107433,
+              "duration_ms": 197.964717,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 16036.600231210221,
+              "duration_ms": 197.049247,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 15928.675102859293,
+              "duration_ms": 198.38435900000002,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_read.multi",
+          "label": "Sequential read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 22691.94718777728,
+          "summary": {
+            "n": 5,
+            "min": 22597.108919938175,
+            "max": 22920.822416600513,
+            "mean": 22737.84113112964,
+            "median": 22691.94718777728,
+            "stddev": 138.10376483163984,
+            "cv": 0.0060737413035473475,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 22547.86381167395,
+              "duration_ms": 202.236453,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 22920.822416600513,
+              "duration_ms": 198.945741,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 22691.94718777728,
+              "duration_ms": 200.952345,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 22597.108919938175,
+              "duration_ms": 201.795726,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 22841.864340544707,
+              "duration_ms": 199.633442,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 22637.46279078752,
+              "duration_ms": 201.436002,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.single",
+          "label": "Sequential write (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 8595.90091570983,
+          "summary": {
+            "n": 5,
+            "min": 8538.892737651373,
+            "max": 8625.941829978314,
+            "mean": 8582.605770108417,
+            "median": 8595.90091570983,
+            "stddev": 35.72109598890167,
+            "cv": 0.004162033879420567,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 8614.292144382587,
+              "duration_ms": 199.66817600000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 8599.113431405221,
+              "duration_ms": 200.02062,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 8553.179935797345,
+              "duration_ms": 201.094799,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 8595.90091570983,
+              "duration_ms": 200.095373,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 8538.892737651373,
+              "duration_ms": 201.431269,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8625.941829978314,
+              "duration_ms": 199.398516,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.multi",
+          "label": "Sequential write (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 9661.815863110467,
+          "summary": {
+            "n": 5,
+            "min": 9636.906557411987,
+            "max": 9771.967872375493,
+            "mean": 9677.950573748718,
+            "median": 9661.815863110467,
+            "stddev": 53.604695205996585,
+            "cv": 0.00553884779608179,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 9652.863763608446,
+              "duration_ms": 198.90470299999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 9771.967872375493,
+              "duration_ms": 196.48038400000002,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 9636.906557411987,
+              "duration_ms": 199.234058,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 9661.815863110467,
+              "duration_ms": 198.720409,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 9663.475942935182,
+              "duration_ms": 198.686271,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 9655.586632910467,
+              "duration_ms": 198.848612,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.single",
+          "label": "Sequential copy (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11716.903116044223,
+          "summary": {
+            "n": 5,
+            "min": 11672.729098100599,
+            "max": 11720.96410022281,
+            "mean": 11705.599574804713,
+            "median": 11716.903116044223,
+            "stddev": 20.091384345566116,
+            "cv": 0.001716390879183248,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11757.176579317078,
+              "duration_ms": 197.32628699999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11672.729098100599,
+              "duration_ms": 198.753863,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 11716.903116044223,
+              "duration_ms": 198.004539,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 11700.00845476904,
+              "duration_ms": 198.290455,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 11717.393104886896,
+              "duration_ms": 197.996259,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11720.96410022281,
+              "duration_ms": 197.935936,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.multi",
+          "label": "Sequential copy (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 13607.330268815811,
+          "summary": {
+            "n": 5,
+            "min": 13445.466214744114,
+            "max": 13652.39851987722,
+            "mean": 13563.888449712535,
+            "median": 13607.330268815811,
+            "stddev": 98.58725168946332,
+            "cv": 0.007268362022805688,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 13643.57950303382,
+              "duration_ms": 199.361172,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 13470.402203329917,
+              "duration_ms": 201.924186,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 13445.466214744114,
+              "duration_ms": 202.298675,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 13652.39851987722,
+              "duration_ms": 199.232391,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 13607.330268815811,
+              "duration_ms": 199.89226,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 13643.845041795612,
+              "duration_ms": 199.357292,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.single",
+          "label": "Triad (a = b + k*c) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 12006.403375112048,
+          "summary": {
+            "n": 5,
+            "min": 11794.630130965117,
+            "max": 12017.201422115615,
+            "mean": 11966.364091020156,
+            "median": 12006.403375112048,
+            "stddev": 96.12324746753555,
+            "cv": 0.008032786461818316,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11977.719704580124,
+              "duration_ms": 200.372029,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 12006.403375112048,
+              "duration_ms": 199.893334,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 12004.598661632304,
+              "duration_ms": 199.923385,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 12017.201422115615,
+              "duration_ms": 199.71372000000002,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 12008.986865275696,
+              "duration_ms": 199.85033099999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11794.630130965117,
+              "duration_ms": 203.48243,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            4
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.multi",
+          "label": "Triad (a = b + k*c) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 15271.242523503128,
+          "summary": {
+            "n": 5,
+            "min": 15226.730333790767,
+            "max": 15352.65566744022,
+            "mean": 15279.542536417906,
+            "median": 15271.242523503128,
+            "stddev": 52.60355426694948,
+            "cv": 0.0034427440573938616,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 15330.703845733102,
+              "duration_ms": 203.513161,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 15271.242523503128,
+              "duration_ms": 204.305576,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 15226.730333790767,
+              "duration_ms": 204.90282100000002,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 15236.172466616046,
+              "duration_ms": 204.775839,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 15352.65566744022,
+              "duration_ms": 203.22217,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 15310.91169073937,
+              "duration_ms": 203.776239,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.single",
+          "label": "Random read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 764.0408564162611,
+          "summary": {
+            "n": 5,
+            "min": 762.4449723211031,
+            "max": 765.8556324127316,
+            "mean": 764.2309826332122,
+            "median": 764.0408564162611,
+            "stddev": 1.2925016439671007,
+            "cv": 0.001691244758899586,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 761.1145256875795,
+              "duration_ms": 210.218035,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 765.0211374383997,
+              "duration_ms": 209.14454800000001,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 764.0408564162611,
+              "duration_ms": 209.412885,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 765.8556324127316,
+              "duration_ms": 208.916659,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 763.7923145775649,
+              "duration_ms": 209.481029,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 762.4449723211031,
+              "duration_ms": 209.85121,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.multi",
+          "label": "Random read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 2448.9191685045976,
+          "summary": {
+            "n": 5,
+            "min": 2414.561410991618,
+            "max": 2464.0221326681362,
+            "mean": 2445.221143466385,
+            "median": 2448.9191685045976,
+            "stddev": 18.57171904564742,
+            "cv": 0.0075951081542342015,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 2437.3486387453554,
+              "duration_ms": 196.935306,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 2444.876315999245,
+              "duration_ms": 196.32895,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 2464.0221326681362,
+              "duration_ms": 194.80344499999998,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 2414.561410991618,
+              "duration_ms": 198.793867,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 2448.9191685045976,
+              "duration_ms": 196.00483599999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 2453.7266891683284,
+              "duration_ms": 195.620809,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            2
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.single",
+          "label": "Cache-resident read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 46821.1753153696,
+          "summary": {
+            "n": 5,
+            "min": 46662.431056854846,
+            "max": 46914.18418055188,
+            "mean": 46788.52466113369,
+            "median": 46821.1753153696,
+            "stddev": 105.63026296299189,
+            "cv": 0.00225761046598541,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 46794.877919774015,
+              "duration_ms": 200.00319299999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 46697.06360920791,
+              "duration_ms": 200.422131,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 46821.1753153696,
+              "duration_ms": 199.89086,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 46662.431056854846,
+              "duration_ms": 200.570883,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 46914.18418055188,
+              "duration_ms": 199.49457,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 46847.76914368422,
+              "duration_ms": 199.777389,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.multi",
+          "label": "Cache-resident read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 161221.1706517195,
+          "summary": {
+            "n": 5,
+            "min": 161165.06806253927,
+            "max": 161258.89638406545,
+            "mean": 161220.08845829358,
+            "median": 161221.1706517195,
+            "stddev": 38.90561480679522,
+            "cv": 0.0002413198949264924,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 160438.6044686314,
+              "duration_ms": 201.061335,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 161201.14270611753,
+              "duration_ms": 200.110244,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 161165.06806253927,
+              "duration_ms": 200.155036,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 161254.16448702605,
+              "duration_ms": 200.044446,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 161258.89638406545,
+              "duration_ms": 200.038576,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 161221.1706517195,
+              "duration_ms": 200.085385,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_random.single",
+          "label": "Random access latency (single)",
+          "unit": "ns",
+          "direction": "lower_is_better",
+          "value": 66.8355537082838,
+          "summary": {
+            "n": 5,
+            "min": 66.29386769170347,
+            "max": 67.30714184304942,
+            "mean": 66.80766256581181,
+            "median": 66.8355537082838,
+            "stddev": 0.36760782493826644,
+            "cv": 0.005502479967415987,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 66.6387408712636,
+              "duration_ms": 200.89288,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 67.30714184304942,
+              "duration_ms": 202.907879,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 66.29386769170347,
+              "duration_ms": 199.853206,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 66.91534589684528,
+              "duration_ms": 201.726749,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 66.8355537082838,
+              "duration_ms": 201.486203,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 66.68640368917714,
+              "duration_ms": 201.036567,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "cache_cliff": 2.931456006302133,
+        "calibration": {
+          "cache_read.multi.passes": 32258,
+          "cache_read.single.passes": 74873,
+          "latency_random.single.passes": 46,
+          "random_read.multi.passes": 12,
+          "random_read.single.passes": 4,
+          "sequential_copy.multi.passes": 34,
+          "sequential_copy.single.passes": 29,
+          "sequential_read.multi.passes": 114,
+          "sequential_read.single.passes": 79,
+          "sequential_write.multi.passes": 48,
+          "sequential_write.single.passes": 43,
+          "triad.multi.passes": 26,
+          "triad.single.passes": 20
+        },
+        "numa_nodes": 1,
+        "plan": {
+          "cache_bytes": 131072,
+          "l2_multiple": 4,
+          "llc_assumed": false,
+          "llc_bytes": 10485760,
+          "llc_multiple": 4,
+          "memory_budget_fraction": 0.25,
+          "multi_bytes_aggregate": 41943040,
+          "multi_bytes_per_thread": 5242880,
+          "multi_contaminated": false,
+          "peak_alloc_bytes": 125829120,
+          "single_bytes": 41943040,
+          "single_contaminated": false
+        },
+        "threads": 8,
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-27T15:38:35.231857086Z",
+      "finished_at": "2026-08-27T15:39:01.633468925Z",
+      "duration_ms": 26401.611405,
+      "metrics": [
+        {
+          "key": "sequential_read.qd1",
+          "label": "Sequential read",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 336.24367823138095,
+          "summary": {
+            "n": 5,
+            "min": 326.4785239289705,
+            "max": 349.7129842699045,
+            "mean": 336.64227859472766,
+            "median": 336.24367823138095,
+            "stddev": 8.489558556676931,
+            "cv": 0.02521833737614765,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 334.3201384244175,
+              "duration_ms": 191.433278,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 336.24367823138095,
+              "duration_ms": 190.338151,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 326.4785239289705,
+              "duration_ms": 196.031271,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 337.7162321840044,
+              "duration_ms": 189.508214,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 333.05997435937786,
+              "duration_ms": 192.15758399999999,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 349.7129842699045,
+              "duration_ms": 183.007217,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.qd1",
+          "label": "Sequential write",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 138.41257047905805,
+          "summary": {
+            "n": 5,
+            "min": 131.43532314846271,
+            "max": 140.86021110967752,
+            "mean": 136.92031695260812,
+            "median": 138.41257047905805,
+            "stddev": 3.8932114346812394,
+            "cv": 0.028434139807233916,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 138.84742596199828,
+              "duration_ms": 180.053752,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 138.41257047905805,
+              "duration_ms": 180.619433,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 139.47579528680046,
+              "duration_ms": 179.24257,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 140.86021110967752,
+              "duration_ms": 177.48092100000002,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 134.41768473904193,
+              "duration_ms": 185.987432,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 131.43532314846271,
+              "duration_ms": 190.20762,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd1",
+          "label": "Random 4K read (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 7256.373591591637,
+          "summary": {
+            "n": 5,
+            "min": 6911.656205882448,
+            "max": 7352.389976054939,
+            "mean": 7169.297377636106,
+            "median": 7256.373591591637,
+            "stddev": 206.38678110992615,
+            "cv": 0.028787588272419656,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 7259.315413012626,
+              "duration_ms": 234.319616,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 7256.373591591637,
+              "duration_ms": 234.414612,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 7340.261380709552,
+              "duration_ms": 231.735617,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 6911.656205882448,
+              "duration_ms": 246.105991,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 7352.389976054939,
+              "duration_ms": 231.353343,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 6985.805733941954,
+              "duration_ms": 243.49374500000002,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_read_4k.p99",
+          "label": "Random 4K read (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.172079,
+          "summary": {
+            "n": 5,
+            "min": 0.163413,
+            "max": 0.17856,
+            "mean": 0.1710974,
+            "median": 0.172079,
+            "stddev": 0.0069218835803558495,
+            "cv": 0.04045580809735185,
+            "ci95": null
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd16",
+          "label": "Random 4K read (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 70812.41237585782,
+          "summary": {
+            "n": 5,
+            "min": 70221.32420838551,
+            "max": 71037.01018970554,
+            "mean": 70722.3464082479,
+            "median": 70812.41237585782,
+            "stddev": 305.41031242736216,
+            "cv": 0.004318441453630052,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 70421.95480738372,
+              "duration_ms": 196.07521599999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 70842.31637300146,
+              "duration_ms": 194.911752,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 70812.41237585782,
+              "duration_ms": 194.99406299999998,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 70698.66889428916,
+              "duration_ms": 195.30777899999998,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 70221.32420838551,
+              "duration_ms": 196.635426,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 71037.01018970554,
+              "duration_ms": 194.37755,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd1",
+          "label": "Random 4K write (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 26948.574102172293,
+          "summary": {
+            "n": 5,
+            "min": 25929.345238512593,
+            "max": 28489.060748539116,
+            "mean": 27226.50340141607,
+            "median": 26948.574102172293,
+            "stddev": 1191.257026939922,
+            "cv": 0.04375358118435303,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 24302.00699311755,
+              "duration_ms": 174.38888899999998,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 25929.345238512593,
+              "duration_ms": 163.44415800000002,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 26948.574102172293,
+              "duration_ms": 157.262495,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 28489.060748539116,
+              "duration_ms": 148.758853,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 26316.555386696167,
+              "duration_ms": 161.039313,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 28448.98153116017,
+              "duration_ms": 148.968426,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_write_4k.p99",
+          "label": "Random 4K write (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.044757,
+          "summary": {
+            "n": 5,
+            "min": 0.043947,
+            "max": 0.15457700000000002,
+            "mean": 0.0731488,
+            "median": 0.044757,
+            "stddev": 0.04787224868543362,
+            "cv": 0.6544502259153071,
+            "ci95": null
+          },
+          "samples": [],
+          "outliers": [
+            0,
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd16",
+          "label": "Random 4K write (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 35254.78094232267,
+          "summary": {
+            "n": 5,
+            "min": 32675.190130687042,
+            "max": 36539.54728979504,
+            "mean": 35240.32949012694,
+            "median": 35254.78094232267,
+            "stddev": 1568.0744314623455,
+            "cv": 0.044496588259813605,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 35907.91741015778,
+              "duration_ms": 200.95846600000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 36539.54728979504,
+              "duration_ms": 197.484658,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 36492.2535355752,
+              "duration_ms": 197.74059699999998,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 32675.190130687042,
+              "duration_ms": 220.840337,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 35239.87555225478,
+              "duration_ms": 204.76803299999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 35254.78094232267,
+              "duration_ms": 204.68145900000002,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_mixed_4k.qd16",
+          "label": "Random 4K mixed 70/30 (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 38865.65902774284,
+          "summary": {
+            "n": 5,
+            "min": 36241.09703426926,
+            "max": 39336.92692551184,
+            "mean": 38276.30886033119,
+            "median": 38865.65902774284,
+            "stddev": 1265.7391731037342,
+            "cv": 0.03306847527336998,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 37620.71259779199,
+              "duration_ms": 199.03929200000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 39068.865998250614,
+              "duration_ms": 191.661565,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 39336.92692551184,
+              "duration_ms": 190.35548999999997,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 38865.65902774284,
+              "duration_ms": 192.663657,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 36241.09703426926,
+              "duration_ms": 206.616262,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 37868.99531588141,
+              "duration_ms": 197.734319,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_fsync.mean",
+          "label": "fsync latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.09773083829995115,
+          "summary": {
+            "n": 5,
+            "min": 0.09326382266731803,
+            "max": 0.10230736003908157,
+            "mean": 0.09769267347337568,
+            "median": 0.09773083829995115,
+            "stddev": 0.003330547491898776,
+            "cv": 0.03409209077287106,
+            "ci95": null
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 0.09554551734245238,
+              "duration_ms": 195.58167400000002,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 0.09627040791402051,
+              "duration_ms": 197.06552499999998,
+              "warmup": false
+            },
+            {
+              "rep": 2,
+              "value": 0.09326382266731803,
+              "duration_ms": 190.911045,
+              "warmup": false
+            },
+            {
+              "rep": 3,
+              "value": 0.09889093844650708,
+              "duration_ms": 202.42975099999998,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 0.10230736003908157,
+              "duration_ms": 209.42316599999998,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 0.09773083829995115,
+              "duration_ms": 200.055026,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "latency_fsync.mean.operations": 2047,
+          "random_mixed_4k.qd16.operations": 7481,
+          "random_read_4k.qd1.operations": 1701,
+          "random_read_4k.qd16.operations": 13801,
+          "random_write_4k.qd1.operations": 4238,
+          "random_write_4k.qd16.operations": 7211,
+          "sequential_read.qd1.operations": 64,
+          "sequential_write.qd1.operations": 25
+        },
+        "filesystem": "ext4",
+        "plan": {
+          "constrained_by_free_space": false,
+          "deep_queue_depth": 16,
+          "direct_io": true,
+          "fixture_bytes": 2147483648,
+          "large_block_bytes": 1048576,
+          "mixed_read_share_pct": 70,
+          "small_block_bytes": 4096
+        },
+        "steady_state_ratio": {
+          "latency_fsync.mean": 0.9850566063758878,
+          "random_mixed_4k.qd16": 0.9692883156008948,
+          "random_write_4k.qd1": 1.0971731553369573,
+          "random_write_4k.qd16": 0.9648390184672271,
+          "sequential_write.qd1": 0.9495909417298843
+        },
+        "workload_version": "1.0.0"
+      }
+    }
+  ],
+  "scores": {
+    "scoring_model": "dbs/0.1.0-dev",
+    "reference_profile": "DARC-REF-1",
+    "uncalibrated": true,
+    "profile": "quick",
+    "total": 383.97888066572807,
+    "total_is_standard": false,
+    "categories": [
+      {
+        "key": "compute",
+        "label": "Compute Score",
+        "score": 312.6956592684922,
+        "weight": 0.26,
+        "metric_count": 10,
+        "modules": [
+          "cpu.mixed"
+        ]
+      },
+      {
+        "key": "memory",
+        "label": "Memory Score",
+        "score": 533.0678518967842,
+        "weight": 0.12,
+        "metric_count": 13,
+        "modules": [
+          "memory.bandwidth"
+        ]
+      },
+      {
+        "key": "storage",
+        "label": "Storage Score",
+        "score": 418.5836894244798,
+        "weight": 0.2,
+        "metric_count": 10,
+        "modules": [
+          "storage.mixed"
+        ]
+      }
+    ],
+    "facets": {
+      "multi_core": 173.59469676421537,
+      "single_core": 563.2578480099797
+    },
+    "composites": [
+      {
+        "key": "node_nextjs",
+        "label": "Node / Next.js",
+        "score": 369.8862804222173,
+        "weight_coverage": 0.65
+      },
+      {
+        "key": "database_server",
+        "label": "Database Server",
+        "score": 431.1256176329668,
+        "weight_coverage": 0.65
+      },
+      {
+        "key": "build_server",
+        "label": "Build Server",
+        "score": 381.75563186123736,
+        "weight_coverage": 0.8999999999999999
+      },
+      {
+        "key": "general_purpose_vps",
+        "label": "General Purpose VPS",
+        "score": 389.04451148028886,
+        "weight_coverage": 0.7
+      }
+    ],
+    "stability_score": 944.4251062149973,
+    "stability_index": 0.9444251062149973,
+    "stability_multiplier": 0.9944425106214998,
+    "uncapped_total": 383.97888066572807,
+    "weak_link_applied": false,
+    "balance_index": 0.75955571745969,
+    "efficiency_score": 312.6956592684923,
+    "median_cv": 0.011114978757000534,
+    "instability_flags": 0,
+    "missing_required_categories": [
+      "network",
+      "web"
+    ],
+    "unreferenced_metrics": []
+  },
+  "verdict": {
+    "state": "partial",
+    "reasons": [
+      {
+        "excessive_variance": {
+          "module": "storage.mixed"
+        }
+      },
+      {
+        "required_module_missing": {
+          "module": "network.transfer"
+        }
+      },
+      {
+        "required_module_missing": {
+          "module": "web.static"
+        }
+      }
+    ],
+    "validator_version": "dbv/0.1.0"
+  },
+  "telemetry": {
+    "samples": 58,
+    "cpu_busy_pct_mean": 31.615429651814537,
+    "cpu_external_busy_pct_max": 33.08080808080808,
+    "cpu_steal_pct_max": 0.0,
+    "cpu_steal_pct_mean": 0.0,
+    "cpu_iowait_pct_mean": 10.785723578065673,
+    "load1_max": 3.33,
+    "mem_used_bytes_max": 7108059136,
+    "swap_used_bytes_max": 45056,
+    "cpu_freq_mhz_first": 3700.42,
+    "cpu_freq_mhz_last": 3699.908,
+    "cpu_temp_c_max": 51.0,
+    "psi_cpu_some_avg10_max": 3.11
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "canonicalization": "DCJ/1",
+    "public_key": "Cn1NBi8wC/9Jk6g2gO+w6Qu8fk70dD97ckn+ab+oRG0=",
+    "value": "fqo8mLjt2MMTeLiwFH1aUPWagRwL33bXatxuaq6qsB1CeMkUysUl40+8D47s8lYXtKvhWnQbIKNd9AwUhZoLAg==",
+    "key_id": "248ec70628eaac2b"
+  }
+}

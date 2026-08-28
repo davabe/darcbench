@@ -1,0 +1,5552 @@
+{
+  "meta": {
+    "schema": "darcbench.bundle/1",
+    "protocol": "darcbench.events/1",
+    "agent_version": "0.1.0",
+    "build_target": "x86_64-unknown-linux-musl",
+    "build_profile": "release",
+    "generated_at": "2026-08-28T13:44:13.081514623Z",
+    "agent_build_hash": "sha256:2e8308c5717b1f2ec8093318ecf9704574d2f5d88ad5a150e921aeb74e0e248a"
+  },
+  "run": {
+    "run_id": "run_091150b5bd82f17a78f8b500771d65c8",
+    "profile": "deep",
+    "state": "completed",
+    "started_at": "2026-08-28T13:39:17.712714185Z",
+    "finished_at": "2026-08-28T13:44:13.081511802Z",
+    "duration_ms": 295416,
+    "modules": [
+      {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      },
+      {
+        "id": "network.transfer",
+        "version": "1.0.0"
+      },
+      {
+        "id": "web.static",
+        "version": "1.0.0"
+      },
+      {
+        "id": "php.runtime",
+        "version": "1.0.0"
+      },
+      {
+        "id": "node.runtime",
+        "version": "1.0.0"
+      },
+      {
+        "id": "database.oltp",
+        "version": "1.0.0"
+      },
+      {
+        "id": "database.cache",
+        "version": "1.0.0"
+      },
+      {
+        "id": "wordpress.site",
+        "version": "1.0.0"
+      },
+      {
+        "id": "deployment.container",
+        "version": "1.0.0"
+      }
+    ],
+    "environment_digest": "sha256:1dac9b9663ee607203ef9af98955bf5d77266cc8ab58da52657970637c02a850",
+    "events_digest": "sha256:ac9f26444d7507fa1ab4c63c142bfb45f589d6316fe8a14f359c85830fb4c4bd",
+    "event_count": 957,
+    "guards_not_enforced": [
+      "The runtime load ceiling was suspended while the container-based modules ran. Their workload executes in a container this process did not fork, so its CPU cannot be told apart from a competing tenant's, and enforcing the ceiling would have degraded every such module on an idle machine. Nothing here reports on whether those measurements had the CPU to themselves."
+    ],
+    "comparability_not_recorded": [
+      "network.transfer/endpoint.host",
+      "network.transfer/endpoint.operator",
+      "network.transfer/network.address_family",
+      "web.static/web.connections",
+      "web.static/web.object_sizes"
+    ]
+  },
+  "environment": {
+    "schema": "darcbench.inventory/1",
+    "collected_at": "2026-08-28T13:39:17.721148567Z",
+    "platform": {
+      "os": "linux",
+      "distribution": "ubuntu",
+      "distribution_version": "24.04",
+      "kernel_release": "6.8.0-138-generic",
+      "architecture": "x86_64",
+      "scope": "unknown",
+      "virtualization": null,
+      "virtualization_evidence": [],
+      "container_runtime": null,
+      "cgroup_cpu_limit": null,
+      "cgroup_mem_limit_bytes": null,
+      "uptime_seconds": 159467,
+      "load1": 1.68,
+      "load5": 1.27,
+      "load15": 1.16,
+      "running_as_root": false,
+      "hostname": "[redacted]",
+      "dmi_vendor": "Default string",
+      "dmi_product": "Default string",
+      "cloud_hint": null,
+      "security_modules": [
+        "lockdown",
+        "capability",
+        "landlock",
+        "yama",
+        "apparmor"
+      ]
+    },
+    "cpu": {
+      "vendor": "GenuineIntel",
+      "model": "Intel(R) Xeon(R) CPU E5-2699 v3 @ 2.30GHz",
+      "family": "6",
+      "stepping": "2",
+      "microcode": "0x49",
+      "logical_cpus": 72,
+      "physical_cores": 36,
+      "sockets": 2,
+      "numa_nodes": 2,
+      "smt_enabled": true,
+      "base_mhz": 2793.756,
+      "max_mhz": 3600.0,
+      "min_mhz": 1200.0,
+      "governor": "performance",
+      "scaling_driver": "intel_cpufreq",
+      "caches": [
+        {
+          "level": "L1d",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L1i",
+          "size_bytes": 32768,
+          "shared_by": 2
+        },
+        {
+          "level": "L2",
+          "size_bytes": 262144,
+          "shared_by": 2
+        },
+        {
+          "level": "L3",
+          "size_bytes": 47185920,
+          "shared_by": 36
+        }
+      ],
+      "instruction_sets": [
+        "aes",
+        "avx",
+        "avx2",
+        "bmi2",
+        "constant_tsc",
+        "nonstop_tsc",
+        "pclmulqdq",
+        "sse4_2"
+      ],
+      "mitigations": [
+        "spectre_v2: Mitigation: Retpolines; IBPB: conditional; IBRS_FW; STIBP: conditional; RSB filling; PBRSB-eIBRS: Not affected; BHI: Not affected",
+        "itlb_multihit: KVM: Mitigation: VMX disabled",
+        "vmscape: Mitigation: IBPB before exit to userspace",
+        "mmio_stale_data: Mitigation: Clear CPU buffers; SMT vulnerable",
+        "mds: Mitigation: Clear CPU buffers; SMT vulnerable",
+        "l1tf: Mitigation: PTE Inversion; VMX: conditional cache flushes, SMT vulnerable",
+        "spec_store_bypass: Mitigation: Speculative Store Bypass disabled via prctl",
+        "spectre_v1: Mitigation: usercopy/swapgs barriers and __user pointer sanitization",
+        "meltdown: Mitigation: PTI"
+      ]
+    },
+    "memory": {
+      "total_bytes": 33574170624,
+      "available_bytes": 30029791232,
+      "free_bytes": 23181533184,
+      "buffers_bytes": 277831680,
+      "cached_bytes": 6729748480,
+      "swap_total_bytes": 8589930496,
+      "swap_free_bytes": 8589930496,
+      "hugepages_total": 0,
+      "swappiness": 60,
+      "psi_available": true
+    },
+    "storage": {
+      "devices": [
+        {
+          "name": "dm-0",
+          "model": null,
+          "size_bytes": 107374182400,
+          "rotational": false,
+          "transport": "dm",
+          "scheduler": null,
+          "queue_depth": null,
+          "physical_block_size": 512
+        },
+        {
+          "name": "dm-1",
+          "model": null,
+          "size_bytes": 134217728000,
+          "rotational": false,
+          "transport": "dm",
+          "scheduler": null,
+          "queue_depth": null,
+          "physical_block_size": 512
+        },
+        {
+          "name": "nvme0n1",
+          "model": "TME38MB256",
+          "size_bytes": 256060514304,
+          "rotational": false,
+          "transport": "nvme",
+          "scheduler": "none",
+          "queue_depth": 1023,
+          "physical_block_size": 512
+        }
+      ],
+      "mounts": [
+        {
+          "source": "tmpfs",
+          "target": "/run",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "size=3278728k",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/mapper/ubuntu--vg-ubuntu--lv",
+          "target": "/",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/dev/shm",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/lock",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "size=5120k",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/loop0",
+          "target": "/snap/aws-cli/2312",
+          "fstype": "squashfs",
+          "options": [
+            "ro",
+            "nodev",
+            "relatime",
+            "errors=continue",
+            "threads=single"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/loop1",
+          "target": "/snap/core22/2437",
+          "fstype": "squashfs",
+          "options": [
+            "ro",
+            "nodev",
+            "relatime",
+            "errors=continue",
+            "threads=single"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/loop2",
+          "target": "/snap/core24/1643",
+          "fstype": "squashfs",
+          "options": [
+            "ro",
+            "nodev",
+            "relatime",
+            "errors=continue",
+            "threads=single"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/loop3",
+          "target": "/snap/lxd/40585",
+          "fstype": "squashfs",
+          "options": [
+            "ro",
+            "nodev",
+            "relatime",
+            "errors=continue",
+            "threads=single"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/loop4",
+          "target": "/snap/snapd/27710",
+          "fstype": "squashfs",
+          "options": [
+            "ro",
+            "nodev",
+            "relatime",
+            "errors=continue",
+            "threads=single"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/nvme0n1p2",
+          "target": "/boot",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/mapper/ubuntu--vg-lv--0",
+          "target": "/home",
+          "fstype": "ext4",
+          "options": [
+            "rw",
+            "relatime"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "/dev/nvme0n1p1",
+          "target": "/boot/efi",
+          "fstype": "vfat",
+          "options": [
+            "rw",
+            "relatime",
+            "fmask=0022",
+            "dmask=0022",
+            "codepage=437",
+            "iocharset=iso8859-1",
+            "shortname=mixed",
+            "errors=remount-ro"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/snapd/ns",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "noexec",
+            "relatime",
+            "size=3278728k",
+            "mode=755",
+            "inode64"
+          ],
+          "network_backed": false
+        },
+        {
+          "source": "tmpfs",
+          "target": "/run/user/1000",
+          "fstype": "tmpfs",
+          "options": [
+            "rw",
+            "nosuid",
+            "nodev",
+            "relatime",
+            "size=3278724k",
+            "nr_inodes=819681",
+            "mode=700",
+            "uid=1000",
+            "gid=1000",
+            "inode64"
+          ],
+          "network_backed": false
+        }
+      ],
+      "complex_stack": true,
+      "stack_indicators": [
+        "device-mapper / LVM present"
+      ]
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "enp5s0",
+          "speed_mbps": null,
+          "mtu": 1500,
+          "operstate": "down",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "enp6s0",
+          "speed_mbps": 1000,
+          "mtu": 1500,
+          "operstate": "up",
+          "virtual_device": false,
+          "mac": "[redacted]"
+        },
+        {
+          "name": "lo",
+          "speed_mbps": null,
+          "mtu": 65536,
+          "operstate": "unknown",
+          "virtual_device": true,
+          "mac": "[redacted]"
+        }
+      ],
+      "primary_interface": "enp6s0",
+      "ipv6_enabled": true
+    },
+    "software": {
+      "panels": [],
+      "web_servers": [],
+      "container_runtimes": [],
+      "databases": [
+        {
+          "name": "MySQL",
+          "evidence": "path exists: /etc/mysql/my.cnf"
+        }
+      ],
+      "runtimes": [
+        {
+          "name": "Python 3",
+          "evidence": "path exists: /usr/bin/python3"
+        }
+      ],
+      "firewalls": [
+        {
+          "name": "ufw",
+          "evidence": "path exists: /etc/ufw/ufw.conf"
+        },
+        {
+          "name": "nftables",
+          "evidence": "path exists: /etc/nftables.conf"
+        }
+      ],
+      "listening_tcp_ports": [
+        22,
+        53,
+        4317,
+        8125,
+        9090,
+        19999
+      ],
+      "production_likelihood": "unlikely",
+      "production_signals": []
+    },
+    "gaps": []
+  },
+  "modules": [
+    {
+      "module": {
+        "id": "cpu.mixed",
+        "version": "1.0.1"
+      },
+      "status": "degraded",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:39:17.721587423Z",
+      "finished_at": "2026-08-28T13:40:26.291914678Z",
+      "duration_ms": 68570.32703999999,
+      "metrics": [
+        {
+          "key": "crypto_sha256.single",
+          "label": "SHA-256 hashing (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 206.25148801854795,
+          "summary": {
+            "n": 11,
+            "min": 201.34060588346577,
+            "max": 208.11987381830798,
+            "mean": 206.13895529422624,
+            "median": 206.25148801854795,
+            "stddev": 2.029107415179579,
+            "cv": 0.00984339622893399,
+            "ci95": [
+              205.10765760137298,
+              207.76503388099957
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 205.97006136944555,
+              "duration_ms": 480.652379,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 207.14900943854582,
+              "duration_ms": 477.91684000000004,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 200.52299150844678,
+              "duration_ms": 493.708972,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 205.40543916300146,
+              "duration_ms": 481.973605,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 206.25148801854795,
+              "duration_ms": 479.996537,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 208.11987381830798,
+              "duration_ms": 475.687392,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 201.34060588346577,
+              "duration_ms": 491.704093,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 208.06647800473462,
+              "duration_ms": 475.809467,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 205.10765760137298,
+              "duration_ms": 482.673349,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 207.76503388099957,
+              "duration_ms": 476.499814,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 207.68070850689068,
+              "duration_ms": 476.693289,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 205.26192638865282,
+              "duration_ms": 482.310586,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 205.02508531621896,
+              "duration_ms": 482.86774199999996,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 207.5042116542959,
+              "duration_ms": 477.09875,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "crypto_sha256.multi",
+          "label": "SHA-256 hashing (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 4152.827172308455,
+          "summary": {
+            "n": 11,
+            "min": 3891.4369173847754,
+            "max": 4452.631599227573,
+            "mean": 4164.732969007484,
+            "median": 4152.827172308455,
+            "stddev": 156.4901799577471,
+            "cv": 0.0375750813130862,
+            "ci95": [
+              4028.953350105057,
+              4296.1823056871
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 3976.407008605977,
+              "duration_ms": 470.77675800000003,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 4245.682361034122,
+              "duration_ms": 440.918524,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 4023.123287936191,
+              "duration_ms": 465.310125,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 4135.846125562106,
+              "duration_ms": 452.628058,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 4152.827172308455,
+              "duration_ms": 450.777247,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 4117.505449706521,
+              "duration_ms": 454.644207,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 4164.788840800706,
+              "duration_ms": 449.482572,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 4296.1823056871,
+              "duration_ms": 435.73569899999995,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 4016.269228685428,
+              "duration_ms": 466.10421099999996,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 3891.4369173847754,
+              "duration_ms": 481.056237,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 4452.631599227573,
+              "duration_ms": 420.42553,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 4297.5472100540455,
+              "duration_ms": 435.597309,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 4258.07445956056,
+              "duration_ms": 439.635337,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 4028.953350105057,
+              "duration_ms": 464.636802,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.single",
+          "label": "DEFLATE compression (level 6) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 18.123264915115268,
+          "summary": {
+            "n": 11,
+            "min": 17.729250132323738,
+            "max": 18.232993331969464,
+            "mean": 18.034963774291274,
+            "median": 18.123264915115268,
+            "stddev": 0.17778192305858523,
+            "cv": 0.00985762573651588,
+            "ci95": [
+              17.82895976437025,
+              18.15687239980726
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 17.79660336756939,
+              "duration_ms": 505.714479,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 17.81156313775415,
+              "duration_ms": 505.289734,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 18.02285351894763,
+              "duration_ms": 499.365985,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 17.729250132323738,
+              "duration_ms": 507.635683,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 18.172453641116707,
+              "duration_ms": 495.25508099999996,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 18.125368315036397,
+              "duration_ms": 496.541634,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 18.132885582690758,
+              "duration_ms": 496.335785,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 17.82895976437025,
+              "duration_ms": 504.79669699999994,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 18.027069266940547,
+              "duration_ms": 499.24920499999996,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 18.09887171090788,
+              "duration_ms": 497.268567,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 18.232993331969464,
+              "duration_ms": 493.610667,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 18.123264915115268,
+              "duration_ms": 496.599263,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 17.75661245692576,
+              "duration_ms": 506.85343400000005,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 18.15687239980726,
+              "duration_ms": 495.680082,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            4,
+            9
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "compress_deflate.multi",
+          "label": "DEFLATE compression (level 6) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 528.0465060112972,
+          "summary": {
+            "n": 11,
+            "min": 499.5460315968099,
+            "max": 564.341514384745,
+            "mean": 530.8561529174244,
+            "median": 528.0465060112972,
+            "stddev": 19.37788345389771,
+            "cv": 0.036503077806299765,
+            "ci95": [
+              518.9457977732848,
+              547.7281960207581
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 553.8036898832249,
+              "duration_ms": 455.034888,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 520.9312351152039,
+              "duration_ms": 483.74906899999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 547.3266074031696,
+              "duration_ms": 460.41978700000004,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 519.0523285941837,
+              "duration_ms": 485.500182,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 523.3474345284468,
+              "duration_ms": 481.515688,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 539.2056699376252,
+              "duration_ms": 467.354136,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 564.341514384745,
+              "duration_ms": 446.538122,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 534.0635400443714,
+              "duration_ms": 471.853967,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 510.92057035798774,
+              "duration_ms": 493.227352,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 554.2200928421582,
+              "duration_ms": 454.693006,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 528.0465060112972,
+              "duration_ms": 477.230693,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 518.9457977732848,
+              "duration_ms": 485.59984699999995,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 499.5460315968099,
+              "duration_ms": 504.45801599999993,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 547.7281960207581,
+              "duration_ms": 460.08221199999997,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.single",
+          "label": "JSON serialise + parse (single)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 8617.159631557079,
+          "summary": {
+            "n": 11,
+            "min": 8393.538080650002,
+            "max": 8644.747984480859,
+            "mean": 8566.289425883142,
+            "median": 8617.159631557079,
+            "stddev": 105.95260681324261,
+            "cv": 0.012368553237660356,
+            "ci95": [
+              8409.528719897811,
+              8641.061253578566
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 8529.40272863391,
+              "duration_ms": 500.15225399999997,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 8633.412361032038,
+              "duration_ms": 494.12675099999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 8601.048737606778,
+              "duration_ms": 495.98602800000003,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 8617.159631557079,
+              "duration_ms": 495.058718,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 8393.538080650002,
+              "duration_ms": 508.248126,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8643.860510039398,
+              "duration_ms": 493.52948200000003,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 8610.71271202162,
+              "duration_ms": 495.429373,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 8641.061253578566,
+              "duration_ms": 493.68936,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 8409.528719897811,
+              "duration_ms": 507.281697,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 8644.747984480859,
+              "duration_ms": 493.478816,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 8610.282014891973,
+              "duration_ms": 495.454155,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 8618.65276226245,
+              "duration_ms": 494.972952,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 8404.664740238439,
+              "duration_ms": 507.57527300000004,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 8634.975275096376,
+              "duration_ms": 494.037315,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1,
+            5,
+            9
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "json_roundtrip.multi",
+          "label": "JSON serialise + parse (multi)",
+          "unit": "ops/s",
+          "direction": "higher_is_better",
+          "value": 117785.14036981246,
+          "summary": {
+            "n": 11,
+            "min": 113982.50246930894,
+            "max": 127100.95725734638,
+            "mean": 118847.18113887211,
+            "median": 117785.14036981246,
+            "stddev": 4260.076117401403,
+            "cv": 0.035844990824170524,
+            "ci95": [
+              115067.6606268295,
+              122206.63902700203
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 114130.10303496021,
+              "duration_ms": 512.257489,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 126915.92763240956,
+              "duration_ms": 460.65140199999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 115962.05532881219,
+              "duration_ms": 504.164917,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 122206.63902700203,
+              "duration_ms": 478.40281400000003,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 117785.14036981246,
+              "duration_ms": 496.361424,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 124045.89564893214,
+              "duration_ms": 471.309427,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 119909.92800365001,
+              "duration_ms": 487.565967,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 115434.07551240176,
+              "duration_ms": 506.470899,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 115067.6606268295,
+              "duration_ms": 508.083676,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 114850.18331455736,
+              "duration_ms": 509.04576999999995,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 127100.95725734638,
+              "duration_ms": 459.98080000000004,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 113982.50246930894,
+              "duration_ms": 512.920832,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 120328.78581123562,
+              "duration_ms": 485.86877699999997,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 116607.2244865167,
+              "duration_ms": 501.375453,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.single",
+          "label": "Integer sort (single)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 51.672486374358876,
+          "summary": {
+            "n": 11,
+            "min": 50.32447171734614,
+            "max": 52.322487007603286,
+            "mean": 51.516986788158235,
+            "median": 51.672486374358876,
+            "stddev": 0.675264680350486,
+            "cv": 0.013107612118838118,
+            "ci95": [
+              50.919941923501575,
+              52.17960434862056
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 49.60850546869477,
+              "duration_ms": 491.43572800000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 51.36054647130394,
+              "duration_ms": 474.671585,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 50.95448810110087,
+              "duration_ms": 478.454262,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 52.322487007603286,
+              "duration_ms": 465.944824,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 50.32447171734614,
+              "duration_ms": 484.444072,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 52.17960434862056,
+              "duration_ms": 467.220714,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 51.82525842083028,
+              "duration_ms": 470.415252,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 52.30958207519536,
+              "duration_ms": 466.059774,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 51.128554995690905,
+              "duration_ms": 476.825367,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 50.919941923501575,
+              "duration_ms": 478.778865,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 51.390957729836735,
+              "duration_ms": 474.390692,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 51.672486374358876,
+              "duration_ms": 471.80605599999996,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 51.89446258375218,
+              "duration_ms": 469.78792699999997,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 50.719047493004695,
+              "duration_ms": 480.675273,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "integer_sort.multi",
+          "label": "Integer sort (multi)",
+          "unit": "Melem/s",
+          "direction": "higher_is_better",
+          "value": 650.5284917629111,
+          "summary": {
+            "n": 11,
+            "min": 590.0814426987588,
+            "max": 975.693764499295,
+            "mean": 706.9394646637166,
+            "median": 650.5284917629111,
+            "stddev": 137.53814260069547,
+            "cv": 0.19455434231008853,
+            "ci95": [
+              598.4441744084667,
+              818.2610785595032
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 570.528378416133,
+              "duration_ms": 496.233896,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 614.8442489872468,
+              "duration_ms": 460.46705399999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 644.7901887689815,
+              "duration_ms": 439.081619,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 650.5284917629111,
+              "duration_ms": 435.208486,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 590.0814426987588,
+              "duration_ms": 479.790584,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 818.2610785595032,
+              "duration_ms": 345.996562,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 701.2393802145581,
+              "duration_ms": 403.735911,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 597.8631178376254,
+              "duration_ms": 473.54571899999996,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 626.6900723204527,
+              "duration_ms": 451.763212,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 620.7579775245615,
+              "duration_ms": 456.080357,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 669.131669959724,
+              "duration_ms": 423.108833,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 927.6429415150272,
+              "duration_ms": 305.198808,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 975.693764499295,
+              "duration_ms": 290.16842199999996,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 598.4441744084667,
+              "duration_ms": 473.085932,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            8,
+            9
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.single",
+          "label": "Double-precision matrix multiply (single)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 6408.717900964641,
+          "summary": {
+            "n": 11,
+            "min": 6345.086651039767,
+            "max": 6433.868290481565,
+            "mean": 6400.958913075903,
+            "median": 6408.717900964641,
+            "stddev": 28.658155451737414,
+            "cv": 0.00447716597480331,
+            "ci95": [
+              6373.854091014745,
+              6427.7617497661695
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 6443.101302778136,
+              "duration_ms": 494.74172300000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 6405.6225338621525,
+              "duration_ms": 497.63641600000005,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 6382.885284468792,
+              "duration_ms": 499.409107,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 6371.173141082172,
+              "duration_ms": 500.32717199999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6433.868290481565,
+              "duration_ms": 495.451709,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 6412.761982627315,
+              "duration_ms": 497.082388,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 6408.717900964641,
+              "duration_ms": 497.396061,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 6373.854091014745,
+              "duration_ms": 500.116726,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 6427.7617497661695,
+              "duration_ms": 495.92240100000004,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 6419.0080239839535,
+              "duration_ms": 496.5987,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 6394.854636002288,
+              "duration_ms": 498.474355,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 6345.086651039767,
+              "duration_ms": 502.384162,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 6432.6268737299715,
+              "duration_ms": 495.547325,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 6390.83470314235,
+              "duration_ms": 498.787903,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "float_matmul.multi",
+          "label": "Double-precision matrix multiply (multi)",
+          "unit": "MFLOP/s",
+          "direction": "higher_is_better",
+          "value": 169746.98601970068,
+          "summary": {
+            "n": 11,
+            "min": 161338.52714314585,
+            "max": 174356.97676387563,
+            "mean": 168707.59809222192,
+            "median": 169746.98601970068,
+            "stddev": 4120.594974888705,
+            "cv": 0.02442447774424619,
+            "ci95": [
+              166268.86564873782,
+              171807.1297449645
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 125415.66272545703,
+              "duration_ms": 483.99032600000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 149093.50227154142,
+              "duration_ms": 407.126847,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 155314.27295255577,
+              "duration_ms": 390.82027899999997,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 166268.86564873782,
+              "duration_ms": 365.07115899999997,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 172003.68990334147,
+              "duration_ms": 352.89921699999996,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 161338.52714314585,
+              "duration_ms": 376.227356,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 171269.7698903351,
+              "duration_ms": 354.41145,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 170926.5494714019,
+              "duration_ms": 355.123108,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 169746.98601970068,
+              "duration_ms": 357.590841,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 167481.49720404667,
+              "duration_ms": 362.427901,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 174356.97676387563,
+              "duration_ms": 348.13615500000003,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 168434.08967836984,
+              "duration_ms": 360.378161,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 162149.49754652186,
+              "duration_ms": 374.345702,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 171807.1297449645,
+              "duration_ms": 353.30296,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "high_variance",
+          "message": "`integer_sort.multi` varied by 19.5% between repetitions (bound 15%). On shared infrastructure this usually means CPU steal or a noisy neighbour rather than a measurement fault.",
+          "metric_key": "integer_sort.multi"
+        },
+        {
+          "code": "informational",
+          "message": "Multi-threaded throughput reached only 28% of 72x the single-thread result. Expected on SMT and on shared-vCPU plans; unexpected on dedicated cores."
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "compress_deflate.multi.iterations": 7,
+          "compress_deflate.single.iterations": 18,
+          "crypto_sha256.multi.iterations": 26,
+          "crypto_sha256.single.iterations": 99,
+          "float_matmul.multi.iterations": 201,
+          "float_matmul.single.iterations": 760,
+          "integer_sort.multi.iterations": 15,
+          "integer_sort.single.iterations": 93,
+          "json_roundtrip.multi.iterations": 812,
+          "json_roundtrip.single.iterations": 4266
+        },
+        "scaling_efficiency": 0.28337827801149496,
+        "shape_single_threads": 1,
+        "threads": 72,
+        "workload_version": "1.0.1"
+      }
+    },
+    {
+      "module": {
+        "id": "memory.bandwidth",
+        "version": "1.0.0"
+      },
+      "status": "degraded",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:40:26.295286183Z",
+      "finished_at": "2026-08-28T13:42:13.254772498Z",
+      "duration_ms": 106959.48570800001,
+      "metrics": [
+        {
+          "key": "sequential_read.single",
+          "label": "Sequential read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 10634.077096439647,
+          "summary": {
+            "n": 11,
+            "min": 9761.575591905057,
+            "max": 10671.860883518742,
+            "mean": 10528.8696166568,
+            "median": 10634.077096439647,
+            "stddev": 263.23785376462064,
+            "cv": 0.025001530396784013,
+            "ci95": [
+              10500.438972661672,
+              10652.591445207061
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 10570.600701884647,
+              "duration_ms": 493.82245600000005,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 10483.533712423536,
+              "duration_ms": 497.92371,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 10666.23626836763,
+              "duration_ms": 489.394747,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 10671.860883518742,
+              "duration_ms": 489.136811,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 10634.077096439647,
+              "duration_ms": 490.87475600000005,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 10517.462012221746,
+              "duration_ms": 496.317457,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 10643.295414479713,
+              "duration_ms": 490.44960199999997,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 10650.362379192042,
+              "duration_ms": 490.12416800000005,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 10616.196546977539,
+              "duration_ms": 491.701522,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 10500.438972661672,
+              "duration_ms": 497.122074,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 10670.564303553547,
+              "duration_ms": 489.196246,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 9761.575591905057,
+              "duration_ms": 534.749739,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 10652.591445207061,
+              "duration_ms": 490.021609,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 10499.141137068047,
+              "duration_ms": 497.18352500000003,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            8
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_read.multi",
+          "label": "Sequential read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 48424.3113994817,
+          "summary": {
+            "n": 11,
+            "min": 44931.694287295366,
+            "max": 59069.1592118168,
+            "mean": 48872.34764202809,
+            "median": 48424.3113994817,
+            "stddev": 4093.434786298192,
+            "cv": 0.08375768678601427,
+            "ci95": [
+              46159.8874342598,
+              49515.20745151347
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 57342.658956735795,
+              "duration_ms": 499.10486399999996,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 53205.987967713074,
+              "duration_ms": 537.9093799999999,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 66012.18179392283,
+              "duration_ms": 433.55634100000003,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 59069.1592118168,
+              "duration_ms": 484.51680000000005,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 53192.71484175101,
+              "duration_ms": 538.043604,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 44931.694287295366,
+              "duration_ms": 636.966855,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 48424.3113994817,
+              "duration_ms": 591.025441,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 45846.60323109367,
+              "duration_ms": 624.255626,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 49140.15789659905,
+              "duration_ms": 582.415711,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 49515.20745151347,
+              "duration_ms": 578.004243,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 48478.27868897443,
+              "duration_ms": 590.3674960000001,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 46159.8874342598,
+              "duration_ms": 620.018843,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 46433.81690973691,
+              "duration_ms": 616.361133,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 46403.99270978682,
+              "duration_ms": 616.757273,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.single",
+          "label": "Sequential write (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 8317.407119182582,
+          "summary": {
+            "n": 11,
+            "min": 7697.9472199550555,
+            "max": 8395.99507070352,
+            "mean": 8275.303940414715,
+            "median": 8317.407119182582,
+            "stddev": 193.5490235321049,
+            "cv": 0.023388751026636644,
+            "ci95": [
+              8308.640818932565,
+              8355.294832534457
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 7212.688369040459,
+              "duration_ms": 598.944496,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 2424.3724669285207,
+              "duration_ms": 1781.904414,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 3746.608330772341,
+              "duration_ms": 1153.042864,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 8308.640818932565,
+              "duration_ms": 519.940637,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 8395.99507070352,
+              "duration_ms": 514.531031,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 8332.200514096772,
+              "duration_ms": 518.47048,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 7697.9472199550555,
+              "duration_ms": 561.188571,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 8309.47862187928,
+              "duration_ms": 519.888214,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 8333.377009616774,
+              "duration_ms": 518.397283,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 8317.407119182582,
+              "duration_ms": 519.392635,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 8307.342296995414,
+              "duration_ms": 520.021909,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 8355.294832534457,
+              "duration_ms": 517.03741,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 8361.902861636529,
+              "duration_ms": 516.628819,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 8308.756979028898,
+              "duration_ms": 519.933368,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1,
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.multi",
+          "label": "Sequential write (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 34498.01083662545,
+          "summary": {
+            "n": 11,
+            "min": 27621.12406711134,
+            "max": 76876.22784204764,
+            "mean": 37531.05483310692,
+            "median": 34498.01083662545,
+            "stddev": 13620.829320202982,
+            "cv": 0.3629215693716065,
+            "ci95": [
+              30039.201773151424,
+              37080.000150922104
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 25106.673877094592,
+              "duration_ms": 408.656282,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 25449.23335213906,
+              "duration_ms": 403.155563,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 19667.513816390117,
+              "duration_ms": 521.672444,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 30385.265352049446,
+              "duration_ms": 337.663663,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 36381.18727245934,
+              "duration_ms": 282.013886,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 30039.201773151424,
+              "duration_ms": 341.553683,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 34498.01083662545,
+              "duration_ms": 297.408452,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 33279.70824088484,
+              "duration_ms": 308.29597199999995,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 76876.22784204764,
+              "duration_ms": 133.461283,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 29887.530252385335,
+              "duration_ms": 343.28698,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 40956.88537337411,
+              "duration_ms": 250.50732999999997,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 35836.46200316517,
+              "duration_ms": 286.300584,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 37080.000150922104,
+              "duration_ms": 276.699028,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 27621.12406711134,
+              "duration_ms": 371.454832,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            5
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.single",
+          "label": "Sequential copy (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11270.623879833041,
+          "summary": {
+            "n": 11,
+            "min": 2058.0572664907627,
+            "max": 11322.8476397349,
+            "mean": 9051.873742044956,
+            "median": 11270.623879833041,
+            "stddev": 3788.0068382951076,
+            "cv": 0.4184776485226736,
+            "ci95": [
+              5475.0607338601685,
+              11287.38792047072
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11003.672094508453,
+              "duration_ms": 490.745267,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11052.178801559203,
+              "duration_ms": 488.59144399999997,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 10988.776096654214,
+              "duration_ms": 491.410504,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 2394.0197195883106,
+              "duration_ms": 2255.620518,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 2058.0572664907627,
+              "duration_ms": 2623.833694,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 5475.0607338601685,
+              "duration_ms": 986.290429,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 10653.022023542835,
+              "duration_ms": 506.89841700000005,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 11280.585073811844,
+              "duration_ms": 478.698575,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 11310.803509992842,
+              "duration_ms": 477.419663,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11280.020882577326,
+              "duration_ms": 478.722518,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 11270.623879833041,
+              "duration_ms": 479.121658,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 11287.38792047072,
+              "duration_ms": 478.41006600000003,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 11322.8476397349,
+              "duration_ms": 476.911831,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 11238.182512591764,
+              "duration_ms": 480.504743,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_copy.multi",
+          "label": "Sequential copy (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11777.620750487213,
+          "summary": {
+            "n": 11,
+            "min": 11419.772555829295,
+            "max": 13621.24956193693,
+            "mean": 12003.227265146596,
+            "median": 11777.620750487213,
+            "stddev": 625.2404398273974,
+            "cv": 0.05208936113730754,
+            "ci95": [
+              11532.532886640342,
+              12184.780551042342
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 12567.951205171985,
+              "duration_ms": 544.241451,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11754.667368115557,
+              "duration_ms": 581.896517,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 12372.381708965358,
+              "duration_ms": 552.844243,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 12150.277099859028,
+              "duration_ms": 562.950124,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 11530.332926057476,
+              "duration_ms": 593.21791,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 13621.24956193693,
+              "duration_ms": 502.15657300000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 11861.350016060858,
+              "duration_ms": 576.6628579999999,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 11755.791114530688,
+              "duration_ms": 581.8408929999999,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 12488.028289605176,
+              "duration_ms": 547.7245760000001,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11713.764164563201,
+              "duration_ms": 583.9284369999999,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 11532.532886640342,
+              "duration_ms": 593.1047470000001,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 11419.772555829295,
+              "duration_ms": 598.961141,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 12184.780551042342,
+              "duration_ms": 561.3560269999999,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 11777.620750487213,
+              "duration_ms": 580.76246,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            2
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.single",
+          "label": "Triad (a = b + k*c) (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 12388.235410050333,
+          "summary": {
+            "n": 11,
+            "min": 9810.870562842609,
+            "max": 12437.487335591335,
+            "mean": 12013.425010825576,
+            "median": 12388.235410050333,
+            "stddev": 848.5504736822119,
+            "cv": 0.07063351816135392,
+            "ci95": [
+              12195.563398165134,
+              12417.723306386908
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 12428.702429426537,
+              "duration_ms": 477.925997,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 12387.216763499493,
+              "duration_ms": 479.526605,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 12389.052773508358,
+              "duration_ms": 479.455541,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 12388.235410050333,
+              "duration_ms": 479.487175,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 12421.106110791081,
+              "duration_ms": 478.21828,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 12369.841389583,
+              "duration_ms": 480.200175,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 9810.870562842609,
+              "duration_ms": 605.4508579999999,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 12195.563398165134,
+              "duration_ms": 487.062369,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 12437.487335591335,
+              "duration_ms": 477.588426,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 12369.51203405774,
+              "duration_ms": 480.212961,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 12394.44326643909,
+              "duration_ms": 479.24702,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 12390.153777577667,
+              "duration_ms": 479.412936,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 12417.723306386908,
+              "duration_ms": 478.34855500000003,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 10952.738527596439,
+              "duration_ms": 542.3301200000001,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3,
+            4,
+            10
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "triad.multi",
+          "label": "Triad (a = b + k*c) (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 11405.815537316832,
+          "summary": {
+            "n": 11,
+            "min": 11161.135378333927,
+            "max": 11809.995801109086,
+            "mean": 11390.205928697122,
+            "median": 11405.815537316832,
+            "stddev": 185.79916043090276,
+            "cv": 0.016312186240881734,
+            "ci95": [
+              11261.522884060994,
+              11467.363373213971
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 11164.456223685045,
+              "duration_ms": 532.045617,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 11456.646947610665,
+              "duration_ms": 518.476307,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 11386.888078890508,
+              "duration_ms": 521.65262,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 11809.995801109086,
+              "duration_ms": 502.96376899999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 11161.135378333927,
+              "duration_ms": 532.20392,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11405.815537316832,
+              "duration_ms": 520.78696,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 11454.697947184102,
+              "duration_ms": 518.564525,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 11414.983940933615,
+              "duration_ms": 520.368669,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 11467.363373213971,
+              "duration_ms": 517.991783,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 11284.451944716855,
+              "duration_ms": 526.3879919999999,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 11198.74409063814,
+              "duration_ms": 530.416621,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 11275.827881723657,
+              "duration_ms": 526.790588,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 11557.726436437146,
+              "duration_ms": 513.94191,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 11261.522884060994,
+              "duration_ms": 527.459746,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.single",
+          "label": "Random read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 370.5188424547563,
+          "summary": {
+            "n": 11,
+            "min": 338.8683282831661,
+            "max": 372.2892918617126,
+            "mean": 360.6486482807738,
+            "median": 370.5188424547563,
+            "stddev": 14.215810235261138,
+            "cv": 0.039417339571431814,
+            "ci95": [
+              343.425547461963,
+              371.7741520852421
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 371.5400265365033,
+              "duration_ms": 484.470009,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 369.8362058932647,
+              "duration_ms": 486.701943,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 368.9892890158174,
+              "duration_ms": 487.819038,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 338.8683282831661,
+              "duration_ms": 531.179768,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 350.0144660006536,
+              "duration_ms": 514.264459,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 366.38231843490655,
+              "duration_ms": 491.29008400000004,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 370.5188424547563,
+              "duration_ms": 485.805253,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 372.2892918617126,
+              "duration_ms": 483.49497,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 340.3178627448335,
+              "duration_ms": 528.917285,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 343.425547461963,
+              "duration_ms": 524.131071,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 370.590167703848,
+              "duration_ms": 485.71175300000004,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 371.99075059878265,
+              "duration_ms": 483.882999,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 371.7741520852421,
+              "duration_ms": 484.16491299999996,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 370.96340345864763,
+              "duration_ms": 485.22306599999996,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0,
+            1,
+            5,
+            6
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read.multi",
+          "label": "Random read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 6300.675259119209,
+          "summary": {
+            "n": 11,
+            "min": 5583.628328854733,
+            "max": 7176.140179094355,
+            "mean": 6346.614342547444,
+            "median": 6300.675259119209,
+            "stddev": 493.9186006135244,
+            "cv": 0.07782395052781359,
+            "ci95": [
+              5926.2824892341405,
+              6732.760178446572
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 7221.674797726405,
+              "duration_ms": 448.64939100000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 4730.564383517099,
+              "duration_ms": 684.907706,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 5733.210851187307,
+              "duration_ms": 565.128352,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 6300.675259119209,
+              "duration_ms": 514.230597,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 6893.549757831512,
+              "duration_ms": 470.004586,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 5926.2824892341405,
+              "duration_ms": 546.717104,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 6312.635850626833,
+              "duration_ms": 513.256281,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 6189.2654449871725,
+              "duration_ms": 523.4870000000001,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 6732.760178446572,
+              "duration_ms": 481.22908199999995,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 6214.827886498967,
+              "duration_ms": 521.333826,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 6729.798518846952,
+              "duration_ms": 481.44086200000004,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 5583.628328854733,
+              "duration_ms": 580.267849,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 7176.140179094355,
+              "duration_ms": 451.496197,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 5753.193874481436,
+              "duration_ms": 563.1654470000001,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.single",
+          "label": "Cache-resident read (single)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 46885.11749725647,
+          "summary": {
+            "n": 11,
+            "min": 45398.52274449932,
+            "max": 47816.08691540082,
+            "mean": 46868.88890519932,
+            "median": 46885.11749725647,
+            "stddev": 726.5500367746941,
+            "cv": 0.01550175508201765,
+            "ci95": [
+              46500.01271531256,
+              47370.07030759067
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 47036.07365334965,
+              "duration_ms": 504.163574,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 45386.67422459385,
+              "duration_ms": 522.485408,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 46019.48268375681,
+              "duration_ms": 515.3007729999999,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 45398.52274449932,
+              "duration_ms": 522.349045,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 46039.39270331149,
+              "duration_ms": 515.0779279999999,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 46500.01271531256,
+              "duration_ms": 509.975667,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 47816.08691540082,
+              "duration_ms": 495.93926500000003,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 46885.11749725647,
+              "duration_ms": 505.786831,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 47794.97003438712,
+              "duration_ms": 496.158382,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 46638.71876765703,
+              "duration_ms": 508.458972,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 47343.516132036784,
+              "duration_ms": 500.88960299999997,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 46947.20461063653,
+              "duration_ms": 505.11793400000005,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 47370.07030759067,
+              "duration_ms": 500.60882,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 46824.165529103695,
+              "duration_ms": 506.44522400000005,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "cache_read.multi",
+          "label": "Cache-resident read (multi)",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 988871.2792045457,
+          "summary": {
+            "n": 11,
+            "min": 940579.2694785575,
+            "max": 1026653.2951373282,
+            "mean": 987047.2193642263,
+            "median": 988871.2792045457,
+            "stddev": 29726.8353893338,
+            "cv": 0.030116933421362912,
+            "ci95": [
+              960892.5037500322,
+              1017533.5016145018
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 980918.328031315,
+              "duration_ms": 471.910848,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 954879.6972069314,
+              "duration_ms": 484.779393,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 1018409.0191509762,
+              "duration_ms": 454.53839400000004,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 1017533.5016145018,
+              "duration_ms": 454.92949300000004,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 960892.5037500322,
+              "duration_ms": 481.745875,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 979131.9812847303,
+              "duration_ms": 472.771811,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 988871.2792045457,
+              "duration_ms": 468.115527,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 1026653.2951373282,
+              "duration_ms": 450.88833999999997,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 996859.8696603987,
+              "duration_ms": 464.364164,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 954611.5773989446,
+              "duration_ms": 484.91555200000005,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 1006824.8594872754,
+              "duration_ms": 459.768147,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 1022981.7710259813,
+              "duration_ms": 452.506597,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 940579.2694785575,
+              "duration_ms": 492.149907,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 962579.5049641915,
+              "duration_ms": 480.90157500000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_random.single",
+          "label": "Random access latency (single)",
+          "unit": "ns",
+          "direction": "lower_is_better",
+          "value": 88.73320912205895,
+          "summary": {
+            "n": 11,
+            "min": 87.84869278308958,
+            "max": 96.77049965082213,
+            "mean": 89.64951913200524,
+            "median": 88.73320912205895,
+            "stddev": 2.5364210580319546,
+            "cv": 0.02829263427835211,
+            "ci95": [
+              87.95805128230604,
+              89.94168144048646
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 88.16688466626545,
+              "duration_ms": 496.91702599999996,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 88.02160254190134,
+              "duration_ms": 496.098202,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 87.97341031806414,
+              "duration_ms": 495.826586,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 89.84223370219387,
+              "duration_ms": 506.359454,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 88.36612257846566,
+              "duration_ms": 498.03995000000003,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 87.84869278308958,
+              "duration_ms": 495.123666,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 87.94107836346294,
+              "duration_ms": 495.64436,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 89.94168144048646,
+              "duration_ms": 506.91995099999997,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 88.67362337334211,
+              "duration_ms": 499.773054,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 87.95805128230604,
+              "duration_ms": 495.74002099999996,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 88.73320912205895,
+              "duration_ms": 500.10888499999993,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 96.77049965082213,
+              "duration_ms": 545.407826,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 90.64497410973837,
+              "duration_ms": 510.883776,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 89.42454404609148,
+              "duration_ms": 504.005315,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            8
+          ],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "high_variance",
+          "message": "`sequential_write.multi` varied by 36.3% between repetitions (bound 15%). For memory this usually means a noisy neighbour on the same memory controller rather than a measurement fault.",
+          "metric_key": "sequential_write.multi"
+        },
+        {
+          "code": "high_variance",
+          "message": "`sequential_copy.single` varied by 41.8% between repetitions (bound 15%). For memory this usually means a noisy neighbour on the same memory controller rather than a measurement fault.",
+          "metric_key": "sequential_copy.single"
+        },
+        {
+          "code": "informational",
+          "message": "This machine has 2 NUMA nodes. Threads were placed by the operating system, so the multi-threaded figures include whatever cross-node traffic the default policy produced. They are a fair description of what an unpinned workload gets, not of the hardware's best case."
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "cache_cliff": 4.408950308715919,
+        "calibration": {
+          "cache_read.multi.passes": 51434,
+          "cache_read.single.passes": 189711,
+          "latency_random.single.passes": 86,
+          "random_read.multi.passes": 18,
+          "random_read.single.passes": 1,
+          "sequential_copy.multi.passes": 19,
+          "sequential_copy.single.passes": 15,
+          "sequential_read.multi.passes": 159,
+          "sequential_read.single.passes": 29,
+          "sequential_write.multi.passes": 57,
+          "sequential_write.single.passes": 24,
+          "triad.multi.passes": 11,
+          "triad.single.passes": 11
+        },
+        "numa_nodes": 2,
+        "plan": {
+          "cache_bytes": 131072,
+          "l2_multiple": 4,
+          "llc_assumed": false,
+          "llc_bytes": 47185920,
+          "llc_multiple": 4,
+          "memory_budget_fraction": 0.25,
+          "multi_bytes_aggregate": 188743680,
+          "multi_bytes_per_thread": 2621440,
+          "multi_contaminated": false,
+          "peak_alloc_bytes": 566231040,
+          "single_bytes": 188743680,
+          "single_contaminated": false
+        },
+        "threads": 72,
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "storage.mixed",
+        "version": "1.0.0"
+      },
+      "status": "completed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:42:13.259519416Z",
+      "finished_at": "2026-08-28T13:43:08.704099010Z",
+      "duration_ms": 55444.579396,
+      "metrics": [
+        {
+          "key": "sequential_read.qd1",
+          "label": "Sequential read",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 2142.8738421388503,
+          "summary": {
+            "n": 11,
+            "min": 2101.0283205732094,
+            "max": 2356.8303411558923,
+            "mean": 2195.953776177147,
+            "median": 2142.8738421388503,
+            "stddev": 104.54604785834375,
+            "cv": 0.04760849203317204,
+            "ci95": [
+              2134.201077643252,
+              2355.9871320041852
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 2352.7603834998545,
+              "duration_ms": 453.934879,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 2107.7769301387502,
+              "duration_ms": 506.694985,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 2357.3639162953846,
+              "duration_ms": 453.04842099999996,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 2142.8738421388503,
+              "duration_ms": 498.396116,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 2355.9871320041852,
+              "duration_ms": 453.313172,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 2111.6042768172038,
+              "duration_ms": 505.776585,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 2356.7071051199605,
+              "duration_ms": 453.174685,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 2137.7546390791913,
+              "duration_ms": 499.589607,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 2356.8303411558923,
+              "duration_ms": 453.150989,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 2101.0283205732094,
+              "duration_ms": 508.322515,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 2160.7079984615275,
+              "duration_ms": 494.28243,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 2140.21484923506,
+              "duration_ms": 499.01532100000003,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 2157.581955720285,
+              "duration_ms": 494.998578,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 2134.201077643252,
+              "duration_ms": 500.421451,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            1,
+            3,
+            5
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "sequential_write.qd1",
+          "label": "Sequential write",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 2324.7922875584145,
+          "summary": {
+            "n": 11,
+            "min": 2270.1274526664192,
+            "max": 2426.6810982889533,
+            "mean": 2339.30188321947,
+            "median": 2324.7922875584145,
+            "stddev": 46.51975434175878,
+            "cv": 0.019886169748102735,
+            "ci95": [
+              2316.017749577706,
+              2368.133552909015
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 1927.5123274203877,
+              "duration_ms": 490.269238,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 2321.915260574778,
+              "duration_ms": 406.99159699999996,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 2316.070544420689,
+              "duration_ms": 408.01865999999995,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 2324.7922875584145,
+              "duration_ms": 406.487928,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 2426.6810982889533,
+              "duration_ms": 389.420761,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 2404.3091264666373,
+              "duration_ms": 393.04430099999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 2288.7948991563267,
+              "duration_ms": 412.881032,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 2368.133552909015,
+              "duration_ms": 399.04844,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 2319.24995996226,
+              "duration_ms": 407.459315,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 2338.4592764852036,
+              "duration_ms": 404.112233,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 2352.9268816891595,
+              "duration_ms": 401.62744,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 2316.017749577706,
+              "duration_ms": 408.027961,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 2322.8284306540722,
+              "duration_ms": 406.831597,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 2270.1274526664192,
+              "duration_ms": 416.276187,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd1",
+          "label": "Random 4K read (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 19039.91886294069,
+          "summary": {
+            "n": 11,
+            "min": 18735.59078959078,
+            "max": 19380.142568197705,
+            "mean": 19042.303186383924,
+            "median": 19039.91886294069,
+            "stddev": 228.66421384428259,
+            "cv": 0.01200822251416454,
+            "ci95": [
+              18815.384972195294,
+              19254.131164446728
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 18862.69441013847,
+              "duration_ms": 495.634388,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 19315.066383563037,
+              "duration_ms": 484.026294,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 18856.599273737545,
+              "duration_ms": 495.794595,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 18916.172742748473,
+              "duration_ms": 494.23316900000003,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 19380.142568197705,
+              "duration_ms": 482.400992,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 19082.904551075353,
+              "duration_ms": 489.914938,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 18952.35965685943,
+              "duration_ms": 493.28949900000003,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 19254.131164446728,
+              "duration_ms": 485.558134,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 18815.384972195294,
+              "duration_ms": 496.880612,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 19189.074632111686,
+              "duration_ms": 487.204317,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 18735.59078959078,
+              "duration_ms": 498.996808,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 18757.428560671062,
+              "duration_ms": 498.415866,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 19039.91886294069,
+              "duration_ms": 491.02099999999996,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 19342.22654938595,
+              "duration_ms": 483.346629,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_read_4k.p99",
+          "label": "Random 4K read (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.061903999999999994,
+          "summary": {
+            "n": 11,
+            "min": 0.061183,
+            "max": 0.064108,
+            "mean": 0.062452818181818186,
+            "median": 0.061903999999999994,
+            "stddev": 0.0010995986375202382,
+            "cv": 0.017606869786388007,
+            "ci95": [
+              0.06151499999999999,
+              0.063665
+            ]
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_read_4k.qd16",
+          "label": "Random 4K read (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 223172.78547059317,
+          "summary": {
+            "n": 11,
+            "min": 220036.7079853008,
+            "max": 226601.1822102793,
+            "mean": 223131.47992564522,
+            "median": 223172.78547059317,
+            "stddev": 2143.8253730604724,
+            "cv": 0.00960790191404129,
+            "ci95": [
+              221320.9749018834,
+              224734.57260440371
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 227703.5826807628,
+              "duration_ms": 482.240985,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 220747.02475395796,
+              "duration_ms": 497.438188,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 220668.87741480928,
+              "duration_ms": 497.61435,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 223021.1049643688,
+              "duration_ms": 492.365958,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 223600.81881297077,
+              "duration_ms": 491.089436,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 221765.90378836278,
+              "duration_ms": 495.152763,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 220176.22077967622,
+              "duration_ms": 498.72779,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 220036.7079853008,
+              "duration_ms": 499.044005,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 225564.9526162412,
+              "duration_ms": 486.813216,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 224734.57260440371,
+              "duration_ms": 488.61196,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 223172.78547059317,
+              "duration_ms": 492.031319,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 224451.05504801733,
+              "duration_ms": 489.22915500000005,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 221320.9749018834,
+              "duration_ms": 496.148185,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 226601.1822102793,
+              "duration_ms": 484.587057,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd1",
+          "label": "Random 4K write (QD1)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 60873.251567088904,
+          "summary": {
+            "n": 11,
+            "min": 57408.43250545364,
+            "max": 63837.2216363703,
+            "mean": 60835.74791366807,
+            "median": 60873.251567088904,
+            "stddev": 1782.0108688181574,
+            "cv": 0.029292166693619132,
+            "ci95": [
+              60046.542843685136,
+              62158.57491937362
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 61361.16630261059,
+              "duration_ms": 270.904238,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 61659.954523938155,
+              "duration_ms": 269.591506,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 61238.71723237279,
+              "duration_ms": 271.445921,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 61946.359304803766,
+              "duration_ms": 268.345068,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 62158.57491937362,
+              "duration_ms": 267.42891099999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 61272.171957248844,
+              "duration_ms": 271.297711,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 57408.43250545364,
+              "duration_ms": 289.556765,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 60110.394187171914,
+              "duration_ms": 276.541191,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 60046.542843685136,
+              "duration_ms": 276.835255,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 60873.251567088904,
+              "duration_ms": 273.075605,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 58749.51721524843,
+              "duration_ms": 282.947006,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 62316.62205565535,
+              "duration_ms": 266.750659,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 60474.13885824891,
+              "duration_ms": 274.877829,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 63837.2216363703,
+              "duration_ms": 260.396671,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_write_4k.p99",
+          "label": "Random 4K write (QD1) p99 latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.02558,
+          "summary": {
+            "n": 11,
+            "min": 0.023982,
+            "max": 0.030257,
+            "mean": 0.02616609090909091,
+            "median": 0.02558,
+            "stddev": 0.001830316445565927,
+            "cv": 0.06994993833526805,
+            "ci95": [
+              0.02476,
+              0.026931999999999998
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            3
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_write_4k.qd16",
+          "label": "Random 4K write (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 355336.8171188759,
+          "summary": {
+            "n": 11,
+            "min": 216634.31300541962,
+            "max": 362561.2386372568,
+            "mean": 341923.40660750115,
+            "median": 355336.8171188759,
+            "stddev": 42195.40009620226,
+            "cv": 0.12340600052759469,
+            "ci95": [
+              348567.59050348453,
+              361165.3452136377
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 214309.24951462616,
+              "duration_ms": 743.150379,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 329123.43792476825,
+              "duration_ms": 483.90355,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 365839.1870497558,
+              "duration_ms": 435.33882,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 352287.78960753145,
+              "duration_ms": 452.084928,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 358665.24561086996,
+              "duration_ms": 444.04636899999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 351930.2217194206,
+              "duration_ms": 452.544255,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 361255.13540277485,
+              "duration_ms": 440.862937,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 362561.2386372568,
+              "duration_ms": 439.274757,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 336741.14310153853,
+              "duration_ms": 472.95676,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 361165.3452136377,
+              "duration_ms": 440.972541,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 216634.31300541962,
+              "duration_ms": 735.174395,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 356012.6327617031,
+              "duration_ms": 447.354912,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 355336.8171188759,
+              "duration_ms": 448.205737,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 348567.59050348453,
+              "duration_ms": 456.909949,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            7
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "random_mixed_4k.qd16",
+          "label": "Random 4K mixed 70/30 (QD16)",
+          "unit": "IOPS",
+          "direction": "higher_is_better",
+          "value": 141797.25681068742,
+          "summary": {
+            "n": 11,
+            "min": 134643.62625238867,
+            "max": 145523.81742946623,
+            "mean": 141177.78578081605,
+            "median": 141797.25681068742,
+            "stddev": 3876.540639352035,
+            "cv": 0.02745857372611378,
+            "ci95": [
+              136922.99155254773,
+              144490.55663669892
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 144450.40844775797,
+              "duration_ms": 508.85283599999997,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 136358.67897929045,
+              "duration_ms": 539.0489299999999,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 142941.75254655152,
+              "duration_ms": 514.223442,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 141797.25681068742,
+              "duration_ms": 518.373921,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 143643.97110097643,
+              "duration_ms": 511.709607,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 134643.62625238867,
+              "duration_ms": 545.9151840000001,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 145170.66518688336,
+              "duration_ms": 506.328189,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 140537.98746160395,
+              "duration_ms": 523.018732,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 145523.81742946623,
+              "duration_ms": 505.09944900000005,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 136032.17486654778,
+              "duration_ms": 540.342754,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 144173.77653808414,
+              "duration_ms": 509.829192,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 140018.81975309175,
+              "duration_ms": 524.958003,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 144490.55663669892,
+              "duration_ms": 508.71144599999997,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 136922.99155254773,
+              "duration_ms": 536.827301,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency_fsync.mean",
+          "label": "fsync latency",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.8594079439579685,
+          "summary": {
+            "n": 11,
+            "min": 0.8371466339754816,
+            "max": 0.8785624640980736,
+            "mean": 0.8588167255214139,
+            "median": 0.8594079439579685,
+            "stddev": 0.015106148302979728,
+            "cv": 0.01758949011363085,
+            "ci95": [
+              0.8421164028021015,
+              0.8722500105078809
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 0.8385599894921191,
+              "duration_ms": 478.817754,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 0.872957418563923,
+              "duration_ms": 498.458686,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 0.8391738038528898,
+              "duration_ms": 479.168242,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 0.8697834553415061,
+              "duration_ms": 496.646353,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 0.8384163047285463,
+              "duration_ms": 478.73571,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 0.8655127548161121,
+              "duration_ms": 494.207783,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 0.8421164028021015,
+              "duration_ms": 480.848466,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 0.8722500105078809,
+              "duration_ms": 498.054756,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 0.8371466339754816,
+              "duration_ms": 478.010728,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 0.8594079439579685,
+              "duration_ms": 490.721936,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 0.8505580490367776,
+              "duration_ms": 485.66864599999997,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 0.8785624640980736,
+              "duration_ms": 501.659167,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 0.876404061295972,
+              "duration_ms": 500.42671900000005,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 0.8568259001751314,
+              "duration_ms": 489.247589,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [],
+      "context": {
+        "build_target": "x86_64-linux",
+        "calibration": {
+          "latency_fsync.mean.operations": 571,
+          "random_mixed_4k.qd16.operations": 73501,
+          "random_read_4k.qd1.operations": 9349,
+          "random_read_4k.qd16.operations": 109797,
+          "random_write_4k.qd1.operations": 16623,
+          "random_write_4k.qd16.operations": 159261,
+          "sequential_read.qd1.operations": 1068,
+          "sequential_write.qd1.operations": 945
+        },
+        "filesystem": "ext4",
+        "plan": {
+          "constrained_by_free_space": false,
+          "deep_queue_depth": 16,
+          "direct_io": true,
+          "fixture_bytes": 2147483648,
+          "large_block_bytes": 1048576,
+          "mixed_read_share_pct": 70,
+          "small_block_bytes": 4096
+        },
+        "steady_state_ratio": {
+          "latency_fsync.mean": 0.9875727339011249,
+          "random_mixed_4k.qd16": 0.9874578881312912,
+          "random_write_4k.qd1": 1.0059771511192406,
+          "random_write_4k.qd16": 1.0086549338390105,
+          "sequential_write.qd1": 0.9632778597739285
+        },
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "network.transfer",
+        "version": "1.0.0"
+      },
+      "status": "degraded",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:43:08.707176305Z",
+      "finished_at": "2026-08-28T13:43:30.102741370Z",
+      "duration_ms": 21395.564870000002,
+      "metrics": [
+        {
+          "key": "dns_resolve.mean",
+          "label": "DNS resolution",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.288443,
+          "summary": {
+            "n": 11,
+            "min": 0.27076849999999997,
+            "max": 0.3579005,
+            "mean": 0.29400690909090915,
+            "median": 0.288443,
+            "stddev": 0.02373450102574119,
+            "cv": 0.0807276981997804,
+            "ci95": [
+              0.2804575,
+              0.2988925
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            6
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "tcp_connect.mean",
+          "label": "TCP connect",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 24.316654,
+          "summary": {
+            "n": 11,
+            "min": 22.461969,
+            "max": 26.061387500000002,
+            "mean": 24.226371454545458,
+            "median": 24.316654,
+            "stddev": 1.24327787043252,
+            "cv": 0.05131919457130468,
+            "ci95": [
+              23.108645000000003,
+              25.201499
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 23.3148445,
+              "duration_ms": 455.146346,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 25.984482,
+              "duration_ms": 360.105972,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 24.448059,
+              "duration_ms": 364.323053,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 26.061387500000002,
+              "duration_ms": 372.45669999999996,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 22.461969,
+              "duration_ms": 343.654691,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 24.316654,
+              "duration_ms": 372.87356,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 23.0379085,
+              "duration_ms": 357.651793,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 25.0509615,
+              "duration_ms": 374.849693,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 24.4045815,
+              "duration_ms": 392.990609,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 23.108645000000003,
+              "duration_ms": 572.004294,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 25.201499,
+              "duration_ms": 362.332577,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 23.4371625,
+              "duration_ms": 325.372668,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 26.039600999999998,
+              "duration_ms": 383.792285,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 23.3697165,
+              "duration_ms": 377.903712,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "tcp_connect.jitter",
+          "label": "TCP connect jitter",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 1.8940842453667943,
+          "summary": {
+            "n": 4,
+            "min": 1.1959071486135007,
+            "max": 6.174765039113909,
+            "mean": 2.7897101696152498,
+            "median": 1.8940842453667943,
+            "stddev": 2.313841724898051,
+            "cv": 0.829420113279069,
+            "ci95": null
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": true
+        },
+        {
+          "key": "tls_handshake.mean",
+          "label": "TLS handshake",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 25.944869999999998,
+          "summary": {
+            "n": 11,
+            "min": 23.691001999999997,
+            "max": 28.791781,
+            "mean": 25.884056090909095,
+            "median": 25.944869999999998,
+            "stddev": 1.5329424371101779,
+            "cv": 0.05922342432446561,
+            "ci95": [
+              24.536285000000003,
+              26.961949999999998
+            ]
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "ttfb.mean",
+          "label": "Time to first byte",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 61.40383,
+          "summary": {
+            "n": 11,
+            "min": 46.303794,
+            "max": 270.602307,
+            "mean": 82.01693409090909,
+            "median": 61.40383,
+            "stddev": 64.40455963800895,
+            "cv": 0.7852592925092974,
+            "ci95": [
+              53.298922999999995,
+              70.043866
+            ]
+          },
+          "samples": [],
+          "outliers": [
+            6
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "download.single",
+          "label": "Download (1 stream)",
+          "unit": "Mbit/s",
+          "direction": "higher_is_better",
+          "value": 305.4035619771653,
+          "summary": {
+            "n": 11,
+            "min": 284.6367665751063,
+            "max": 322.04212317953204,
+            "mean": 301.1334850229327,
+            "median": 305.4035619771653,
+            "stddev": 12.102102968831646,
+            "cv": 0.040188499687804614,
+            "ci95": [
+              291.0401871835229,
+              309.5975990796581
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 309.0327288850447,
+              "duration_ms": 353.646162,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 289.2117465008465,
+              "duration_ms": 358.843427,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 167.66545837786245,
+              "duration_ms": 637.930693,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 322.04212317953204,
+              "duration_ms": 322.03022500000003,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 295.66974912352487,
+              "duration_ms": 316.14995899999997,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 308.6402135986608,
+              "duration_ms": 303.471627,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 309.5975990796581,
+              "duration_ms": 380.12319,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 292.3658581181318,
+              "duration_ms": 316.651825,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 284.6367665751063,
+              "duration_ms": 320.956232,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 312.12176107082456,
+              "duration_ms": 299.010889,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 305.8603118114919,
+              "duration_ms": 306.880511,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 285.09020353464024,
+              "duration_ms": 340.358453,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 291.0401871835229,
+              "duration_ms": 325.812606,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 305.4035619771653,
+              "duration_ms": 313.495092,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "download.multi",
+          "label": "Download (4 streams)",
+          "unit": "Mbit/s",
+          "direction": "higher_is_better",
+          "value": 539.2653503371512,
+          "summary": {
+            "n": 11,
+            "min": 463.26062893699043,
+            "max": 665.7616870999625,
+            "mean": 554.4628689045846,
+            "median": 539.2653503371512,
+            "stddev": 59.90799093954239,
+            "cv": 0.10804689420934284,
+            "ci95": [
+              518.8075683586471,
+              614.5464257735356
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 519.0001993063493,
+              "duration_ms": 899.433818,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 519.2909715463259,
+              "duration_ms": 749.954857,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 546.5900909341019,
+              "duration_ms": 800.715116,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 634.6620865359536,
+              "duration_ms": 651.272959,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 545.9295771875052,
+              "duration_ms": 759.4772290000001,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 535.9488851182296,
+              "duration_ms": 694.100371,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 518.8075683586471,
+              "duration_ms": 685.177562,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 539.2653503371512,
+              "duration_ms": 732.615817,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 665.7616870999625,
+              "duration_ms": 987.28822,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 507.79595189078344,
+              "duration_ms": 712.368279,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 522.3170136541509,
+              "duration_ms": 665.161694,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 614.5464257735356,
+              "duration_ms": 1059.929835,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 550.7963830575213,
+              "duration_ms": 648.515509,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 463.26062893699043,
+              "duration_ms": 898.105852,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            5
+          ],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "high_variance",
+          "message": "`ttfb.mean` varied by 79% between repetitions (bound 30%). The internet is shared; this usually means congestion on the path rather than a fault in the machine.",
+          "metric_key": "ttfb.mean"
+        },
+        {
+          "code": "validation_failed",
+          "message": "The run reached its 512 MiB transfer ceiling, so some measurements were cut short. The ceiling is a hard bound on what this suite will pull from a third party."
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "endpoints": [
+          {
+            "host": "speed.cloudflare.com",
+            "operator": "Cloudflare",
+            "role": "Throughput"
+          },
+          {
+            "host": "one.one.one.one",
+            "operator": "Cloudflare",
+            "role": "LatencyProbe"
+          },
+          {
+            "host": "dns.google",
+            "operator": "Google Public DNS",
+            "role": "LatencyProbe"
+          },
+          {
+            "host": "dns.quad9.net",
+            "operator": "Quad9",
+            "role": "LatencyProbe"
+          }
+        ],
+        "ipv6_available": true,
+        "probe_failures": 0,
+        "transfer": {
+          "bytes_spent": 536870912,
+          "ceiling_bytes": 536870912,
+          "download_bytes_per_stream": 7669584,
+          "parallel_streams": 4
+        },
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "web.static",
+        "version": "1.0.0"
+      },
+      "status": "degraded",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:43:30.103306218Z",
+      "finished_at": "2026-08-28T13:44:13.078682886Z",
+      "duration_ms": 42975.376476,
+      "metrics": [
+        {
+          "key": "requests.small_keepalive",
+          "label": "Small objects, keep-alive",
+          "unit": "req/s",
+          "direction": "higher_is_better",
+          "value": 932427.9767277008,
+          "summary": {
+            "n": 11,
+            "min": 928352.8824141162,
+            "max": 952640.7111291813,
+            "mean": 937349.4317315776,
+            "median": 932427.9767277008,
+            "stddev": 8421.774182963876,
+            "cv": 0.008984668788251384,
+            "ci95": [
+              931449.4109211375,
+              945287.035984666
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 937742.134602884,
+              "duration_ms": 500.22337100000004,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 938615.8402105843,
+              "duration_ms": 500.243423,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 965005.7808354555,
+              "duration_ms": 500.368491,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 945287.035984666,
+              "duration_ms": 500.105633,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 928352.8824141162,
+              "duration_ms": 500.19055000000003,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 943266.823576609,
+              "duration_ms": 500.2300589999999,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 952640.7111291813,
+              "duration_ms": 500.332812,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 932427.9767277008,
+              "duration_ms": 500.155003,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 931449.4109211375,
+              "duration_ms": 500.20056800000003,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 931500.7367871389,
+              "duration_ms": 500.23512400000004,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 935145.9925580607,
+              "duration_ms": 500.3500480000001,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 932271.0785167982,
+              "duration_ms": 500.2003940000001,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 930157.4463700856,
+              "duration_ms": 500.253394,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 948343.6540618611,
+              "duration_ms": 500.437115,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            3,
+            10
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "connections.plaintext",
+          "label": "New connection per request",
+          "unit": "conn/s",
+          "direction": "higher_is_better",
+          "value": 13784.543932959048,
+          "summary": {
+            "n": 11,
+            "min": 13558.753960335373,
+            "max": 14140.824160827407,
+            "mean": 13794.687616959756,
+            "median": 13784.543932959048,
+            "stddev": 204.06516276648085,
+            "cv": 0.014793025288633195,
+            "ci95": [
+              13613.912511650513,
+              13978.871927932185
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 14978.625596263433,
+              "duration_ms": 505.32048900000007,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 14103.588857197858,
+              "duration_ms": 506.750787,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 14001.271291752493,
+              "duration_ms": 506.740011,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 13969.25271559569,
+              "duration_ms": 506.684665,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 13812.9778142696,
+              "duration_ms": 506.69777100000005,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 13562.196256695332,
+              "duration_ms": 506.85042400000003,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 14140.824160827407,
+              "duration_ms": 506.61858800000005,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 13613.912511650513,
+              "duration_ms": 506.76132900000005,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 13784.543932959048,
+              "duration_ms": 506.9449,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 13671.989270630138,
+              "duration_ms": 506.72981699999997,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 13558.753960335373,
+              "duration_ms": 506.905355,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 14014.642389470959,
+              "duration_ms": 506.898756,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 13633.598846191093,
+              "duration_ms": 506.83645099999995,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 13978.871927932185,
+              "duration_ms": 506.62207800000004,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "connections.tls",
+          "label": "New TLS connection per request",
+          "unit": "conn/s",
+          "direction": "higher_is_better",
+          "value": 12317.397436979882,
+          "summary": {
+            "n": 11,
+            "min": 11126.094791591991,
+            "max": 12868.262100572936,
+            "mean": 12314.727072899324,
+            "median": 12317.397436979882,
+            "stddev": 487.4330594444981,
+            "cv": 0.03958131240416837,
+            "ci95": [
+              12095.914979413265,
+              12686.211973367888
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 12118.089041474404,
+              "duration_ms": 506.268543,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 12665.282429127037,
+              "duration_ms": 506.66135199999997,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 12544.358932721676,
+              "duration_ms": 506.363761,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 12868.262100572936,
+              "duration_ms": 506.518197,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 12686.211973367888,
+              "duration_ms": 507.32312700000006,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 11126.094791591991,
+              "duration_ms": 506.647442,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 12640.019140634266,
+              "duration_ms": 506.408098,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 12835.58816246985,
+              "duration_ms": 505.859898,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 12317.397436979882,
+              "duration_ms": 508.0625519999999,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 12064.038753520828,
+              "duration_ms": 507.79063999999994,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 12152.635316131928,
+              "duration_ms": 506.88627900000006,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 12095.914979413265,
+              "duration_ms": 507.60987199999994,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 12379.571380753492,
+              "duration_ms": 507.207037,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 12296.263766456254,
+              "duration_ms": 507.30889599999995,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "throughput.medium",
+          "label": "64 KiB objects",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 33903.46714887348,
+          "summary": {
+            "n": 11,
+            "min": 9926.317126215874,
+            "max": 34920.41141777703,
+            "mean": 31720.03891550418,
+            "median": 33903.46714887348,
+            "stddev": 7258.705937873507,
+            "cv": 0.22883660254040805,
+            "ci95": [
+              32996.28082821015,
+              34127.61378944595
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 16969.892483512715,
+              "duration_ms": 500.475117,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 9535.256150132836,
+              "duration_ms": 500.563992,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 33094.51347260406,
+              "duration_ms": 500.12697699999995,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 9926.317126215874,
+              "duration_ms": 500.36864199999997,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 32785.32596829589,
+              "duration_ms": 500.14813300000003,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 34105.124033253414,
+              "duration_ms": 500.26066099999997,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 34920.41141777703,
+              "duration_ms": 500.153953,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 33400.92595297738,
+              "duration_ms": 500.31608000000006,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 33823.9936045869,
+              "duration_ms": 500.15389600000003,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 34875.632660118215,
+              "duration_ms": 500.410816,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 34127.61378944595,
+              "duration_ms": 500.13613599999996,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 33903.46714887348,
+              "duration_ms": 500.179735,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 34055.33554079172,
+              "duration_ms": 500.390139,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 32996.28082821015,
+              "duration_ms": 500.162989,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            0
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "throughput.large",
+          "label": "1 MiB objects",
+          "unit": "MiB/s",
+          "direction": "higher_is_better",
+          "value": 73780.11545378623,
+          "summary": {
+            "n": 11,
+            "min": 73079.46799656974,
+            "max": 74731.21563305159,
+            "mean": 73836.22471568483,
+            "median": 73780.11545378623,
+            "stddev": 445.80034502456425,
+            "cv": 0.006037691481940897,
+            "ci95": [
+              73617.21984381624,
+              73985.40267466224
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 72045.294003233,
+              "duration_ms": 500.741101,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 73877.15984370238,
+              "duration_ms": 500.953866,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 73492.7390610733,
+              "duration_ms": 501.070601,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 73079.46799656974,
+              "duration_ms": 500.770783,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 73875.56418815888,
+              "duration_ms": 500.85633900000005,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 74731.21563305159,
+              "duration_ms": 500.88901799999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 73394.51461042528,
+              "duration_ms": 500.828342,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 73881.9750390433,
+              "duration_ms": 500.948179,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 73617.21984381624,
+              "duration_ms": 500.970369,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 74398.22397115447,
+              "duration_ms": 500.980263,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 73985.40267466224,
+              "duration_ms": 500.9237600000001,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 73695.43894949391,
+              "duration_ms": 500.88670300000007,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 73759.3335123713,
+              "duration_ms": 500.900362,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 73780.11545378623,
+              "duration_ms": 501.05696,
+              "warmup": false
+            }
+          ],
+          "outliers": [
+            2
+          ],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency.small_mean",
+          "label": "Mean response time under load",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.0961688081216272,
+          "summary": {
+            "n": 11,
+            "min": 0.09482544336053096,
+            "max": 0.09718117712113918,
+            "mean": 0.09608211107159176,
+            "median": 0.0961688081216272,
+            "stddev": 0.0006024663316204106,
+            "cv": 0.006270327794645423,
+            "ci95": [
+              0.09565452963029666,
+              0.09639464400744698
+            ]
+          },
+          "samples": [
+            {
+              "rep": 0,
+              "value": 0.09504520617230026,
+              "duration_ms": 510.918888,
+              "warmup": true
+            },
+            {
+              "rep": 1,
+              "value": 0.09525595672355065,
+              "duration_ms": 509.96242700000005,
+              "warmup": true
+            },
+            {
+              "rep": 2,
+              "value": 0.09531124270503487,
+              "duration_ms": 510.107643,
+              "warmup": true
+            },
+            {
+              "rep": 3,
+              "value": 0.09565452963029666,
+              "duration_ms": 508.49140000000006,
+              "warmup": false
+            },
+            {
+              "rep": 4,
+              "value": 0.09482544336053096,
+              "duration_ms": 509.23450699999995,
+              "warmup": false
+            },
+            {
+              "rep": 5,
+              "value": 0.09639464400744698,
+              "duration_ms": 509.09450899999996,
+              "warmup": false
+            },
+            {
+              "rep": 6,
+              "value": 0.09718117712113918,
+              "duration_ms": 508.86923399999995,
+              "warmup": false
+            },
+            {
+              "rep": 7,
+              "value": 0.09589814287062515,
+              "duration_ms": 510.08702999999997,
+              "warmup": false
+            },
+            {
+              "rep": 8,
+              "value": 0.09602999945947377,
+              "duration_ms": 511.831092,
+              "warmup": false
+            },
+            {
+              "rep": 9,
+              "value": 0.0961688081216272,
+              "duration_ms": 508.5856,
+              "warmup": false
+            },
+            {
+              "rep": 10,
+              "value": 0.09560446365172846,
+              "duration_ms": 508.90233399999994,
+              "warmup": false
+            },
+            {
+              "rep": 11,
+              "value": 0.09632118027849862,
+              "duration_ms": 510.979547,
+              "warmup": false
+            },
+            {
+              "rep": 12,
+              "value": 0.09649730828893131,
+              "duration_ms": 509.559321,
+              "warmup": false
+            },
+            {
+              "rep": 13,
+              "value": 0.09632752499721091,
+              "duration_ms": 510.6354400000001,
+              "warmup": false
+            }
+          ],
+          "outliers": [],
+          "measures_dispersion": false
+        },
+        {
+          "key": "latency.small_p99",
+          "label": "99th percentile response time under load",
+          "unit": "ms",
+          "direction": "lower_is_better",
+          "value": 0.139958,
+          "summary": {
+            "n": 11,
+            "min": 0.13761099999999998,
+            "max": 0.146198,
+            "mean": 0.14110127272727271,
+            "median": 0.139958,
+            "stddev": 0.0030911692639164594,
+            "cv": 0.02190745132321534,
+            "ci95": [
+              0.138732,
+              0.14531
+            ]
+          },
+          "samples": [],
+          "outliers": [],
+          "measures_dispersion": false
+        }
+      ],
+      "warnings": [
+        {
+          "code": "high_variance",
+          "message": "`throughput.medium` varied by 23% across repetitions, above this module's 20% bound. On a loopback HTTP measurement that usually means the machine was doing something else at the same time.",
+          "metric_key": "throughput.medium"
+        }
+      ],
+      "context": {
+        "build_target": "x86_64-linux",
+        "connections": 64,
+        "latency_load_share": 0.25,
+        "latency_load_share_target": 0.25,
+        "latency_offered_rate_per_s": 233106.9941819252,
+        "measured_reps": 11,
+        "object_sizes": [
+          1024,
+          65536,
+          1048576
+        ],
+        "origin": "in-process, 127.0.0.1, OS-assigned port, destroyed with the module",
+        "protocol": "HTTP/1.1",
+        "workload_version": "1.0.0"
+      }
+    },
+    {
+      "module": {
+        "id": "php.runtime",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080141892Z",
+      "finished_at": "2026-08-28T13:44:13.080221168Z",
+      "duration_ms": 0.079153,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no PHP CLI binary was found at any allow-listed path. This module measures the PHP the machine actually has; there is nothing to measure here, and reporting zeroes would be worse than saying so.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "node.runtime",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080273263Z",
+      "finished_at": "2026-08-28T13:44:13.080342601Z",
+      "duration_ms": 0.06922500000000001,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no Node.js binary was found at any allow-listed path. Version-manager installs (nvm, fnm, volta, asdf) live under $HOME and are deliberately not searched: they are owned by an ordinary user, and a benchmark running as root must not execute a binary that user can rewrite.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "database.oltp",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080389908Z",
+      "finished_at": "2026-08-28T13:44:13.080429257Z",
+      "duration_ms": 0.039216,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "database.cache",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080486045Z",
+      "finished_at": "2026-08-28T13:44:13.080516819Z",
+      "duration_ms": 0.030636999999999998,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "wordpress.site",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080569260Z",
+      "finished_at": "2026-08-28T13:44:13.080612548Z",
+      "duration_ms": 0.043158,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    },
+    {
+      "module": {
+        "id": "deployment.container",
+        "version": "1.0.0"
+      },
+      "status": "failed",
+      "cycle": 0,
+      "started_at": "2026-08-28T13:44:13.080653983Z",
+      "finished_at": "2026-08-28T13:44:13.080673057Z",
+      "duration_ms": 0.018962,
+      "metrics": [],
+      "warnings": [],
+      "error": "precondition not met: no container runtime was found among /usr/bin/docker, /usr/local/bin/docker, /usr/bin/podman, /usr/local/bin/podman, /usr/bin/nerdctl. Database modules create and destroy their own instance and will not use one already on this machine, so they are reported as not measured rather than pointed at your server.",
+      "context": {}
+    }
+  ],
+  "scores": {
+    "scoring_model": "dbs/0.1.0-dev",
+    "reference_profile": "DARC-REF-1",
+    "uncalibrated": true,
+    "profile": "deep",
+    "total": 1145.9553779922314,
+    "total_is_standard": true,
+    "categories": [
+      {
+        "key": "compute",
+        "label": "Compute Score",
+        "score": 716.4709607252992,
+        "weight": 0.26,
+        "metric_count": 10,
+        "modules": [
+          "cpu.mixed"
+        ]
+      },
+      {
+        "key": "memory",
+        "label": "Memory Score",
+        "score": 616.4365441267212,
+        "weight": 0.12,
+        "metric_count": 13,
+        "modules": [
+          "memory.bandwidth"
+        ]
+      },
+      {
+        "key": "storage",
+        "label": "Storage Score",
+        "score": 977.6013896003653,
+        "weight": 0.2,
+        "metric_count": 10,
+        "modules": [
+          "storage.mixed"
+        ]
+      },
+      {
+        "key": "network",
+        "label": "Network Score",
+        "score": 486.3421396857989,
+        "weight": 0.08,
+        "metric_count": 7,
+        "modules": [
+          "network.transfer"
+        ]
+      },
+      {
+        "key": "web",
+        "label": "Web Score",
+        "score": 6399.815475118535,
+        "weight": 0.18,
+        "metric_count": 7,
+        "modules": [
+          "web.static"
+        ]
+      }
+    ],
+    "facets": {
+      "multi_core": 900.0388813237964,
+      "single_core": 570.3427354245134
+    },
+    "composites": [
+      {
+        "key": "wordpress_hosting",
+        "label": "WordPress Hosting",
+        "score": 1850.215493932121,
+        "weight_coverage": 0.75
+      },
+      {
+        "key": "php_commerce",
+        "label": "PHP Commerce",
+        "score": 1656.097884146688,
+        "weight_coverage": 0.7000000000000001
+      },
+      {
+        "key": "node_nextjs",
+        "label": "Node / Next.js",
+        "score": 1443.4410881164995,
+        "weight_coverage": 0.9500000000000001
+      },
+      {
+        "key": "database_server",
+        "label": "Database Server",
+        "score": 808.6780281788959,
+        "weight_coverage": 0.65
+      },
+      {
+        "key": "static_media_server",
+        "label": "Static / Media Server",
+        "score": 1043.7071370125107,
+        "weight_coverage": 0.9999999999999999
+      },
+      {
+        "key": "build_server",
+        "label": "Build Server",
+        "score": 755.3965449128725,
+        "weight_coverage": 0.8999999999999999
+      },
+      {
+        "key": "general_purpose_vps",
+        "label": "General Purpose VPS",
+        "score": 992.0868426474899,
+        "weight_coverage": 1.0
+      }
+    ],
+    "stability_score": 849.4153328931855,
+    "stability_index": 0.8494153328931855,
+    "stability_multiplier": 0.9849415332893185,
+    "uncapped_total": 1145.9553779922314,
+    "weak_link_applied": false,
+    "balance_index": 0.4584270908935749,
+    "efficiency_score": 716.470960725299,
+    "median_cv": 0.030116933421362912,
+    "instability_flags": 5,
+    "missing_required_categories": [],
+    "unreferenced_metrics": []
+  },
+  "verdict": {
+    "state": "partial",
+    "reasons": [
+      {
+        "excessive_variance": {
+          "module": "cpu.mixed"
+        }
+      },
+      {
+        "excessive_variance": {
+          "module": "memory.bandwidth"
+        }
+      },
+      {
+        "excessive_variance": {
+          "module": "network.transfer"
+        }
+      },
+      {
+        "excessive_variance": {
+          "module": "web.static"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "php.runtime"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "node.runtime"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "database.oltp"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "database.cache"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "wordpress.site"
+        }
+      },
+      {
+        "module_failed": {
+          "module": "deployment.container"
+        }
+      }
+    ],
+    "validator_version": "dbv/0.1.0"
+  },
+  "telemetry": {
+    "samples": 296,
+    "cpu_busy_pct_mean": 28.09447594423232,
+    "cpu_external_busy_pct_max": 14.285714285714285,
+    "cpu_steal_pct_max": 0.0,
+    "cpu_steal_pct_mean": 0.0,
+    "cpu_iowait_pct_mean": 1.5013079902141082,
+    "load1_max": 32.78,
+    "mem_used_bytes_max": 5883125760,
+    "swap_used_bytes_max": 0,
+    "cpu_freq_mhz_first": 2947.335,
+    "cpu_freq_mhz_last": 1728.191,
+    "cpu_temp_c_max": 49.0,
+    "psi_cpu_some_avg10_max": 30.9
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "canonicalization": "DCJ/1",
+    "public_key": "ZjMOKR8lF6wG5IwgL9CxwsHoNFjyNBMD6nL1TB7Em9k=",
+    "value": "fORxzXRUlFno+t0QKwhRMwCYue/eeJskDNosHDdvH/+CYG4RlSCbka8B9gaT+yD2gxSJtZHXobDBZiVwBaC9CA==",
+    "key_id": "c0513604a9f4cef3"
+  }
+}

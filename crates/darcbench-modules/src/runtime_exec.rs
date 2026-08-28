@@ -209,6 +209,44 @@ pub fn directory_is_writable_by_others(path: &Path) -> Option<String> {
     None
 }
 
+/// A path rendered for a message a human will read, with any home directory
+/// elided to `~`.
+///
+/// `docs/PRIVACY.md` says usernames and paths inside home directories are
+/// **never** collected, and the scratch directory defaults to
+/// `$XDG_STATE_HOME/darcbench` - which is under `$HOME` for any agent not run
+/// as root. A precondition failure naming it therefore wrote a username into
+/// the bundle, which is signed, and would then be published.
+///
+/// Found by scanning the first field corpus before publishing it: one bundle
+/// carried `/home/ubuntu/.local/state/darcbench/scratch` in a `node.runtime`
+/// error. Generic and harmless in that instance, and a breach of a guarantee
+/// the project states and tests for, which is the part that matters.
+///
+/// A string transform rather than a lookup of `$HOME`: this crate reads nothing
+/// about the host it is not measuring, and the shape is what identifies a home
+/// directory here regardless of whose it is. The operator still gets an
+/// actionable path, because `~/.local/state/darcbench/scratch` is unambiguous
+/// on the machine that produced it.
+pub fn elide_home(path: &Path) -> String {
+    let text = path.display().to_string();
+    if let Some(rest) = text.strip_prefix("/root") {
+        if rest.is_empty() || rest.starts_with('/') {
+            return format!("~{rest}");
+        }
+    }
+    let Some(rest) = text.strip_prefix("/home/") else {
+        return text;
+    };
+    // `/home/alice/x` -> `~/x`; `/home/alice` -> `~`; `/home` alone is not a
+    // home directory and is left as it is by the `strip_prefix` above failing.
+    match rest.find('/') {
+        Some(cut) => format!("~{}", &rest[cut..]),
+        None if rest.is_empty() => text,
+        None => "~".to_string(),
+    }
+}
+
 /// `None` when this inode is root-owned and writable only by root.
 fn unsafe_ownership(metadata: &std::fs::Metadata) -> Option<String> {
     if metadata.uid() != 0 {
@@ -329,8 +367,8 @@ impl ScriptFile {
                  user choosing what this agent runs. See docs/THREAT-MODEL.md, T-EXEC. \
                  A scratch this agent creates is `0700` whatever the umask, so this one predates \
                  that: `rm -rf {}` is enough, and the next run recreates it correctly.",
-                scratch.display(),
-                scratch.display()
+                elide_home(scratch),
+                elide_home(scratch)
             )));
         }
 
@@ -861,6 +899,51 @@ mod tests {
     /// commit message, and silently not applied - a string replacement missed
     /// and nothing failed. A property that only a commit message asserts is not
     /// a property.
+    /// A message a human reads must not carry a username into a signed bundle.
+    ///
+    /// `docs/PRIVACY.md` lists "usernames, paths inside home directories" as
+    /// never collected. The scratch directory is under `$HOME` whenever the
+    /// agent is not root, so any precondition failure naming it breached that -
+    /// and bundles are signed, so the leak is not editable after the fact.
+    ///
+    /// Found by scanning the first field corpus before publishing it, in a
+    /// `node.runtime` refusal reading
+    /// `/home/ubuntu/.local/state/darcbench/scratch`.
+    #[test]
+    fn a_path_under_a_home_directory_is_elided_before_it_reaches_a_message() {
+        use std::path::PathBuf;
+        for (raw, expected) in [
+            (
+                "/home/ubuntu/.local/state/darcbench/scratch",
+                "~/.local/state/darcbench/scratch",
+            ),
+            ("/home/alice", "~"),
+            (
+                "/root/.local/state/darcbench/scratch",
+                "~/.local/state/darcbench/scratch",
+            ),
+            ("/root", "~"),
+            // Not a home directory: left exactly as it is, because eliding it
+            // would make the message wrong rather than private.
+            ("/var/lib/darcbench/scratch", "/var/lib/darcbench/scratch"),
+            ("/home", "/home"),
+            ("/rootfs/x", "/rootfs/x"),
+            ("/tmp/scratch", "/tmp/scratch"),
+        ] {
+            assert_eq!(elide_home(&PathBuf::from(raw)), expected, "eliding {raw}");
+        }
+
+        // The property that matters, stated directly: no output of this
+        // function may contain a username.
+        for raw in ["/home/ubuntu/x", "/home/dave/y", "/root/z"] {
+            let shown = elide_home(&PathBuf::from(raw));
+            assert!(
+                !shown.contains("/home/") && !shown.starts_with("/root"),
+                "{raw} rendered as {shown}, which still names a home directory"
+            );
+        }
+    }
+
     #[test]
     fn the_script_refuses_a_planted_symlink_and_is_never_briefly_readable() {
         let dir = std::env::temp_dir().join(format!(
