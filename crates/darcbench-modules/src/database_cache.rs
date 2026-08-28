@@ -810,6 +810,9 @@ fn single(value: f64) -> Summary {
         median: value,
         stddev: 0.0,
         cv: None,
+        // One observation has no distribution, so it has no spread of any
+        // kind - the same reason `cv` and `ci95` are `None` rather than zero.
+        mad: None,
         ci95: None,
     }
 }

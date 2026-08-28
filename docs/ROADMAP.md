@@ -1182,7 +1182,7 @@ Phase 2 modules ──► DARC-REF-1 calibration ──► dbs/1.0.0
 Calibration gates everything that claims comparability. Leaderboards must not
 ship before anti-replay.
 
-### Open questions the first field corpus raised
+### Open questions the field corpora raised
 
 Three bare-metal hosts, `quick` profile, recorded in
 [FIELD-EVIDENCE.md](FIELD-EVIDENCE.md). These are decisions, not defects: each
@@ -1202,15 +1202,24 @@ one moves scores, and none of them is answered by running the calibration.
 - **`scope: unknown` and rankability.** A host whose DMI reads `Default
   string` cannot be attested as bare metal. Whether it may still be ranked, and
   on what evidence, is unsettled.
+- **`quick` is not comparable, and nothing says so.** Two `quick` runs on one
+  machine moved the multi-core facet by 17.5% and Compute by 9.2%, where two
+  `standard` runs on the same machine held everything inside 4.1%. Five
+  repetitions against seven, on the most load-sensitive thing measured. The
+  profiles were designed this way; what is missing is saying it where a user
+  about to submit a score will read it, and deciding whether a `quick` run
+  should be submittable at all.
 - **A minimum-passes floor for `memory.bandwidth`.** On the largest host the
   calibrator sized one metric at a single pass per repetition, which leaves no
   internal averaging - and that host is the one whose memory module tripped the
   variance bound.
-- **~~Robust stability judgement.~~ Done.** `Summary::is_unstable` now requires
-  the spread to be wide *and* the median to be poorly determined, using the
-  `ci95` every metric already carried. Over the published corpus that cleared 4
-  of 16 flags and added none. What it did *not* clear is the real question
-  below.
+- **~~Robust stability judgement.~~ Done.** `Summary::is_unstable` requires the
+  spread to be wide *and* the robust spread - a median absolute deviation,
+  scaled so one bound judges both - to agree. Over five repeated runs on one
+  host it clears 7 of 10 flags and adds none, including `triad.single` at a CV
+  of 36% around a median the other six repetitions agreed on to 0.3%. The first
+  attempt used `ci95` and only ever helped `deep`: that interval trims nothing
+  at n = 6 or 7. What none of it clears is the real question below.
 - **Is latency to somebody else's network a comparable measurement?**
   `ttfb.mean` on H1 runs 29-129 ms with no outlier and a median determined only
   to within 56%: genuinely irreproducible, honestly measured. It is anchored and

@@ -1339,6 +1339,9 @@ fn single(value: f64) -> Summary {
         cv: None,
         // A single observation has no interval, and inventing one would be a
         // claim about a distribution nobody sampled.
+        // One observation has no distribution, so it has no spread of any
+        // kind - the same reason `cv` is `None` rather than zero.
+        mad: None,
         ci95: None,
     }
 }

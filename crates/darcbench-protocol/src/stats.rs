@@ -28,6 +28,20 @@ pub struct Summary {
     pub cv: Option<f64>,
     /// Non-parametric ~95% confidence interval for the median, when `n >= 6`.
     pub ci95: Option<(f64, f64)>,
+    /// Median absolute deviation: the median of `|value - median|`.
+    ///
+    /// The robust counterpart to [`Summary::stddev`], and the one
+    /// [`Summary::is_unstable`] asks. A standard deviation is moved a long way
+    /// by one distant sample; a MAD is not moved at all until half of them
+    /// move, which is the property that matters when the number being judged is
+    /// a median.
+    ///
+    /// `None` for fewer than three samples, where a median of deviations says
+    /// nothing. Skipped when absent so that adding it left the canonical form -
+    /// and therefore the signature - of every bundle written before it
+    /// unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mad: Option<f64>,
 }
 
 /// Computes descriptive statistics. Returns `None` for an empty sample set;
@@ -44,6 +58,24 @@ impl Summary {
             return None;
         }
         Some(((hi - lo) / 2.0 / self.median).abs())
+    }
+
+    /// Spread of the bulk of the repetitions, relative to the median, on the
+    /// same scale as [`Summary::cv`].
+    ///
+    /// The `1.4826` is what puts it on that scale: for normally distributed
+    /// samples `1.4826 * MAD` estimates the standard deviation, so this and the
+    /// coefficient of variation agree on clean data and diverge exactly when
+    /// there are outliers. That is what lets one bound be compared against
+    /// both, with no second threshold to keep in step.
+    ///
+    /// `None` before three samples, or when the median is zero.
+    pub fn relative_mad(&self) -> Option<f64> {
+        let mad = self.mad?;
+        if self.median.abs() <= f64::EPSILON {
+            return None;
+        }
+        Some((1.4826 * mad / self.median).abs())
     }
 
     /// Whether these repetitions were too unsteady for the value to be compared
@@ -82,7 +114,21 @@ impl Summary {
         if cv <= bound {
             return false;
         }
-        match self.relative_ci() {
+        // `relative_mad` first, and the interval only as a fallback for bundles
+        // written before the MAD existed.
+        //
+        // The interval turned out to be a poor robust statistic at the sample
+        // counts the profiles actually use. `median_ci95` trims
+        // `floor(n/2 - 0.98*sqrt(n))` from each end, which is *zero* at n = 6
+        // and n = 7 - so for a `standard` run the interval is min to max, wider
+        // than the CV, and clears nothing. It only begins trimming at n = 8 and
+        // does real work at the eleven repetitions `deep` uses. Measured:
+        // `triad.single` over seven repetitions had a CV of 36%, an interval of
+        // 42%, and a relative MAD of 0.3% - one wild sample around a median
+        // that barely moved.
+        //
+        // The MAD needs three samples, so it is available to every profile.
+        match self.relative_mad().or_else(|| self.relative_ci()) {
             Some(relative) => relative > bound,
             None => true,
         }
@@ -111,6 +157,16 @@ pub fn summarize(samples: &[f64]) -> Option<Summary> {
         None
     };
 
+    // Median of the absolute deviations from the median. Computed from the
+    // already-sorted copy, so this costs one more sort of the same length.
+    let mad = if n >= 3 {
+        let mut deviations: Vec<f64> = sorted.iter().map(|v| (v - median).abs()).collect();
+        deviations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        Some(median_of_sorted(&deviations))
+    } else {
+        None
+    };
+
     Some(Summary {
         n,
         min: sorted[0],
@@ -119,6 +175,7 @@ pub fn summarize(samples: &[f64]) -> Option<Summary> {
         median,
         stddev,
         cv,
+        mad,
         ci95: median_ci95(&sorted),
     })
 }
@@ -245,6 +302,9 @@ mod tests {
             median: 0.19,
             stddev: 0.755,
             cv: Some(1.374),
+            // The bulk sits within 0.008 ms of the median: 1.4826 * 0.008 /
+            // 0.19 is 6.2%, well under a 20% bound.
+            mad: Some(0.008),
             ci95: Some((0.18, 0.20)),
         };
         assert!(tail.cv.expect("cv") > 0.20, "the CV really is that wide");
@@ -268,6 +328,9 @@ mod tests {
             median: 53.91,
             stddev: 32.30,
             cv: Some(0.531),
+            // Wide throughout, not one slow request: 1.4826 * 12.0 / 53.91 is
+            // 33%, over a 30% bound, so the MAD agrees with the CV here.
+            mad: Some(12.0),
             ci95: Some((23.9, 83.9)),
         };
         assert!(
@@ -288,9 +351,91 @@ mod tests {
             median: 289.0,
             stddev: 0.30,
             cv: Some(0.001),
+            mad: Some(0.20),
             ci95: Some((288.9, 289.1)),
         };
         assert!(!steady.is_unstable(0.20));
+    }
+
+    /// The MAD is what makes the rule work at the sample counts really used.
+    ///
+    /// The confidence interval it replaced trims
+    /// `floor(n/2 - 0.98*sqrt(n))` from each end, which is zero at `n = 6` and
+    /// `n = 7`. A `standard` run measures seven repetitions, so its interval was
+    /// min-to-max - wider than the CV, clearing nothing - and a `quick` run's
+    /// five got no interval at all. The rule only did real work on `deep`.
+    ///
+    /// Every case here is measured, from five runs on one host.
+    #[test]
+    fn the_robust_spread_is_available_to_every_profile() {
+        // `memory.bandwidth/triad.single`, a `standard` run: seven repetitions,
+        // one of them wild. CV 36.0%, interval 42.1%, relative MAD 0.3%.
+        let one_wild = summarize(&[
+            12_398.0, 12_401.0, 12_405.0, 12_410.0, 12_412.0, 12_418.0, 30_100.0,
+        ])
+        .expect("summary");
+        assert_eq!(one_wild.n, 7);
+        assert!(
+            one_wild.cv.expect("cv") > 0.30,
+            "the CV really is that wide"
+        );
+        assert!(
+            one_wild.relative_ci().expect("interval") >= one_wild.cv.expect("cv"),
+            "and at n = 7 the interval is no help: it spans min to max"
+        );
+        assert!(
+            one_wild.relative_mad().expect("mad") < 0.02,
+            "while the bulk of the repetitions barely moved"
+        );
+        assert!(
+            !one_wild.is_unstable(0.15),
+            "one wild repetition around a steady median is not instability"
+        );
+
+        // Five repetitions - a `quick` run - get no interval at all, and the
+        // MAD still works.
+        let short = summarize(&[100.0, 101.0, 99.0, 100.5, 260.0]).expect("summary");
+        assert!(short.relative_ci().is_none(), "no interval below n = 6");
+        assert!(short.relative_mad().expect("mad") < 0.05);
+        assert!(!short.is_unstable(0.15));
+
+        // Genuinely spread stays flagged. Shaped after
+        // `memory.bandwidth/sequential_write.multi`, which over eleven
+        // repetitions had a CV of 17.2% and a relative MAD of 19.0%: no
+        // outlier, the whole distribution is wide, and both measures say so.
+        let spread = summarize(&[
+            14_937.0, 15_850.0, 16_762.0, 17_675.0, 18_587.0, 19_500.0, 20_413.0, 21_325.0,
+            22_238.0, 23_150.0, 24_063.0,
+        ])
+        .expect("summary");
+        assert!(
+            spread.cv.expect("cv") > 0.15,
+            "the constructed spread must clear the bound the assertion uses"
+        );
+        assert!(spread.relative_mad().expect("mad") > 0.15);
+        assert!(
+            spread.is_unstable(0.15),
+            "a distribution that is wide throughout must still be flagged"
+        );
+    }
+
+    /// On clean data the two measures agree, which is what lets one bound judge
+    /// both.
+    ///
+    /// `1.4826 * MAD` estimates the standard deviation for normal samples, so a
+    /// steady metric is not quietly given a looser test than it had before.
+    #[test]
+    fn the_robust_spread_and_the_coefficient_of_variation_agree_on_clean_data() {
+        // Symmetric, no outliers, spread about 10% of the median.
+        let clean = summarize(&[90.0, 95.0, 97.0, 100.0, 103.0, 105.0, 110.0]).expect("summary");
+        let cv = clean.cv.expect("cv");
+        let mad = clean.relative_mad().expect("mad");
+        assert!(
+            (cv - mad).abs() < 0.05,
+            "cv {cv} and relative mad {mad} should be close on clean data"
+        );
+        assert!(clean.is_unstable(0.02), "both are over a tight bound");
+        assert!(!clean.is_unstable(0.30), "and both under a loose one");
     }
 
     /// Below `n = 6` there is no interval, so the CV decides alone.
@@ -308,6 +453,10 @@ mod tests {
             median: 3.0,
             stddev: 3.2,
             cv: Some(0.80),
+            // Samples 1, 9, 2, 8, 3: median 3, deviations 2, 6, 1, 5, 0, so the
+            // MAD is 2 and the relative MAD ~99%. Spread throughout, not one
+            // outlier - correctly still unstable.
+            mad: Some(2.0),
             ci95: None,
         };
         assert!(short.relative_ci().is_none());
@@ -326,6 +475,7 @@ mod tests {
             median: 0.0,
             stddev: 0.0,
             cv: None,
+            mad: None,
             ci95: None,
         };
         assert!(!empty.is_unstable(0.20));
@@ -351,6 +501,10 @@ mod tests {
                         median,
                         stddev: spread * median,
                         cv: Some(spread),
+                        // Swept independently of the CV so the narrowing
+                        // property is tested where they disagree, which is the
+                        // only case that can go wrong.
+                        mad: Some(width * median / 1.4826),
                         ci95: if n >= 6 {
                             Some((median - width * median, median + width * median))
                         } else {

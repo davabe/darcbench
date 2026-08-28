@@ -346,12 +346,21 @@ within **5.3%**. The run was downgraded to `Partial`, and therefore made
 unrankable, on the strength of the 137%, while the number it actually publishes
 was solid to a twentieth.
 
-`Summary` already carried what was needed: `ci95`, a non-parametric confidence
-interval for the median, computed for every metric with six or more
-repetitions. `Summary::is_unstable` now requires **both** to agree — the spread
-is wide *and* the median is genuinely poorly determined. Below `n = 6` there is
-no interval and the CV decides alone, which is the old behaviour kept where
-there is not enough evidence to do better rather than kept everywhere.
+`Summary::is_unstable` now requires **both** to agree: the spread is wide *and*
+the robust spread agrees it is wide. The robust half is the **median absolute
+deviation**, scaled by 1.4826 so that it estimates a standard deviation for
+clean data and can therefore be judged by the same bound as the CV, with no
+second threshold to keep in step. On a steady metric the two agree and nothing
+changes; they diverge exactly when there is an outlier.
+
+The first attempt used `ci95`, the non-parametric interval for the median that
+`Summary` already carried, and that was a poor choice at the sample counts the
+profiles actually use. `median_ci95` trims `floor(n/2 - 0.98·√n)` from each
+end, which is **zero at n = 6 and n = 7** — so for a `standard` run the interval
+spans min to max, is wider than the CV, and clears nothing, and a `quick` run's
+five repetitions get no interval at all. It only begins trimming at n = 8. The
+four metrics it cleared were all from `deep` runs, which is the only profile it
+ever helped. The MAD needs three samples, so it works for every profile.
 
 Replayed over this corpus, with each module's own bound:
 
@@ -368,6 +377,29 @@ Replayed over this corpus, with each module's own bound:
 | `network.transfer/ttfb.mean` (H3) | 78.5% | **13.6%** | 30% |
 | `memory.bandwidth/sequential_write.multi` | 36.3% | **10.2%** | 15% |
 | `web.static/throughput.medium` | 22.9% | **1.7%** | 20% |
+
+Those figures are the interval version, and every metric it cleared came from a
+`deep` run. Replayed with the MAD over five runs on a second host — two `quick`,
+two `standard`, one `deep` — it clears **7 of 10**, and the cases it clears at
+the smaller sample counts are the stark ones:
+
+| cleared metric | profile | n | CV | rel. MAD |
+|---|---|---|---|---|
+| `memory.bandwidth/triad.single` | standard | 7 | 36.0% | **0.3%** |
+| `memory.bandwidth/sequential_copy.single` | standard | 7 | 18.9% | **0.9%** |
+| `storage.mixed/random_write_4k.qd16` | standard | 7 | 20.7% | **2.3%** |
+| `storage.mixed/random_write_4k.qd1` | standard | 7 | 25.9% | **4.1%** |
+| `memory.bandwidth/sequential_read.multi` | quick | 5 | 21.7% | **3.1%** |
+| `memory.bandwidth/random_read.multi` | quick | 5 | 15.6% | **4.7%** |
+| `memory.bandwidth/triad.multi` | quick | 5 | 23.2% | **13.9%** |
+
+`triad.single` is the shape in miniature: one wild repetition out of seven,
+around a median the other six agree on to within a third of a percent, and the
+run was unrankable for it.
+
+The three it does not clear are the ones that should not be cleared —
+`memory.bandwidth/sequential_write.multi` and `latency_random.single` on a host
+under load, both with a relative MAD of 19–22%, and `ttfb.mean`.
 
 Never flagging anything the CV bound did not is the property that made it safe
 to apply to eight modules and the validator in one change, and a test sweeps
@@ -394,6 +426,68 @@ one that should be reported without bearing on the verdict — the way
 this is a scoring-model decision and it is on the roadmap as one. Raising the
 bound until the three hosts pass would be fitting a threshold to three
 measurements, which is what calibration exists to avoid.
+
+---
+
+## Corpus 2026-08c — repeated runs on one host
+
+Five runs on a single machine — two `quick`, two `standard`, one `deep` — from
+the binary carrying every fix above. Not published: they are from a development
+host with a `PerformanceTest` process pinned at 100% of a core throughout, so
+they describe a *contended* machine. That is what makes them useful.
+
+### The first measurement of run-to-run reproducibility
+
+Everything before this compared different machines. Two `standard` runs on the
+same machine answer a different and more urgent question: **how much does the
+headline number move when nothing changes?** A leaderboard is meaningless
+without it.
+
+| | run 1 | run 2 | spread |
+|---|---|---|---|
+| **Total** | 964 | 1004 | **4.1%** |
+| Compute | 691 | 680 | 1.6% |
+| Memory | 626 | 602 | 4.0% |
+| Storage | 922 | 940 | 1.9% |
+| Network | 241 | 251 | 4.1% |
+| Web | 7424 | 7135 | 4.0% |
+| single-core facet | 560 | 561 | **0.2%** |
+| multi-core facet | 853 | 825 | 3.4% |
+
+Better than expected on a host that was never quiet: nothing exceeds 4.1%, and
+the single-core facet repeats to two parts in a thousand.
+
+`quick` does not hold up nearly as well:
+
+| | run 1 | run 2 | spread |
+|---|---|---|---|
+| **Total** | 736 | 761 | 3.3% |
+| Compute | 675 | 740 | 9.2% |
+| multi-core facet | 798 | 952 | **17.5%** |
+| single-core facet | 571 | 575 | 0.8% |
+
+A 17.5% swing in the multi-core facet between two runs of the same profile on
+the same machine. Five repetitions against `standard`'s seven, and multi-core
+throughput is the most load-sensitive thing measured — those two runs started at
+load 6.25 and 2.23.
+
+This is a number the project needed and did not have: **`quick` is for triage
+and `standard` is the smallest profile whose score is worth comparing.** The
+profiles were already designed that way; now there is evidence for saying so,
+and it belongs in front of anyone about to submit a score.
+
+### What it confirmed
+
+**The transfer ceiling no longer disqualifies a run that succeeds.** The `deep`
+run spent 536870912 bytes against a ceiling of 536870912 — exhausted to the
+byte, the exact condition that degraded all three hosts of the previous corpus —
+and raised no ceiling warning at all.
+
+**`memory.bandwidth` was flagged in all five runs, on a different metric each
+time** — `triad.multi`, `sequential_read.multi`, `sequential_copy.single`,
+`sequential_write.multi`, `triad.single`. Five runs, five different metrics is
+not one bad metric; it is a contended machine, and it is what drove the move
+from the confidence interval to the MAD above.
 
 ### Reproducing this
 

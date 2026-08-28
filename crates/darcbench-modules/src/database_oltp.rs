@@ -938,6 +938,9 @@ fn single(value: f64) -> Summary {
         // `None`, not zero. A coefficient of variation of zero claims the
         // measurement was perfectly stable; `None` says it was measured once.
         cv: None,
+        // One observation has no distribution, so it has no spread of any
+        // kind - the same reason `cv` is `None` rather than zero.
+        mad: None,
         ci95: None,
     }
 }

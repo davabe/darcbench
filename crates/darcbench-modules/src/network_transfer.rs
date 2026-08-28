@@ -1583,9 +1583,16 @@ mod tests {
                     // ttfb.mean at 118% CV silently while flagging
                     // download.single at 44%. Jitter is exempt: its samples are
                     // per-path, so their spread is endpoint diversity.
-                    if metric.key != "tcp_connect.jitter"
-                        && metric.summary.cv.is_some_and(|cv| cv > 0.30)
-                    {
+                    //
+                    // `is_unstable` and not `cv > bound`, because those are no
+                    // longer the same question: a metric whose coefficient of
+                    // variation is wide but whose robust spread is narrow is one
+                    // slow repetition around a steady median, and the module
+                    // deliberately does not warn about it. Asserting the bare CV
+                    // here re-imposed the rule the module had just stopped
+                    // applying, and this test failed against a live network the
+                    // first time that happened - correctly.
+                    if metric.key != "tcp_connect.jitter" && metric.summary.is_unstable(0.30) {
                         assert!(
                             output.warnings.iter().any(|w| {
                                 w.code == WarningCode::HighVariance
