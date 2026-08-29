@@ -1159,10 +1159,17 @@ external security audit; public 1.0. **~14 ew.**
 
 ## Explicitly deferred
 
+> Two rows below were re-examined on 2026-08-29 when the client product line was decided
+> ([ADR-0015](adr/0015-two-product-lines-one-engine.md), [ADR-0016](adr/0016-client-reference-darc-ref-c1.md),
+> [ADR-0017](adr/0017-engine-shell-process-separation.md), [ADR-0018](adr/0018-gpu-compute-api.md)).
+> Neither deferral was wrong. Both said *this is a different product*, and the client line is that
+> different product — built beside this roadmap, sharing the measurement engine and nothing else.
+> This roadmap continues to describe the **server** line only.
+
 | Item | Why | Revisit |
 |---|---|---|
-| Windows Server support | Different measurement model entirely; no evidence of demand yet | After 1.0 |
-| GPU benchmarking | Different product | Not planned |
+| Windows **Server** support | Different measurement model entirely; no evidence of demand yet. That reading still holds — and the client line ([ADR-0015](adr/0015-two-product-lines-one-engine.md)) does **not** overturn it: it puts DARCBench on Windows as a *client* product with its own scoring model, and does not make the server agent run there | After 1.0 |
+| GPU benchmarking **in the server total** | *Different product* — and that was right: it became the client line. Scored under `dcs/x`, never contributing to `dbs/x`. See [ADR-0018](adr/0018-gpu-compute-api.md) | Not planned for `dbs` |
 | Synthetic transaction / uptime monitoring | Different product | Not planned |
 | Cost-efficiency scoring | Needs a price the agent cannot know; risks compromising neutrality | Phase 7, user-supplied price only |
 | Third-party modules in the official total | See ADR-0006 | Requires a curated signed registry |
