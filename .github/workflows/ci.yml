@@ -55,6 +55,63 @@ jobs:
       - name: Test
         run: cargo test --workspace --release
 
+  # The cross-platform ratchet (ADR-0015).
+  #
+  # This job lists the crates that are portable *today* and builds them on
+  # Windows and macOS. The list only ever grows: a crate is added when it
+  # becomes portable, and removing one is a deliberate act that has to be
+  # argued for in a pull request. That is what turns "the core is portable"
+  # from an assertion into something CI can fail on.
+  #
+  # Not advisory. The other advisory jobs here exist because their input can
+  # change underneath us (latest stable clippy, a future MSRV). This one is
+  # entirely within our control, so a regression is a bug, not news.
+  #
+  # `darcbench-report` is deliberately absent: it depends on
+  # `darcbench-inventory`, which is /proc and /sys. It joins the list when
+  # `HostFacts` lands. `darcbench-modules` joins when `darcbench-core` is
+  # extracted out of it.
+  cross-platform:
+    name: Cross-platform (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      PORTABLE_CRATES: "-p darcbench-protocol -p darcbench-scoring"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Same intent as the `rust` job's pin check, written portably: that job
+      # uses `grep -oP`, which is GNU-only and is not what macOS ships. The
+      # check matters more here than anywhere else - a different rustc means
+      # different codegen, and cross-OS numbers produced by two compilers
+      # measure the compilers.
+      - name: Verify the pinned toolchain is what we are actually using
+        run: |
+          expected="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          actual="$(rustc --version | cut -d' ' -f2)"
+          echo "pinned=$expected active=$actual"
+          [ "$actual" = "$expected" ] || {
+            echo "::error::rustc $actual does not match the pinned $expected"
+            exit 1
+          }
+
+      - name: Clippy
+        run: cargo clippy $PORTABLE_CRATES --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test $PORTABLE_CRATES --release
+
   web:
     name: Web UI
     runs-on: ubuntu-latest
