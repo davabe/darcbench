@@ -212,6 +212,47 @@ that silently dropped rows it could not read
 
 ### Added
 
+**A second product line, decided and recorded before any code moved**
+- DARCBench enters the client-device market alongside the server line. Four
+  ADRs carry the decisions: [0015](docs/adr/0015-two-product-lines-one-engine.md)
+  (two product lines, one measurement engine, two scoring models),
+  [0016](docs/adr/0016-client-reference-darc-ref-c1.md) (DARC-REF-C1, the client
+  reference), [0017](docs/adr/0017-engine-shell-process-separation.md) (the
+  client UI is a separate process, silent while measuring) and
+  [0018](docs/adr/0018-gpu-compute-api.md) (GPU API - **Proposed**, pending a
+  measurement).
+- **The engine is shared and the boundary is a crate, not a `cfg`.** Forking per
+  platform would destroy cross-platform comparability, which is the only thing
+  that makes a client benchmark worth building. `cfg(unix)` is the wrong tool
+  because macOS is unix and is a *client* target. `docs/CORE-EXTRACTION.md` is
+  the mechanical plan, with a verification gate on every step.
+- **One machine calibrates a `-dev` model, never a 1.0.** The client reference
+  will be characterised on a single host, so it carries `calibrated: false` and
+  `dcs/0.1.0-dev` until the three-host rule in SCORING-SYSTEM section 3.1 is
+  satisfied - the same discipline DARC-REF-1 is held to today.
+- **Cross-OS variance is disclosed, never corrected.** OS joins the
+  comparability tuple as rule 7, displayed and never silently pooled, exactly as
+  execution scope is under rule 6. An OS correction factor would buy less than
+  the credibility it costs.
+- ADR-0002 is amended rather than superseded: one repository stands, now with a
+  testable split trigger instead of "reconsider once the protocol is stable".
+  The two rows in ROADMAP's deferred table that this touches were re-examined
+  and neither was wrong - both said *this is a different product*, and the
+  client line is that different product.
+
+**Cross-platform CI ratchet**
+- A `cross-platform` job builds and tests the portable crates on
+  `windows-latest` and `macos-latest`. It starts at `darcbench-protocol` and
+  `darcbench-scoring`, and the list only ever grows: a crate is added when it
+  becomes portable and removing one has to be argued for. That is what turns
+  "the core is portable" from an assertion into something CI can fail on.
+- Not advisory. The other advisory jobs exist because their input can change
+  underneath us; this one is entirely within our control.
+- Its toolchain-pin check is written portably. The `rust` job's version uses
+  `grep -oP`, which is GNU-only and would fail on macOS - and the pin matters
+  more here than anywhere, because cross-OS numbers produced by two different
+  compilers measure the compilers.
+
 **`darcbench compare` refuses a category built from different workloads**
 - The fact landed in the bundle with `CategoryOutcome.modules`; this puts it in
   the index (schema 3) so a comparison can use it without opening either

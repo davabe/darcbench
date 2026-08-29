@@ -1,6 +1,7 @@
 # ADR-0002: Single monorepo with Cargo and pnpm workspaces
 
 **Status:** Accepted · **Date:** 2026-08-03
+**Amended by:** [ADR-0015](0015-two-product-lines-one-engine.md) — the decision stands, with a concrete split trigger
 
 ## Context
 
@@ -39,3 +40,15 @@ without pulling in a CLI, an HTTP server and a tokio runtime.
 
 Third parties begin depending on `darcbench-protocol` as a published crate, or
 the control plane grows a team that needs an independent release cadence.
+
+**Amended 2026-08-29 by [ADR-0015](0015-two-product-lines-one-engine.md).** The
+client product line raised the multi-repo question again and this decision was
+re-affirmed for the current phase, on the argument above: a second reference
+profile, a second scoring model, a GPU module and the `darcbench-core`
+extraction all touch protocol, scoring and modules together, so a version
+boundary through the middle of them is at its most expensive right now.
+
+ADR-0015 replaces "reconsider once the protocol is stable" with a testable
+trigger: **split when `darcbench-core` has produced a calibrated `dcs/1.0.0`
+and a platform product is ready to ship a signed installer.** Until both hold,
+one repository.

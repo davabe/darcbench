@@ -257,6 +257,7 @@ scripts/ tests/         validation and end-to-end checks
 [Research sources](docs/RESEARCH-SOURCES.md)
 
 **Building on it**
+[Core extraction](docs/CORE-EXTRACTION.md) ·
 [API](docs/API.md) ·
 [Real-time protocol](docs/REALTIME-PROTOCOL.md) ·
 [Data model](docs/DATA-MODEL.md)

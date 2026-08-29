@@ -18,3 +18,8 @@ and what would make us revisit it. An ADR is never deleted; it is superseded.
 | [0011](0011-network-tls-client.md) | rustls with the ring provider and the host trust store, for the network module | Accepted |
 | [0012](0012-load-generation.md) | In-process open-model load generator; saturation judged by the schedule, not by CPU | Accepted |
 | [0013](0013-executing-a-discovered-runtime.md) | Runtime modules execute the operator's interpreter, under a path allow-list and a safe-path check | Accepted |
+| [0014](0014-reverse-proxy-integration.md) | Reverse-proxy integration writes an inert file, never a live one | Accepted |
+| [0015](0015-two-product-lines-one-engine.md) | Two product lines, one measurement engine, two scoring models | Accepted |
+| [0016](0016-client-reference-darc-ref-c1.md) | DARC-REF-C1 as the client reference; one host calibrates a `-dev` model, never a 1.0 | Accepted |
+| [0017](0017-engine-shell-process-separation.md) | The client UI is a separate process, silent while measuring | Accepted |
+| [0018](0018-gpu-compute-api.md) | GPU API: wgpu on native backends, pending a backend-variance measurement | **Proposed** |
