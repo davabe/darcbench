@@ -9,6 +9,9 @@
 # The shared measurement engine: a change here moves numbers in both
 # product lines at once.
 /crates/darcbench-core/       @darcbench/methodology
+# The instrument calibration depends on: what it measures and how it
+# reports is a methodology question, not a tooling one.
+/crates/darcbench-characterise/ @darcbench/methodology
 /crates/darcbench-modules/    @darcbench/methodology
 /docs/SCORING-SYSTEM.md       @darcbench/methodology
 /docs/BENCHMARK-METHODOLOGY.md @darcbench/methodology

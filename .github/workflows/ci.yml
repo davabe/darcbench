@@ -86,7 +86,7 @@ jobs:
       run:
         shell: bash
     env:
-      PORTABLE_CRATES: "-p darcbench-protocol -p darcbench-scoring -p darcbench-core"
+      PORTABLE_CRATES: "-p darcbench-protocol -p darcbench-scoring -p darcbench-core -p darcbench-characterise"
     steps:
       - uses: actions/checkout@v4
 

@@ -13,6 +13,7 @@ Full reasoning and rejected alternatives: [ADR-0009](docs/adr/0009-licensing.md)
 | `crates/darcbench-inventory` | Apache-2.0 |
 | `crates/darcbench-scoring` | Apache-2.0 |
 | `crates/darcbench-core` | Apache-2.0 |
+| `crates/darcbench-characterise` | Apache-2.0 |
 | `crates/darcbench-modules` | Apache-2.0 |
 | `crates/darcbench-report` | Apache-2.0 |
 | `crates/darcbench-agent` | Apache-2.0 |

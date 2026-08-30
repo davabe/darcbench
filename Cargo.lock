@@ -499,6 +499,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "darcbench-characterise"
+version = "0.1.0"
+dependencies = [
+ "darcbench-core",
+ "darcbench-protocol",
+ "serde_json",
+]
+
+[[package]]
 name = "darcbench-core"
 version = "0.1.0"
 dependencies = [
