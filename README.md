@@ -81,9 +81,14 @@ The toolchains are pinned, so you do not choose versions:
 | pnpm | `packageManager` in [`apps/web/package.json`](apps/web/package.json) | 11.20.0 — pnpm ≥ 10 self-selects it |
 
 Both pins are verified in CI: a job fails if the running version is not the
-pinned one. The Rust pin is *not* the MSRV — `rust-version = "1.82"` in
-`Cargo.toml` remains the minimum a consumer needs. The pin is the single version
-we all build, lint and test with, so nobody sees diagnostics nobody else sees.
+pinned one. The Rust pin is *not* the MSRV — `rust-version = "1.88"` in
+`Cargo.toml` is the minimum a consumer needs. The pin is the single version we
+all build, lint and test with, so nobody sees diagnostics nobody else sees.
+
+The MSRV is measured rather than aspirational: the `msrv` CI job builds the
+workspace with exactly that toolchain, and `Cargo.toml` records which
+dependencies set the floor. It moves up when a dependency requires it, and that
+is a change with a changelog entry — never a silent one.
 
 > **On dependency build scripts.** [`apps/web/pnpm-workspace.yaml`](apps/web/pnpm-workspace.yaml)
 > declares `allowBuilds: { esbuild: false }`. esbuild's postinstall script is
