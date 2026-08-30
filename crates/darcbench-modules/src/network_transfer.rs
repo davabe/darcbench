@@ -1274,6 +1274,45 @@ mod tests {
         }
     }
 
+    /// The stability exemption list must name metrics this module really
+    /// produces, and must never grow to cover the ones that measure the machine.
+    ///
+    /// `PATH_LATENCY_METRICS` is a list of string keys, an arrangement its own
+    /// comment defends on the grounds that it lives twenty lines from where the
+    /// metrics are built. The price of that arrangement is that a rename or a
+    /// typo makes an entry quietly stop matching, and the metric it was meant to
+    /// exempt goes back to being judged for a fact about the endpoint's postcode.
+    ///
+    /// Nothing deterministic checked this before. The only thing exercising the
+    /// exemption was a live-network test, which is how that test's own copy of
+    /// the rule stayed at "jitter only" through the list widening to five - and
+    /// then failed, intermittently and for real reasons, whenever somebody
+    /// else's CDN was slow.
+    #[test]
+    fn the_stability_exemption_names_real_metrics_and_spares_no_throughput() {
+        let produced = [
+            "dns_resolve.mean",
+            "tcp_connect.mean",
+            "tcp_connect.jitter",
+            "tls_handshake.mean",
+            "ttfb.mean",
+            "download.single",
+            "download.multi",
+        ];
+        for exempt in PATH_LATENCY_METRICS {
+            assert!(
+                produced.contains(exempt),
+                "`{exempt}` is exempt from the stability judgement but is not a metric this                  module produces, so the exemption silently does nothing"
+            );
+        }
+        for throughput in ["download.single", "download.multi"] {
+            assert!(
+                !PATH_LATENCY_METRICS.contains(&throughput),
+                "`{throughput}` measures this machine's networking and must stay judged;                  exempting it would hide the instability the module exists to report"
+            );
+        }
+    }
+
     // --- the transfer ceiling ---------------------------------------------
 
     /// The ceiling is the mechanism that stops this being a traffic amplifier,
@@ -1608,22 +1647,38 @@ mod tests {
                         metric.summary.n
                     );
 
-                    // Every per-repetition metric is checked against the
-                    // variance bound, not just the ones built in the loop that
-                    // happened to contain the check. A live run published
-                    // ttfb.mean at 118% CV silently while flagging
-                    // download.single at 44%. Jitter is exempt: its samples are
-                    // per-path, so their spread is endpoint diversity.
+                    // Every metric the module actually judges is checked
+                    // against the variance bound, not just the ones built in the
+                    // loop that happened to contain the check. A live run
+                    // published ttfb.mean at 118% CV silently while flagging
+                    // download.single at 44%.
                     //
-                    // `is_unstable` and not `cv > bound`, because those are no
-                    // longer the same question: a metric whose coefficient of
-                    // variation is wide but whose robust spread is narrow is one
-                    // slow repetition around a steady median, and the module
-                    // deliberately does not warn about it. Asserting the bare CV
-                    // here re-imposed the rule the module had just stopped
-                    // applying, and this test failed against a live network the
-                    // first time that happened - correctly.
-                    if metric.key != "tcp_connect.jitter" && metric.summary.is_unstable(0.30) {
+                    // This assertion has now been wrong in both of its halves,
+                    // the same way twice: by restating the module's rule instead
+                    // of reading it.
+                    //
+                    // First the bound. `is_unstable` and not `cv > bound`,
+                    // because those are not the same question: a metric whose
+                    // coefficient of variation is wide but whose robust spread
+                    // is narrow is one slow repetition around a steady median,
+                    // and the module deliberately does not warn about it.
+                    //
+                    // Then the exemption. This read `key != "tcp_connect.jitter"`
+                    // - true when jitter was the only exemption, stale from the
+                    // moment `PATH_LATENCY_METRICS` grew to five. Those four
+                    // extra metrics measure distance to the endpoint rather than
+                    // this machine's networking, so the module excludes them from
+                    // the stability judgement on purpose; asserting they must
+                    // warn made this test fail whenever somebody else's CDN was
+                    // slow, which is exactly the fact the exclusion exists to
+                    // stop reporting. Read the list and the manifest bound rather
+                    // than copying either, so widening one cannot desynchronise
+                    // this again.
+                    if !PATH_LATENCY_METRICS.contains(&metric.key.as_str())
+                        && metric
+                            .summary
+                            .is_unstable(module.manifest().stability_cv_bound)
+                    {
                         assert!(
                             output.warnings.iter().any(|w| {
                                 w.code == WarningCode::HighVariance

@@ -10,6 +10,38 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ### Fixed
 
+**A CI failure blamed on the network was the test disagreeing with the module**
+- `an_unreachable_network_fails_the_module_rather_than_scoring_zero` failed
+  intermittently, on `main` and on branches, always with
+  `ttfb.mean exceeded the variance bound without a warning`. It looked like
+  flakiness in a test that measures the live internet. It was not.
+- The module skips every key in `PATH_LATENCY_METRICS` - `dns_resolve.mean`,
+  `tcp_connect.mean`, `tcp_connect.jitter`, `tls_handshake.mean`, `ttfb.mean` -
+  when deciding whether to raise `HighVariance`, because those measure distance
+  to the endpoint rather than this machine's networking. The test exempted only
+  `tcp_connect.jitter`, which was correct when jitter was the only entry and
+  stale from the moment the list grew to five. So the test demanded a warning
+  for `ttfb.mean` that the module will never emit - and it noticed exactly when
+  somebody else's CDN was slow, which is the fact the exclusion exists to stop
+  reporting.
+- **The bounds were never the problem.** Both sides use 0.30; the module reads it
+  from its manifest and the test had it hardcoded. Both sides call `is_unstable`.
+  Only the exemption list diverged.
+- The test now reads `PATH_LATENCY_METRICS` and `manifest().stability_cv_bound`
+  rather than restating either, so widening one cannot desynchronise it again.
+  This assertion has now been wrong in both halves the same way - by copying the
+  module's rule instead of reading it - and the comment says so, because the
+  first fix did not stop the second.
+- **A deterministic test now guards the list**, which nothing did before: the
+  only thing exercising the exemption was the live-network test, which is how it
+  drifted unnoticed. It asserts every exempt key is a metric the module really
+  produces, so a rename cannot silently void an exemption, and that neither
+  throughput metric is ever exempted, since those do measure the machine.
+- The other half of that test keeps its jitter-only special case on purpose:
+  `tcp_connect.jitter` is the one metric summarised per *path* rather than per
+  repetition, so it alone is bounded by the endpoint count. Being per-path and
+  being endpoint-distance are different properties, and only jitter has both.
+
 **`rust-version = "1.82"` was a promise the workspace could not keep** - found by
 the `msrv` job, which had been red on `main` and unread
 - Seventeen locked dependencies declare a `rust-version` above 1.82. The binding
