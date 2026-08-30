@@ -315,6 +315,14 @@ impl BenchmarkModule for CpuMixed {
 /// owns. What was wrong was that nothing in the bundle said which path had run,
 /// so a reader could not tell a slow CPU from a CPU missing one instruction.
 fn isa_dispatch() -> serde_json::Map<String, serde_json::Value> {
+    // `mut` is needed on x86_64 and unused everywhere else, because the only
+    // writer is the `cfg`-gated block below. Without the allow, `-D warnings`
+    // fails the build on every non-x86_64 target - including linux/arm64, which
+    // `docs/RELEASE-STRATEGY.md` ships. That went unnoticed until the
+    // cross-platform CI job started building on an arm64 runner: every job
+    // before it was `ubuntu-latest`, so nothing had ever linted this code on
+    // ARM at all.
+    #[allow(unused_mut)]
     let mut map = serde_json::Map::new();
     #[cfg(target_arch = "x86_64")]
     {
