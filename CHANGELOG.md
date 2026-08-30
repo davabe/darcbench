@@ -391,6 +391,14 @@ product lines share it and the compiler enforces that they do
   fact rather than a claim, and it is the actual deliverable here.
   `darcbench-modules` will never join that list - it is the server line and is
   Linux-only by design.
+- **The ratchet earned its keep on day one.** `macos-latest` is Apple Silicon,
+  so it is the first machine that has ever compiled this codebase on ARM - every
+  job before it was `ubuntu-latest`. It immediately failed `cpu_mixed`'s
+  `isa_dispatch`, whose `map` binding is only written inside a
+  `#[cfg(target_arch = "x86_64")]` block, making `mut` unused everywhere else
+  and `-D warnings` fatal. Latent on `main`, and latent on **linux/arm64**,
+  which `docs/RELEASE-STRATEGY.md` lists in the release matrix. Now an
+  `#[allow(unused_mut)]` carrying the explanation.
 - No measurement and no score changes. The five files moved without edits beyond
   visibility; the corpus, the seeds and the timing policy are byte-for-byte what
   they were.
