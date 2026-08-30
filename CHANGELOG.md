@@ -44,10 +44,14 @@ the `msrv` job, which had been red on `main` and unread
   change surfaced, both fixed here because CONTRIBUTING requires newly-fired
   lints to land in the same commit:
   - `clippy::manual_is_multiple_of` is MSRV-gated. `is_multiple_of` stabilised
-    in 1.87, so at 1.82 clippy suppressed the lint and at 1.88 it fires - four
-    sites in `storage_mixed`, `wordpress_fixture` and `workloads`. Every operand
-    is unsigned, where `x.is_multiple_of(n)` is exactly `x % n == 0`, so the
-    generated corpus is byte-identical and no measurement moves.
+    in 1.87, so at 1.82 clippy suppressed the lint and at 1.88 it fires - five
+    sites in `storage_mixed`, `wordpress_fixture`, `workloads` and the agent's
+    `runner`. They surfaced in two rounds: clippy stops at the first crate that
+    fails, so fixing `darcbench-modules` is what let it reach
+    `darcbench-agent`. Every operand is unsigned, where `x.is_multiple_of(n)` is
+    exactly `x % n == 0`, so the generated corpus is byte-identical and no
+    measurement moves. Two further `% n == 0` sites were left alone: clippy does
+    not flag them, and one infers `i32`, where `is_multiple_of` does not exist.
   - `wordpress_site.rs` did not compile on 1.88 at all: `E0716`, a temporary
     freed while `options` still borrowed it. Later compilers accept it, which is
     why nobody saw it. Now a `let` binding, with a comment saying why it must

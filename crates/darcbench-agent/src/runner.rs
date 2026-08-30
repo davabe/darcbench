@@ -1486,7 +1486,7 @@ impl RunManager {
                 // A heartbeat every 10 s lets a client distinguish "nothing is
                 // happening" from "the connection died".
                 ticks += 1;
-                if ticks % 10 == 0 {
+                if ticks.is_multiple_of(10) {
                     handle.emit(Event::Heartbeat(Heartbeat {
                         state: handle.state(),
                         last_seq: handle.last_seq(),
