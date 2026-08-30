@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-29
+**Amended:** 2026-08-30 - the allocator is recorded, not eliminated; see "The allocator row"
 **Phase:** 2
 **Supersedes:** nothing
 **Related:** [ADR-0015](0015-two-product-lines-one-engine.md), [ADR-0007](0007-scoring-versioning.md),
@@ -88,11 +89,31 @@ Known sources of cross-OS divergence, and the disposition of each:
 
 | Source | Disposition |
 |---|---|
-| Allocator (glibc vs Windows heap vs magazine_malloc) | **Eliminate.** Bundle one allocator on all targets |
+| Allocator (glibc vs Windows heap vs magazine_malloc) | **Record, then eliminate only if it proves large.** Revised 2026-08-30 - see below |
 | Toolchain (`target-cpu`, `opt-level`, `lto`, `codegen-units`) | **Eliminate.** Pin identically across targets, verify in CI |
 | Thread placement (P/E cores, macOS QoS classes) | **Control.** Set affinity and QoS explicitly. Homogeneous on the 9900X; not on Intel clients or Apple Silicon |
 | Timer resolution and cost | **Validate.** Re-check `MIN_REP_MS` per OS |
 | Filesystem (NTFS vs APFS vs ext4) | **Report.** This is a real property of the machine, not noise |
+
+#### The allocator row, revised 2026-08-30
+
+This ADR said *eliminate: bundle one allocator on all targets*. Building the
+instrument showed the price. Every production-grade replacement - mimalloc,
+rpmalloc, snmalloc - is C or C++, and this workspace is deliberately pure Rust
+apart from `rusqlite`; the `rustls` dependency comment records `aws-lc-sys`
+being rejected for needing `cmake` alone. Bundling would put a C toolchain
+requirement on the one crate that must build on MSVC, macOS and Linux, to remove
+a variable nobody has yet shown to be large.
+
+So the allocator is **recorded** rather than eliminated: `darcbench-characterise`
+carries the full target triple, which names the allocator and the CRT, and the
+allocation-heavy metrics are identified so its contribution shows up in the
+results instead of hiding in them. If the residual on those metrics is large,
+bundling becomes the round-two experiment and the C dependency is then worth its
+price, because it buys a known quantity rather than a guess.
+
+The other three rows stand as written. See
+[CHARACTERISATION-RUNBOOK](../CHARACTERISATION-RUNBOOK.md).
 
 For what remains after that, the disposition is **disclose, never correct**. An
 OS correction factor would look like fudging and would cost more credibility

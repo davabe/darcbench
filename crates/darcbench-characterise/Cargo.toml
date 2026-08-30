@@ -1,0 +1,28 @@
+[package]
+name = "darcbench-characterise"
+description = "Runs the portable measurement engine and emits raw per-repetition CSV. For characterising one machine across operating systems; never produces a score."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "darcbench-characterise"
+path = "src/main.rs"
+
+# Deliberately thin. This binary has to build on every target the client line
+# will ever reach, so it depends on the portable engine and nothing else that
+# could fail to compile somewhere. No CLI framework: the argument surface is
+# three flags and a hand-rolled parser cannot fail to build on a platform.
+#
+# No bundled allocator, and that is a revision of ADR-0016 rather than an
+# oversight - see the "Allocator" section in docs/CHARACTERISATION-RUNBOOK.md.
+[dependencies]
+darcbench-core.workspace = true
+darcbench-protocol.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

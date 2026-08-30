@@ -44,6 +44,7 @@ Two operating modes, one binary:
 | `darcbench-inventory` | Rust | Read-only system discovery, environment classification, telemetry sampling, redaction |
 | `darcbench-scoring` | Rust | Pure scoring model: normalisation, aggregation, composites |
 | `darcbench-core` | Rust | The portable measurement engine: module contract, timing harness, workloads, `cpu.mixed`, `memory.bandwidth`. No OS dependency; shared by both product lines (ADR-0015) |
+| `darcbench-characterise` | Rust | Runs the engine and emits raw per-repetition CSV. Characterisation only; never scores |
 | `darcbench-modules` | Rust | The server line's workloads - web, database, CMS, storage, network, deployment - and the allow-list registry |
 | `darcbench-report` | Rust | Result bundles, canonical JSON, Ed25519 signing, validation, HTML rendering |
 | `darcbench-agent` | Rust | CLI, dashboard server, run orchestration, preflight safety |

@@ -244,6 +244,50 @@ that silently dropped rows it could not read
 
 ### Added
 
+**`darcbench-characterise`: the instrument the cross-OS commitment needed**
+- [ADR-0016](docs/adr/0016-client-reference-darc-ref-c1.md) commits to measuring
+  and disclosing the cross-OS delta rather than correcting it. Nothing could
+  measure it: `darcbench-agent` is the server line and is Linux-only, and
+  `darcbench-core` is a library with no entry point. The commitment was
+  unexecutable by anyone, including its author.
+- A binary that runs `cpu.mixed` and `memory.bandwidth` through the real
+  `BenchmarkModule` path - the same calibration, repetition loop and statistics
+  the product publishes - and writes one CSV row per repetition, with provenance
+  as NDJSON on stderr. `--passes` repeats the whole suite, because a cross-OS
+  delta means nothing without the within-OS spread to compare it against.
+- **It never produces a score.** No reference profile, no normalisation, no
+  bundle, no signature. Raw physical units are the only thing that can honestly
+  be compared across two operating systems before anyone knows what the delta is.
+- **`MachineFacts` is left at its default on every platform, deliberately.** Fact
+  discovery is `/proc` on Linux and would be WMI on Windows, so populating it
+  would feed the two runs different inputs and fold the gap between two inventory
+  implementations into a number reported as an OS difference. The cost is stated
+  rather than hidden: `memory.bandwidth` sizes its working set from an assumed
+  cache, so its absolute figures are not comparable with a full agent run.
+- It carries its own `build.rs` for the target triple, the same reason
+  `darcbench-report` has one: `x86_64-pc-windows-msvc` and
+  `x86_64-pc-windows-gnu` would otherwise both report `x86_64-windows` and be
+  compared as the same machine, when they differ in allocator and CRT.
+- Joined the cross-platform ratchet. An instrument for comparing operating
+  systems that only builds on one of them is not an instrument.
+- [docs/CHARACTERISATION-RUNBOOK.md](docs/CHARACTERISATION-RUNBOOK.md) is the
+  procedure: native boots only - a VM or WSL2 measures the hypervisor - the same
+  pinned compiler on both sides, and a decision rule that refuses to call a delta
+  a finding unless it exceeds the within-OS spread.
+
+**ADR-0016's allocator row is amended: recorded, not eliminated**
+- It said *bundle one allocator on all targets*. Building the instrument showed
+  the price: every production-grade replacement is C or C++, and this workspace
+  is pure Rust apart from `rusqlite` - `aws-lc-sys` was already rejected for
+  needing `cmake` alone. Bundling would put a C toolchain on the one crate that
+  must build on MSVC, macOS and Linux, to remove a variable nobody has shown to
+  be large.
+- The target triple names the allocator and the CRT, and the allocation-heavy
+  metrics are called out in the runbook, so its contribution appears in the
+  results rather than hiding in them. If that residual is large, bundling becomes
+  the round-two experiment and the C dependency then buys a known quantity
+  instead of a guess.
+
 **A second product line, decided and recorded before any code moved**
 - DARCBench enters the client-device market alongside the server line. Four
   ADRs carry the decisions: [0015](docs/adr/0015-two-product-lines-one-engine.md)
