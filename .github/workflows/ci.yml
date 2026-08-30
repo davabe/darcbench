@@ -67,10 +67,14 @@ jobs:
   # change underneath us (latest stable clippy, a future MSRV). This one is
   # entirely within our control, so a regression is a bug, not news.
   #
+  # `darcbench-core` joined here when it was extracted out of `darcbench-modules`
+  # (ADR-0015). Green on both runners is what makes "the engine is portable" a
+  # fact rather than a claim.
+  #
   # `darcbench-report` is deliberately absent: it depends on
   # `darcbench-inventory`, which is /proc and /sys. It joins the list when
-  # `HostFacts` lands. `darcbench-modules` joins when `darcbench-core` is
-  # extracted out of it.
+  # `HostFacts` lands. `darcbench-modules` never joins - it is the server line,
+  # and it is Linux-only by design.
   cross-platform:
     name: Cross-platform (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -82,7 +86,7 @@ jobs:
       run:
         shell: bash
     env:
-      PORTABLE_CRATES: "-p darcbench-protocol -p darcbench-scoring"
+      PORTABLE_CRATES: "-p darcbench-protocol -p darcbench-scoring -p darcbench-core"
     steps:
       - uses: actions/checkout@v4
 

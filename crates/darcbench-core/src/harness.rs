@@ -8,6 +8,16 @@
 //! contain are the same decisions whatever is being measured - and a module
 //! that quietly diverged from them would produce numbers that look comparable
 //! and are not.
+//!
+//! # Visibility
+//!
+//! [`calibrate_with`], [`time_reps`] and [`RepOutcome`] are `pub` rather than
+//! `pub(crate)` because the server line's modules call them from
+//! `darcbench-modules`, across the crate boundary introduced by
+//! [ADR-0015](../../../docs/adr/0015-two-product-lines-one-engine.md).
+//! [`MIN_REP_MS`] and [`MAX_CALIBRATION_ITERATIONS`] stay `pub(crate)`: nothing
+//! outside this crate reads them, and measurement policy is not a number a
+//! consumer should be able to branch on.
 
 use darcbench_protocol::metrics::{MetricSample, Warning, WarningCode};
 
@@ -50,7 +60,7 @@ const MAX_CALIBRATION_GROWTH: f64 = 16.0;
 /// trustworthy duration converges in a handful of probes instead, and because
 /// the probes it skips are the small ones it also cuts calibration's own
 /// wall-clock cost.
-pub(crate) fn calibrate_with(
+pub fn calibrate_with(
     target_ms: u64,
     reporter: &dyn ModuleReporter,
     mut probe: impl FnMut(u64) -> f64,
@@ -89,13 +99,13 @@ pub(crate) fn calibrate_with(
 }
 
 /// What the repetition loop produced for one metric.
-pub(crate) struct RepOutcome {
+pub struct RepOutcome {
     /// Every repetition, warm-ups included and flagged.
-    pub(crate) samples: Vec<MetricSample>,
+    pub samples: Vec<MetricSample>,
     /// Values from the measured (non-warm-up) repetitions only.
-    pub(crate) measured: Vec<f64>,
+    pub measured: Vec<f64>,
     /// Validation warnings raised during the loop.
-    pub(crate) warnings: Vec<Warning>,
+    pub warnings: Vec<Warning>,
 }
 
 /// Runs the warm-up and measured repetitions for one metric, streaming each to
@@ -108,7 +118,7 @@ pub(crate) struct RepOutcome {
 /// so the streamed progress fraction is monotonic across the whole module
 /// rather than restarting per metric.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn time_reps(
+pub fn time_reps(
     params: &ModuleParams,
     reporter: &dyn ModuleReporter,
     metric_key: &str,

@@ -43,7 +43,8 @@ Two operating modes, one binary:
 | `darcbench-protocol` | Rust | Wire types: ids, metrics, statistics, events, run lifecycle, result states |
 | `darcbench-inventory` | Rust | Read-only system discovery, environment classification, telemetry sampling, redaction |
 | `darcbench-scoring` | Rust | Pure scoring model: normalisation, aggregation, composites |
-| `darcbench-modules` | Rust | Module contract, workload implementations, the allow-list registry |
+| `darcbench-core` | Rust | The portable measurement engine: module contract, timing harness, workloads, `cpu.mixed`, `memory.bandwidth`. No OS dependency; shared by both product lines (ADR-0015) |
+| `darcbench-modules` | Rust | The server line's workloads - web, database, CMS, storage, network, deployment - and the allow-list registry |
 | `darcbench-report` | Rust | Result bundles, canonical JSON, Ed25519 signing, validation, HTML rendering |
 | `darcbench-agent` | Rust | CLI, dashboard server, run orchestration, preflight safety |
 | `apps/web` | TypeScript / React | The dashboard, compiled into the agent binary |

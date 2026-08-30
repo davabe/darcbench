@@ -1,0 +1,29 @@
+[package]
+name = "darcbench-core"
+description = "The portable DARCBench measurement engine: the module contract, the timing harness, and the workloads shared by every product line."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# Nothing here may depend on an operating system. That is the whole point of the
+# crate boundary (ADR-0015): the server line and the client line share one
+# measurement engine, and the compiler is what keeps it that way. `rustix`,
+# `rustls` and the rest of the server line's dependencies are deliberately
+# absent - `rustix`'s `OFlags::DIRECT` alone is Linux-only and is the single
+# reason `darcbench-modules` cannot compile on macOS.
+#
+# The `cross-platform` CI job builds this crate on Windows and macOS. A
+# dependency added here that does not build on both will fail it.
+[dependencies]
+darcbench-protocol.workspace = true
+flate2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

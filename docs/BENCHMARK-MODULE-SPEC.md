@@ -1,7 +1,7 @@
 # Benchmark module specification
 
 **Version:** `darcbench.module/1`
-**Contract:** `crates/darcbench-modules/src/module.rs`
+**Contract:** `crates/darcbench-core/src/module.rs`
 
 A module is a **versioned workload definition**, not a script. It declares
 everything the agent and the safety layer need *before* it runs.

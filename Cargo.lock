@@ -499,6 +499,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "darcbench-core"
+version = "0.1.0"
+dependencies = [
+ "darcbench-protocol",
+ "flate2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "darcbench-inventory"
 version = "0.1.0"
 dependencies = [
@@ -516,6 +528,7 @@ name = "darcbench-modules"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "darcbench-core",
  "darcbench-protocol",
  "flate2",
  "hex",
