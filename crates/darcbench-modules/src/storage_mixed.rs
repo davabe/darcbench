@@ -295,7 +295,7 @@ impl AlignedBuffer {
 
     /// True when the usable slice really starts on an [`ALIGN`] boundary.
     fn is_aligned(&self) -> bool {
-        self.as_slice().as_ptr() as usize % ALIGN == 0
+        (self.as_slice().as_ptr() as usize).is_multiple_of(ALIGN)
     }
 }
 

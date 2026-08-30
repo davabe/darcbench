@@ -40,6 +40,18 @@ the `msrv` job, which had been red on `main` and unread
 - README claimed 1.82 "remains the minimum a consumer needs", which contradicted
   the code. Corrected, with the standard the number is now held to: measured by
   the `msrv` job, and moved only with a changelog entry.
+- **Raising the floor made CI fail, which is the point.** Two consequences the
+  change surfaced, both fixed here because CONTRIBUTING requires newly-fired
+  lints to land in the same commit:
+  - `clippy::manual_is_multiple_of` is MSRV-gated. `is_multiple_of` stabilised
+    in 1.87, so at 1.82 clippy suppressed the lint and at 1.88 it fires - four
+    sites in `storage_mixed`, `wordpress_fixture` and `workloads`. Every operand
+    is unsigned, where `x.is_multiple_of(n)` is exactly `x % n == 0`, so the
+    generated corpus is byte-identical and no measurement moves.
+  - `wordpress_site.rs` did not compile on 1.88 at all: `E0716`, a temporary
+    freed while `options` still borrowed it. Later compilers accept it, which is
+    why nobody saw it. Now a `let` binding, with a comment saying why it must
+    stay one.
 - **The job stays advisory for now.** Its own comment says to promote it "once
   it has been green for a release", and it has not been green yet. The reason
   this went unseen is worth stating: `continue-on-error: true` means a red MSRV

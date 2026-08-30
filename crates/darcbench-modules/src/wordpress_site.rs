@@ -693,10 +693,16 @@ impl WordpressSite {
         env: &[String],
         base: &str,
     ) -> Result<(), ModuleError> {
+        // Bound rather than inlined into the struct literal: as a temporary it
+        // is freed at the end of that statement while `options` still borrows it,
+        // which rustc 1.88 - the declared MSRV - rejects with E0716. Later
+        // compilers accept it, so inlining this again would compile here and
+        // break the MSRV job.
+        let web_container = container_name(run_id, images.web.key());
         let options = Ephemeral {
             env,
             network: Some(network),
-            volumes_from: Some(&container_name(run_id, images.web.key())),
+            volumes_from: Some(&web_container),
             stdin: None,
         };
         // `wp` explicitly rather than relying on the image's entrypoint to add

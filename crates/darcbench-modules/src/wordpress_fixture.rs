@@ -645,7 +645,7 @@ fn build_post(
     // A long tail with no comments at all, because a corpus where every post
     // is commented would let a theme's comment query look uniformly expensive
     // and hide the case an operator actually has.
-    let comment_count = if index % 3 == 0 {
+    let comment_count = if index.is_multiple_of(3) {
         0
     } else {
         1 + (next(rng) as usize % counts.max_comments)
