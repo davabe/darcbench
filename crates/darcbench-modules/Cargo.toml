@@ -1,6 +1,6 @@
 [package]
 name = "darcbench-modules"
-description = "Benchmark module contract and the first-party DARCBench workload modules."
+description = "The DARCBench server line's workload modules: web, database, CMS, storage, network and deployment."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 darcbench-protocol.workspace = true
+darcbench-core.workspace = true
 chrono.workspace = true
 # For `O_DIRECT` and `statvfs` through safe wrappers; the workspace forbids
 # `unsafe_code`, so raw libc calls are not an option.

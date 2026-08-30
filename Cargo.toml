@@ -108,6 +108,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 darcbench-protocol = { path = "crates/darcbench-protocol", version = "0.1.0" }
+darcbench-core = { path = "crates/darcbench-core", version = "0.1.0" }
 darcbench-inventory = { path = "crates/darcbench-inventory", version = "0.1.0" }
 darcbench-scoring = { path = "crates/darcbench-scoring", version = "0.1.0" }
 darcbench-modules = { path = "crates/darcbench-modules", version = "0.1.0" }

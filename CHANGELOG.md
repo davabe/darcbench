@@ -360,6 +360,41 @@ that silently dropped rows it could not read
 
 ### Changed
 
+**`darcbench-core`: the measurement engine is now its own crate**, so both
+product lines share it and the compiler enforces that they do
+- `module`, `harness`, `workloads`, `cpu.mixed` and `memory.bandwidth` moved out
+  of `darcbench-modules` into `darcbench-core`. What stayed is everything that
+  needs an operating system: a process, a listening socket, a container daemon,
+  an interpreter the operator installed, or a filesystem beyond a scratch file.
+  Follows [ADR-0015](docs/adr/0015-two-product-lines-one-engine.md) and the plan
+  in [docs/CORE-EXTRACTION.md](docs/CORE-EXTRACTION.md).
+- **The boundary is a crate, not a `#[cfg(unix)]`.** The distinction is product
+  line, not OS family: macOS is unix and is a *client* target, so a `cfg(unix)`
+  gate would have compiled the WordPress module for a MacBook.
+- **No server module changed, and neither did the agent.** The engine is
+  re-exported at `darcbench-modules`' root, so `crate::harness`, `crate::module`
+  and `crate::workloads` keep resolving in all seventeen remaining module files,
+  and `darcbench_modules::module::ModuleReporter` still works for the agent.
+  That the agent needed no edit was the gate the extraction was held to.
+- **`darcbench-core` drops `rustix` entirely**, along with `rcgen`, `rustls` and
+  the rest of the server line's tree. `rustix`'s `OFlags::DIRECT` is a
+  Linux-only constant and was the single reason this code could not compile on
+  macOS, so the boundary removes that blocker by construction rather than by
+  `cfg`.
+- `harness`'s `calibrate_with`, `time_reps` and `RepOutcome` are now `pub`
+  rather than `pub(crate)`, because the server modules call them across the new
+  boundary. `MIN_REP_MS` and `MAX_CALIBRATION_ITERATIONS` stay `pub(crate)`:
+  nothing outside reads them, and measurement policy is not a number a consumer
+  should branch on.
+- **The cross-platform ratchet gained `darcbench-core`.** Green on
+  `windows-latest` and `macos-latest` is what makes "the engine is portable" a
+  fact rather than a claim, and it is the actual deliverable here.
+  `darcbench-modules` will never join that list - it is the server line and is
+  Linux-only by design.
+- No measurement and no score changes. The five files moved without edits beyond
+  visibility; the corpus, the seeds and the timing policy are byte-for-byte what
+  they were.
+
 - CI cancels superseded runs on branches, and installs `cargo-audit` and
   `cargo-deny` prebuilt rather than compiling both from source on every run.
 - Two comments corrected to match their configuration: the crossterm note
