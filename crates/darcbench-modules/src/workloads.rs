@@ -180,7 +180,7 @@ impl CompressDeflate {
         while corpus.len() < Self::CORPUS_BYTES {
             let word = WORDS[(rng.next_u64() % WORDS.len() as u64) as usize];
             corpus.extend_from_slice(word.as_bytes());
-            corpus.push(if rng.next_u64() % 12 == 0 {
+            corpus.push(if rng.next_u64().is_multiple_of(12) {
                 b'\n'
             } else {
                 b' '
@@ -264,7 +264,7 @@ impl JsonRoundtrip {
                     "sku": format!("SKU-{:08X}", rng.next_u64() & 0xFFFF_FFFF),
                     "title": "Deterministic product record for benchmark corpus",
                     "price_cents": rng.next_u64() % 100_000,
-                    "in_stock": rng.next_u64() % 2 == 0,
+                    "in_stock": rng.next_u64().is_multiple_of(2),
                     "tags": ["hosting", "server", "benchmark"],
                     "attributes": {
                         "weight_g": rng.next_u64() % 5_000,
