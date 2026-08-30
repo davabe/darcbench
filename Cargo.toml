@@ -5,7 +5,25 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+# The lowest rustc that can build this workspace, and a promise to anyone
+# building from source. It is NOT the pinned build toolchain - that lives in
+# `rust-toolchain.toml` and is far newer.
+#
+# 1.88 is measured, not chosen. Seventeen locked dependencies declare a
+# `rust-version` above 1.82, in four families: time/time-core/time-macros,
+# rcgen, instability (via ratatui) and darling all require 1.88; the clap
+# family, zeroize, unicode-segmentation, security-framework, deranged and
+# base64ct require 1.85. The binding constraint is 1.88, so that is what is
+# declared. The `msrv` CI job is what verifies this and it is why the gap was
+# found at all.
+#
+# The alternative was pinning every one of those back to a version honouring
+# 1.82 - all of them have one. It was rejected: three of them (`zeroize`,
+# `base64ct`, `security-framework`) and arguably `rcgen` are security-relevant,
+# and holding back upstream fixes in exactly those crates to protect an MSRV
+# number is the wrong trade for a project that keeps a threat model. Pinning
+# would also have to be redone after every `cargo update`.
+rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/davabe/darcbench"
 # The product's own site: what it measures, how to run it, the leaderboards.
@@ -46,9 +64,15 @@ rustls-pki-types = "1"
 # The live terminal dashboard (`crates/darcbench-agent/src/tui.rs`).
 #
 # Pinned to 0.29 rather than the current 0.30 because 0.30 raises its MSRV to
-# 1.88, and `rust-version` above promises 1.82. The dashboard is not worth
-# silently breaking that promise for consumers who build from source; when the
-# workspace MSRV moves past 1.88 for its own reasons, this can follow.
+# 1.88 - which `rust-version` above now declares, so the condition this pin was
+# waiting on has been met and 0.30 is unblocked. Bumping it is a separate change
+# that has to be compiled and tested, not folded into an MSRV correction.
+#
+# Worth recording why the pin failed at its stated job: it held 0.29 to protect
+# a 1.82 promise, and ratatui 0.29's own transitive `instability` drifted to
+# 0.3.13, which requires 1.88. The promise was broken *through the dependency
+# the pin was defending*. Pinning a direct dependency does not pin its graph -
+# only the lockfile plus a job that checks the lockfile can do that.
 #
 # crossterm is deliberately NOT a direct dependency: ratatui re-exports the
 # exact version it was built against as `ratatui::crossterm`, and depending on

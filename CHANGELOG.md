@@ -10,6 +10,42 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ### Fixed
 
+**`rust-version = "1.82"` was a promise the workspace could not keep** - found by
+the `msrv` job, which had been red on `main` and unread
+- Seventeen locked dependencies declare a `rust-version` above 1.82. The binding
+  ones need **1.88**: `time`/`time-core`/`time-macros`, `rcgen`, `instability`
+  and the `darling` family. A second tier needs 1.85: the `clap` family,
+  `zeroize`, `unicode-segmentation`, `security-framework`, `deranged` and
+  `base64ct`. `rust-version` is now 1.88, and `Cargo.toml` records which crates
+  set the floor so the next move is arguable rather than mysterious.
+- The immediate symptom was `clap_builder 4.6.5` failing to parse under Cargo
+  1.82 because it needs `edition2024`. That was a symptom and not the cause:
+  `clap = "4.5"` is a caret range, the lockfile drifted to 4.6.5 on some
+  `cargo update`, and pinning clap back would have fixed the error message while
+  leaving the 1.88 requirements untouched.
+- **Pinning everything back was considered and rejected.** Every offender does
+  have a version honouring 1.82, so it was available. But `zeroize`, `base64ct`
+  and `security-framework` - and arguably `rcgen` - are security-relevant, and
+  declining upstream fixes in exactly those crates to protect an MSRV number is
+  the wrong trade for a project that keeps a threat model. It would also have to
+  be redone after every `cargo update`.
+- **The ratatui pin failed at its stated job, and the comment now says so.**
+  ratatui was held at 0.29 because 0.30 raises its MSRV to 1.88 and "the
+  dashboard is not worth silently breaking that promise". ratatui 0.29's own
+  transitive `instability` then drifted to 0.3.13, which requires 1.88 - so the
+  promise was broken *through the dependency the pin was defending*. Pinning a
+  direct dependency does not pin its graph. Since 1.88 is now declared, ratatui
+  0.30 is unblocked; bumping it is a separate change that has to be compiled and
+  tested.
+- README claimed 1.82 "remains the minimum a consumer needs", which contradicted
+  the code. Corrected, with the standard the number is now held to: measured by
+  the `msrv` job, and moved only with a changelog entry.
+- **The job stays advisory for now.** Its own comment says to promote it "once
+  it has been green for a release", and it has not been green yet. The reason
+  this went unseen is worth stating: `continue-on-error: true` means a red MSRV
+  job still produces a green run conclusion, so the gap is only visible by
+  opening the job list. Promoting it is the follow-up.
+
 **A fresh `serve` listed runs it could not open** — found by running the agent,
 not by reading it
 - `GET /api/v1/runs` and `.../compare/...` answered from the SQLite index while
