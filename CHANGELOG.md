@@ -37,8 +37,10 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
   builders: a fixture that drifts from the protocol fails `tsc`.
 - The bundle is unchanged: tests are not part of the build, and `app.js` is the
   same size before and after.
-- `engines.node` moves to `>=22.13`, what Vitest 5 and jsdom 29 need. Building
-  the dashboard alone would run on an older 22.x; testing it does not.
+- `engines.node` moves to `^22.13.0 || ^24.0.0 || >=26.0.0`: the releases
+  Vitest 5 and jsdom 29 both support. Odd-numbered Node lines are excluded
+  because Vitest does not support them. Building the dashboard alone would run
+  on an older 22.x; testing it does not.
 
 ### Security
 
