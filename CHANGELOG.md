@@ -63,6 +63,15 @@ with any code change); this release ends that.
   from one compiler. The script now also refuses a binary of the wrong
   architecture, and builds `--locked`.
 
+### Security
+
+**rustls 0.23.43 → 0.23.45 (RUSTSEC-2026-0285)**
+- TLS 1.3 handshake messages were accepted across encryption-level boundaries.
+  Published 2026-09-14, after the last green run on `main`, and found by the
+  `Supply chain` job on this release's pull request. `rustls-webpki` moves to
+  0.103.15 with it. `network.transfer` and `web.static` are the TLS users; no
+  measurement changes.
+
 ### Fixed
 
 **A symlink-chain test assumed nobody runs the suite as root**
