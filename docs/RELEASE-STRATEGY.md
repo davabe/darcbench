@@ -68,7 +68,8 @@ arm64 with `--target aarch64-unknown-linux-musl`, cross-compiled by the same zig
 
 **What is wired up today.** [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 runs on a pushed `vX.Y.Z` tag, or by hand from `main` with the tag to create
-(the tag is only created once everything else has passed). It checks the tag
+(the tag is created atomically once every build has passed, and a failed
+publish is resumed by running again). It checks the tag
 matches the workspace version, is on `main` and has a CHANGELOG section; builds both static musl targets `--locked`
 and without any dependency cache; runs each binary (arm64 under qemu) to confirm
 its version and its embedded dashboard; and publishes deterministic `.tar.gz`
