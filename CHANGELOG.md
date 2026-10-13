@@ -42,9 +42,11 @@ with any code change); this release ends that.
 ### Added
 
 **Releases are built, attested and published from a tag**
-- `.github/workflows/release.yml` runs on `vX.Y.Z` tags. It refuses a tag that
-  does not match the workspace version, is not on `main`, or has no section
-  here, before compiling anything.
+- `.github/workflows/release.yml` runs on a pushed `vX.Y.Z` tag, or by hand
+  from `main` with the tag to create - created only after every other step has
+  passed, so a failed run leaves no tag. It refuses a tag that does not match
+  the workspace version, is not on `main`, already exists (by hand), or has no
+  section here, before compiling anything.
 - Static musl binaries for `x86_64-unknown-linux-musl` and
   `aarch64-unknown-linux-musl`, each run before it is published - arm64 under
   qemu - to check it reports the tagged version and has the dashboard embedded.
