@@ -17,7 +17,7 @@ changed silently.
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --release
-(cd apps/web && pnpm build)
+(cd apps/web && pnpm test && pnpm build)
 ./scripts/e2e.sh
 ```
 

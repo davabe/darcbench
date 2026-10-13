@@ -162,6 +162,10 @@ jobs:
         working-directory: apps/web
         run: pnpm install --frozen-lockfile && pnpm build
 
+      - name: Test
+        working-directory: apps/web
+        run: pnpm test
+
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist

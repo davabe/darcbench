@@ -294,6 +294,13 @@ function foldEvent(state: RunView, event: DarcEvent): RunView {
   }
 }
 
+/**
+ * The fold itself, exported for its tests. It is pure, and it is where the
+ * replay, bounding and ordering rules above actually live - so it is tested
+ * directly rather than only through an `EventSource`.
+ */
+export { reduce as reduceRunView, initial as initialRunView, LOG_LIMIT, TELEMETRY_WINDOW, FLUSH_MS, MAX_PENDING };
+
 export function useRunStream() {
   const [view, dispatch] = useReducer(reduce, initial);
   const sourceRef = useRef<EventSource | null>(null);
