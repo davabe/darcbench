@@ -10,6 +10,23 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ### Fixed
 
+**A symlink-chain test assumed nobody runs the suite as root**
+- `a_non_root_symlink_on_the_way_to_a_name_is_refused` builds a symlink and a
+  directory and expects both to be owned by uid != 0. Under root - a container,
+  a devcontainer, CI under `sudo` - they are owned by root, the module correctly
+  accepts them, and the test failed. The module was right; the fixture was not.
+- The test now hands its fixture to `nobody` with `lchown` when it finds it
+  owned by root, so the condition it guards against is constructed whoever runs
+  it. Nothing is skipped, and nothing outside the test changed.
+
+**The README described a build two phases old**
+- Its status table said four of five required categories, `dbs/0.1.0-dev`, and
+  every module beyond Phase 2 "not built yet"; its profile table marked
+  `standard`, `deep`, `read-only` and `web` as unavailable. All eleven modules
+  and every profile ship, and the model is `dbs/0.2.0-dev`. The layout omitted
+  `darcbench-core` and `darcbench-characterise`, and the command list omitted
+  `web-target`, `web-drive` and `proxy`.
+
 **A CI failure blamed on the network was the test disagreeing with the module**
 - `an_unreachable_network_fails_the_module_rather_than_scoring_zero` failed
   intermittently, on `main` and on branches, always with

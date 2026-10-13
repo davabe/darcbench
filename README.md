@@ -16,18 +16,20 @@ things, and refuses to publish a number it cannot defend.
 
 ## Status
 
-**Phase 1 complete; Phase 2 in progress. Working end to end, honest about what
-it is not.**
+**Phases 1, 3 and 4 complete; Phase 2 complete except calibration. Working end
+to end, honest about what it is not.**
 
 | | |
 |---|---|
-| ✅ Working | Agent, embedded dashboard, live event streaming, cancellation, `cpu.mixed`, `memory.bandwidth`, `storage.mixed` and `network.transfer` modules, scoring pipeline, signed result bundles, HTML/JSON/NDJSON reports, tamper detection |
-| ⚠️ Not calibrated | The scoring model `dbs/0.1.0-dev` has **not** been calibrated against reference hardware. Raw measurements are real; scores are development output |
-| ⏳ Not built yet | Web, PHP, Node.js, database, WordPress and deployment modules; the control plane |
+| ✅ Working | Agent, embedded dashboard, live event streaming, cancellation, eleven modules (`cpu.mixed`, `memory.bandwidth`, `storage.mixed`, `network.transfer`, `web.static`, `php.runtime`, `node.runtime`, `database.oltp`, `database.cache`, `wordpress.site`, `deployment.container`), every profile, scoring pipeline, signed result bundles, HTML/JSON/NDJSON reports, tamper detection, external load-generator mode, reverse-proxy integration |
+| ⚠️ Not calibrated | The scoring model `dbs/0.2.0-dev` has **not** been calibrated against reference hardware. Raw measurements are real; scores are development output |
+| ⏳ Not built yet | The control plane (Phase 5) and everything that depends on it: verification tiers above `Local`, public results, leaderboards |
 
-Every score this build produces is flagged `uncalibrated` and every run is
-`Partial`, because four of five required categories are implemented. That is the
-correct answer, not a limitation we are hiding.
+Every score this build produces is flagged `uncalibrated`. A `standard` run on a
+healthy machine completes with every required category measured; it still
+cannot be `Validated`, because that tier needs a calibrated model and a server
+that recomputes the score. That is the correct answer, not a limitation we are
+hiding.
 
 `network.transfer` is the only module that contacts anything outside the
 machine. It reaches a compile-time list of public measurement endpoints, sends
@@ -185,6 +187,9 @@ darcbench doctor              readiness and risk assessment
 darcbench inspect             full system inventory as JSON
 darcbench serve               local dashboard (loopback by default)
 darcbench run --profile ...   benchmark from the terminal
+darcbench web-target          host an origin for a load generator on another machine
+darcbench web-drive           drive load against a web-target, with its consent
+darcbench proxy ...           preview / apply / roll back a reverse-proxy config
 darcbench status              recent runs
 darcbench compare <a> <b>     two runs, metric by metric
 darcbench report [run_id]     stored bundle, or --html
@@ -201,11 +206,11 @@ Global: `--json`, `--no-color`, `--non-interactive`, `--home <dir>`,
 | Profile | Duration | Purpose | Status |
 |---|---|---|---|
 | `quick` | 3–6 min | First look at a VPS · makes no outbound connection | ✅ |
-| `standard` | 10–20 min | The comparable score | ⏳ needs Phase 3 modules |
-| `deep` | 30–60 min | Larger datasets, more repetitions | ⏳ |
+| `standard` | 10–20 min | The comparable score: the five required categories | ✅ |
+| `deep` | 30–60 min | Everything, including PHP, Node, databases, WordPress and containers | ✅ |
 | `endurance` | 1 h | Throttling, burst credits, noisy neighbours | ✅ |
-| `read-only` | 4–8 min | Sensitive production hosts | ⏳ |
-| `web` | 8–15 min | Static, TLS, PHP, Node, WordPress, DB | ⏳ |
+| `read-only` | 4–8 min | Sensitive production hosts | ✅ |
+| `web` | 8–15 min | Static, TLS, PHP, Node | ✅ |
 
 A profile with no implemented modules says so and refuses to start, rather than
 running a subset and calling it that profile.
@@ -230,7 +235,10 @@ crates/
   darcbench-protocol/   wire types: ids, metrics, statistics, events, run lifecycle
   darcbench-inventory/  read-only discovery, telemetry, privacy redaction
   darcbench-scoring/    the pure scoring model
-  darcbench-modules/    module contract, workloads, allow-list registry
+  darcbench-core/       portable measurement engine: module contract, harness,
+                        workloads, cpu.mixed, memory.bandwidth
+  darcbench-modules/    server workloads, allow-list registry
+  darcbench-characterise/ cross-OS characterisation instrument (no scores)
   darcbench-report/     bundles, canonical JSON, Ed25519 signing, validation, HTML
   darcbench-agent/      CLI, dashboard server, orchestration, preflight
 apps/

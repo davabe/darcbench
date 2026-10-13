@@ -675,8 +675,18 @@ mod tests {
         std::fs::create_dir_all(dir.join("real")).unwrap();
         std::os::unix::fs::symlink(dir.join("real"), dir.join("link")).unwrap();
 
-        // The test process is not root, so the link it just created is owned by
-        // uid != 0 - which is exactly the condition being guarded against.
+        // The condition being guarded against is a link and a directory owned
+        // by uid != 0. Run as an ordinary user, creating them is enough. Run as
+        // root - a container, a devcontainer, CI under sudo - they are owned by
+        // root and correctly accepted, so hand them to `nobody` to construct
+        // the same condition rather than assume who runs the suite.
+        if std::fs::symlink_metadata(&dir).unwrap().uid() == 0 {
+            const NOBODY: u32 = 65_534;
+            for path in [dir.join("link"), dir.join("real")] {
+                std::os::unix::fs::lchown(&path, Some(NOBODY), None).unwrap();
+            }
+        }
+
         let error = check_unresolved_chain(&dir.join("link").join("php"))
             .expect_err("a non-root symlink in the chain must be refused");
         assert!(
