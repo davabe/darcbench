@@ -13,14 +13,46 @@
 # release must be buildable by a contributor who cannot install packages, and
 # pinning the compiler pins the generated code for the C half of the binary.
 #
-# Usage:  scripts/build-static.sh [--check]
+# Usage:  scripts/build-static.sh [--check] [--target <triple>]
 #           --check   verify the toolchain and exit without building
+#           --target  x86_64-unknown-linux-musl (default) or
+#                     aarch64-unknown-linux-musl
+#
+# Both targets are built from an x86-64 host with the same zig. arm64 is a
+# cross build rather than a native one on purpose: one pinned compiler for the C
+# half of every published binary, instead of a second toolchain whose version
+# would have to be pinned and checked separately.
 set -euo pipefail
+
+CHECK_ONLY=0
+TARGET="x86_64-unknown-linux-musl"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --check) CHECK_ONLY=1 ;;
+        --target)
+            [ $# -ge 2 ] || { echo "--target needs a value" >&2; exit 2; }
+            TARGET="$2"
+            shift
+            ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+case "$TARGET" in
+    x86_64-unknown-linux-musl) ARCH="x86_64" ;;
+    aarch64-unknown-linux-musl) ARCH="aarch64" ;;
+    *) echo "unsupported target: $TARGET (x86_64- or aarch64-unknown-linux-musl)" >&2; exit 2 ;;
+esac
+# zig's spelling of the same target, and the env-var spelling cargo and cc-rs
+# derive from the rust triple.
+ZIG_TARGET="$ARCH-linux-musl"
+TRIPLE_ENV="$(echo "$TARGET" | tr 'a-z-' 'A-Z_')"
+TRIPLE_CC="$(echo "$TARGET" | tr '-' '_')"
 
 ZIG_VERSION="0.16.0"
 ZIG_SHA256="70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
 ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-TARGET="x86_64-unknown-linux-musl"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Kept out of `target/`, which `cargo clean` empties - re-downloading a 52 MB
@@ -29,7 +61,7 @@ TOOLS="${DARCBENCH_TOOLCHAIN_DIR:-$ROOT/.toolchain}"
 ZIG_DIR="$TOOLS/zig-x86_64-linux-$ZIG_VERSION"
 SHIM_DIR="$TOOLS/shim"
 # cc-rs derives this name from the target triple and will accept nothing else.
-SHIM="$SHIM_DIR/x86_64-linux-musl-gcc"
+SHIM="$SHIM_DIR/$ARCH-linux-musl-gcc"
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 
@@ -65,7 +97,7 @@ its own way and rejects \`x86_64-unknown-linux-gnu\` outright.
 import subprocess, sys
 args = [a for a in sys.argv[1:] if not a.startswith("--target=")]
 sys.exit(subprocess.call(
-    ["$ZIG_DIR/zig", "cc", "-target", "x86_64-linux-musl"] + args))
+    ["$ZIG_DIR/zig", "cc", "-target", "$ZIG_TARGET"] + args))
 SHIM_BODY
 chmod +x "$SHIM"
 
@@ -81,22 +113,35 @@ file "$probe/probe" | grep -q "statically linked" || {
 }
 say "toolchain ok: zig $("$ZIG_DIR/zig" version), static link confirmed"
 
-if [ "${1:-}" = "--check" ]; then
+if [ "$CHECK_ONLY" = 1 ]; then
     exit 0
 fi
 
 # `link-self-contained=no` because rust ships its own musl startup objects and
 # zig ships musl too: with both, `_start_c` is defined twice and the link fails.
 export PATH="$SHIM_DIR:$PATH"
-export CC_x86_64_unknown_linux_musl="$SHIM"
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-self-contained=no -C linker=$SHIM"
+export "CC_${TRIPLE_CC}=$SHIM"
+export "CARGO_TARGET_${TRIPLE_ENV}_RUSTFLAGS=-C link-self-contained=no -C linker=$SHIM"
 
 say "building $TARGET"
-cargo build --release --target "$TARGET" -p darcbench-agent
+# `--locked`: a static binary is what gets published and what calibration runs,
+# so it is built from the committed lockfile, never from whatever the registry
+# would resolve today.
+cargo build --release --locked --target "$TARGET" -p darcbench-agent
 
 BIN="$ROOT/target/$TARGET/release/darcbench"
 file "$BIN" | grep -q "statically linked" || {
     echo "the built binary is not statically linked" >&2
+    exit 1
+}
+# A cross build that silently produced a host binary would pass every other
+# check here and fail only on the machine it was shipped to.
+case "$ARCH" in
+    x86_64) EXPECT_ARCH="x86-64" ;;
+    aarch64) EXPECT_ARCH="ARM aarch64" ;;
+esac
+file "$BIN" | grep -q "$EXPECT_ARCH" || {
+    echo "the built binary is not $EXPECT_ARCH: $(file -b "$BIN")" >&2
     exit 1
 }
 # The hash goes in the bundle as `agent_build_hash`, so it is the thing that
@@ -104,4 +149,8 @@ file "$BIN" | grep -q "statically linked" || {
 # to guess it.
 say "built $(stat -c%s "$BIN") bytes"
 sha256sum "$BIN"
-"$BIN" --version
+# The binary is only run when it can be: an arm64 build on an x86-64 host is
+# checked by `file` above and executed by whoever has the hardware (or qemu).
+if [ "$ARCH" = "$(uname -m)" ]; then
+    "$BIN" --version
+fi

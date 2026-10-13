@@ -1,0 +1,239 @@
+name: Release
+
+# A release is a tag. Pushing `vX.Y.Z` builds the static binaries, attests where
+# they came from, and publishes them - nothing else starts this workflow, so a
+# release cannot be produced from a branch nobody reviewed.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+# Two pushes of the same tag must not race to publish one release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Read-only by default. Only `publish` is granted write, and only what it uses.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Everything that can make this release wrong without making it fail to build
+  # is checked first, before any minutes are spent compiling.
+  verify:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the tag has to be shown to be on `main`.
+          fetch-depth: 0
+
+      - name: The tag names the version the binary reports
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          declared="$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)"
+          echo "tag=$tag declared=$declared"
+          # `agent_version` goes into every bundle and is a comparability key. A
+          # binary published as v0.3.0 that reports 0.2.0 would put its results
+          # beside the wrong ones.
+          [ "$version" = "$declared" ] || {
+            echo "::error::tag $tag does not match the workspace version $declared in Cargo.toml"
+            exit 1
+          }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: The tag is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"
+            exit 1
+          }
+
+      - name: The changelog has this release's section
+        run: ./scripts/release-notes.sh "${{ steps.version.outputs.version }}" > /dev/null
+
+  web:
+    name: Web UI
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/web/package.json
+      # No dependency cache in this workflow, here or below. A cache is written
+      # by any branch's CI, and a release built from one would contain whatever
+      # that branch put there. Slower, and every input is the tag's.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install and build
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile && pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          if-no-files-found: error
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: [verify, web]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # Static musl only: one file, no libc version to match, and the build
+        # the calibration runbook requires. A glibc build from this runner would
+        # need glibc 2.39 and not start on Debian 12.
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      # The same script a contributor runs, so a release binary is produced the
+      # way field and calibration binaries are. It pins zig by checksum and
+      # refuses a binary that is not static or not the requested architecture.
+      - name: Build the static binary
+        run: ./scripts/build-static.sh --target "${{ matrix.target }}"
+
+      - name: The binary runs, embeds the dashboard, and reports this version
+        run: |
+          bin="target/${{ matrix.target }}/release/darcbench"
+          case "${{ matrix.target }}" in
+            aarch64-*)
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq qemu-user-static
+              run() { qemu-aarch64-static "$bin" "$@"; }
+              ;;
+            *) run() { "$bin" "$@"; } ;;
+          esac
+          reported="$(run --version)"
+          echo "$reported"
+          [ "$reported" = "darcbench $VERSION" ] || {
+            echo "::error::binary reports '$reported', expected 'darcbench $VERSION'"
+            exit 1
+          }
+          # `doctor` exits 2 when preflight would refuse a run, which a shared
+          # runner under load legitimately can. That is the runner's state, not
+          # the binary's; anything else is a crash.
+          status=0
+          run doctor --json --home "$RUNNER_TEMP/darcbench-home" > doctor.json || status=$?
+          cat doctor.json
+          [ "$status" = 0 ] || [ "$status" = 2 ] || {
+            echo "::error::doctor exited $status"
+            exit 1
+          }
+          # A release that silently fell back to the built-in console would
+          # still pass every check above.
+          jq -e '.ui_bundled == true' doctor.json > /dev/null || {
+            echo "::error::the dashboard is not embedded in this binary"
+            exit 1
+          }
+
+      - name: Package
+        run: |
+          name="darcbench-v${VERSION}-${{ matrix.target }}"
+          mkdir -p "dist/$name"
+          cp "target/${{ matrix.target }}/release/darcbench" "dist/$name/"
+          cp LICENSE README.md CHANGELOG.md "dist/$name/"
+          # Deterministic archive: fixed order, owner and mtime (the tagged
+          # commit's), and no timestamp in the gzip header. Two builds of the
+          # same binary produce the same archive.
+          mtime="$(git log -1 --format=%ct)"
+          tar --sort=name --mtime="@$mtime" --owner=0 --group=0 --numeric-owner \
+              -C dist -cf - "$name" | gzip -n -9 > "dist/$name.tar.gz"
+          # The bare binary's hash is what a bundle records as `agent_build_hash`,
+          # so it is published separately from the archive's: it is how anyone
+          # checks that a result came from this release.
+          (cd "dist/$name" && sha256sum darcbench) \
+            | sed "s|darcbench\$|$name/darcbench|" > "dist/$name.binary.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.binary.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # create the release
+      id-token: write       # sign the provenance attestation (keyless)
+      attestations: write   # store it
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- *.tar.gz > SHA256SUMS
+          # One file mapping every published binary to the `agent_build_hash` a
+          # bundle produced by it will carry.
+          cat -- *.binary.sha256 | sed 's/^/sha256:/' > AGENT-BUILD-HASHES
+          rm -f -- *.binary.sha256
+          cat SHA256SUMS AGENT-BUILD-HASHES
+
+      # SLSA build provenance, signed through Sigstore with this workflow's
+      # identity: anyone can check an archive was built here, from this tag,
+      # with `gh attestation verify <file> --repo davabe/darcbench`.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Release notes
+        run: |
+          {
+            echo "**Scores from this release are uncalibrated.** Raw measurements are real; every score is flagged \`uncalibrated\` until \`dbs/1.0.0\`. See [ROADMAP](https://github.com/davabe/darcbench/blob/${GITHUB_REF_NAME}/docs/ROADMAP.md)."
+            echo
+            echo "Static Linux binaries for x86-64 and arm64. Verify a download with \`sha256sum -c SHA256SUMS --ignore-missing\` and \`gh attestation verify <archive> --repo ${GITHUB_REPOSITORY}\`. \`AGENT-BUILD-HASHES\` lists the \`agent_build_hash\` each binary writes into its result bundles."
+            echo
+            ./scripts/release-notes.sh "$VERSION"
+          } > notes.md
+          wc -c notes.md
+
+      - name: Publish the release
+        run: |
+          flags=()
+          [ "${{ needs.verify.outputs.prerelease }}" = "true" ] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "DARCBench $GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            "${flags[@]}" \
+            dist/*.tar.gz dist/SHA256SUMS dist/AGENT-BUILD-HASHES

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 # The lowest rustc that can build this workspace, and a promise to anyone
 # building from source. It is NOT the pinned build toolchain - that lives in
@@ -107,12 +107,12 @@ tower-http = { version = "0.6", features = ["set-header", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-darcbench-protocol = { path = "crates/darcbench-protocol", version = "0.1.0" }
-darcbench-core = { path = "crates/darcbench-core", version = "0.1.0" }
-darcbench-inventory = { path = "crates/darcbench-inventory", version = "0.1.0" }
-darcbench-scoring = { path = "crates/darcbench-scoring", version = "0.1.0" }
-darcbench-modules = { path = "crates/darcbench-modules", version = "0.1.0" }
-darcbench-report = { path = "crates/darcbench-report", version = "0.1.0" }
+darcbench-protocol = { path = "crates/darcbench-protocol", version = "0.2.0" }
+darcbench-core = { path = "crates/darcbench-core", version = "0.2.0" }
+darcbench-inventory = { path = "crates/darcbench-inventory", version = "0.2.0" }
+darcbench-scoring = { path = "crates/darcbench-scoring", version = "0.2.0" }
+darcbench-modules = { path = "crates/darcbench-modules", version = "0.2.0" }
+darcbench-report = { path = "crates/darcbench-report", version = "0.2.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

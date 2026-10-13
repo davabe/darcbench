@@ -6,7 +6,7 @@ Four things version independently, on purpose:
 
 | Artifact | Format | Changes when |
 |---|---|---|
-| Agent | `0.1.0` | Any code change |
+| Agent | `0.2.0` | Any code change |
 | Event protocol | `darcbench.events/1` | Breaking wire change (major only) |
 | Bundle schema | `darcbench.bundle/1` | Breaking result-format change |
 | Scoring model | `dbs/0.2.0-dev` | Any change to how scores are computed |
@@ -63,7 +63,20 @@ The amd64 musl build is produced by
 [`scripts/build-static.sh`](../scripts/build-static.sh), which pins the C
 cross-compiler by checksum. Pinning it matters beyond reproducibility: SQLite is
 compiled from C into the same process the benchmark measures, so the compiler is
-part of the measurement in the same way the libc is. arm64 is not wired up yet.
+part of the measurement in the same way the libc is. The same script builds
+arm64 with `--target aarch64-unknown-linux-musl`, cross-compiled by the same zig.
+
+**What is wired up today.** [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+runs on a `vX.Y.Z` tag: it checks the tag matches the workspace version, is on
+`main` and has a CHANGELOG section; builds both static musl targets `--locked`
+and without any dependency cache; runs each binary (arm64 under qemu) to confirm
+its version and its embedded dashboard; and publishes deterministic `.tar.gz`
+archives, `SHA256SUMS`, SLSA build provenance signed through Sigstore, and
+`AGENT-BUILD-HASHES` - the `agent_build_hash` each binary writes into its
+bundles. glibc builds are not published: built on a current runner they need a
+newer glibc than Debian 12 has, and static musl is the default download anyway.
+`.deb`, `.rpm`, the container image, the SBOM and the reproducible-rebuild job
+below are not built yet.
 
 **Reproducible builds** (Phase 8): `--locked`, no build timestamps. Two
 independent builds of a tag must produce identical binaries, so the build-hash
