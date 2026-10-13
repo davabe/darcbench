@@ -8,6 +8,61 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-13
+
+The first tagged release, and the first with published binaries: static Linux
+builds for x86-64 and arm64, with build provenance and the `agent_build_hash`
+each one writes into its bundles.
+
+**Highlights since 0.1.0.** Ten modules beyond `cpu.mixed` - `memory.bandwidth`,
+`storage.mixed`, `network.transfer`, `web.static`, `php.runtime`,
+`node.runtime`, `database.oltp`, `database.cache`, `wordpress.site` and
+`deployment.container` - so every profile now runs and a healthy `standard` run
+measures all five required categories. The `endurance` profile; the open-model
+load generator and the external `web-target` / `web-drive` mode; reverse-proxy
+integration; the container isolation tier; a SQLite run index with `compare`,
+`status` and `prune`; the live terminal dashboard. The scoring model moves to
+`dbs/0.2.0-dev`: Network is scored on throughput, not on distance to an
+endpoint. The measurement engine is extracted into `darcbench-core` and proven
+portable on Windows and macOS, and `darcbench-characterise` measures the cross-OS
+delta the client line depends on.
+
+**Still true, and stated rather than hidden.** Scores are uncalibrated - every
+one is flagged `uncalibrated` until `dbs/1.0.0`. There is no control plane, so
+no run can be `Validated`. The agent is Linux-only.
+
+**Why there is no `v0.1.0` tag.** 0.1.0 was cut on 2026-08-03, before the
+earliest commit this repository's history retains. No commit here is the code
+that section describes, and tagging a later one as 0.1.0 would publish different
+code under a version whose changelog says something else - and the agent version
+is a comparability key in every bundle. Every build since then also reported
+`0.1.0`, which `docs/RELEASE-STRATEGY.md` forbids (the agent version changes
+with any code change); this release ends that.
+
+### Added
+
+**Releases are built, attested and published from a tag**
+- `.github/workflows/release.yml` runs on `vX.Y.Z` tags. It refuses a tag that
+  does not match the workspace version, is not on `main`, or has no section
+  here, before compiling anything.
+- Static musl binaries for `x86_64-unknown-linux-musl` and
+  `aarch64-unknown-linux-musl`, each run before it is published - arm64 under
+  qemu - to check it reports the tagged version and has the dashboard embedded.
+- Deterministic `.tar.gz` archives, `SHA256SUMS`, SLSA build provenance signed
+  through Sigstore (`gh attestation verify`), and `AGENT-BUILD-HASHES`, which
+  maps each binary to the `agent_build_hash` its bundles carry - the first half
+  of the build attestation `Verified` results will need.
+- No dependency cache in release builds: a cache can be written by any branch,
+  and a release must contain only what its tag does.
+- Notes come from this file through `scripts/release-notes.sh`, which can be run
+  locally to see exactly what a tag will publish.
+
+**`scripts/build-static.sh` builds arm64**
+- `--target aarch64-unknown-linux-musl`, cross-compiled with the same
+  checksum-pinned zig as x86-64, so the C half of every published binary comes
+  from one compiler. The script now also refuses a binary of the wrong
+  architecture, and builds `--locked`.
+
 ### Fixed
 
 **A symlink-chain test assumed nobody runs the suite as root**

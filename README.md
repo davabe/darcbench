@@ -128,7 +128,7 @@ cargo build --release          # binary at target/release/darcbench
 ```
 DARCBench doctor
 
-  agent            0.1.0
+  agent            0.2.0
   bundled web UI   yes
   scope            VirtualMachine
   cpu              Intel(R) Xeon(R) Processor @ 2.80GHz
