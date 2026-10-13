@@ -8,6 +8,48 @@ schema and scoring model. See [docs/RELEASE-STRATEGY.md](docs/RELEASE-STRATEGY.m
 
 ## [Unreleased]
 
+### Added
+
+**The dashboard has tests, and CI runs them**
+- 68 Vitest tests under `apps/web/src/*.test.ts(x)`, on jsdom, against the same
+  Vite configuration the embedded bundle is built with. `pnpm test` runs them;
+  the `Web UI` CI job now does too. Until now the dashboard's only check was
+  `tsc`, so nothing verified what it did - only that it type-checked.
+- What they hold the UI to:
+  - The SSE fold is idempotent, so a reconnect's replayed tail cannot
+    double-count.
+  - Warm-up samples are never charted, and telemetry and the log stay bounded.
+  - Events are applied once per flush window, or at once on a terminal event
+    or a full pool.
+  - The bearer token rides every request, run ids are path-encoded, and agent
+    error codes reach the UI.
+  - The token leaves the address bar only after the session exists.
+  - Comparisons put the worst regression first, never caption float noise as
+    a change, name what they could not line up, and drop answers for a pair
+    no longer selected.
+  - Category balance excludes facets and recognises a total on the weak-link
+    cap.
+- Each of those rules was checked by breaking the code it guards: eleven
+  deliberate defects, eleven failing tests.
+- Tests import from `vitest` explicitly rather than using globals, so
+  `tsc --noEmit` type-checks them with the application's own strict config and
+  no test types leak into application code. Event fixtures are fully typed
+  builders: a fixture that drifts from the protocol fails `tsc`.
+- The bundle is unchanged: tests are not part of the build, and `app.js` is the
+  same size before and after.
+- `engines.node` moves to `>=22.13`, what Vitest 5 and jsdom 29 need. Building
+  the dashboard alone would run on an older 22.x; testing it does not.
+
+### Security
+
+**Two dashboard build-tool advisories, cleared**
+- `nanoid` 3.3.20 and `source-map-js` 1.2.2, both reached through
+  `vite → postcss`, for a looping custom generator and an event-loop denial of
+  service in indexed source maps. Both were present on `main` before this
+  change. Neither ships: they run while building, and nothing from them is in
+  the embedded bundle. Updated in the lockfile within the ranges their parents
+  already allow; no override.
+
 ## [0.2.0] — 2026-10-13
 
 The first tagged release, and the first with published binaries: static Linux

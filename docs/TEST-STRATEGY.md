@@ -1,6 +1,6 @@
 # Test strategy
 
-**Today: 179 tests across six crates, all passing.** The rule for any change
+**Today: 643 Rust tests across the workspace and 68 dashboard tests, all passing.** The rule for any change
 affecting measurement or scoring is a test that would fail without it.
 
 ## Layers
@@ -13,6 +13,7 @@ affecting measurement or scoring is a test that would fail without it.
 | Contract | `protocol`, `canonical` | Serialisation stability, forward compatibility, signature round-trip |
 | End-to-end | `scripts/e2e.sh` | The real binary: doctor → run → verify → tamper detection |
 | Reference | `scripts/check-links.sh` | Every path named in a document or a doc comment still exists |
+| Dashboard | `apps/web/src/*.test.ts(x)` — Vitest, jsdom | The event fold, the API client, and what each panel says |
 | Browser | Playwright (manual) | The dashboard renders, streams and completes a run |
 
 ## What is covered today
@@ -81,6 +82,27 @@ affecting measurement or scoring is a test that would fail without it.
 - The uncalibrated banner is present.
 - The fallback console has no inline script that CSP would block.
 
+### Dashboard
+Run in CI by the `Web UI` job with `pnpm test`, against the same Vite
+configuration the embedded bundle is built with, and type-checked by
+`tsc --noEmit` alongside the application code.
+- **The event fold is idempotent.** A tail re-delivered after a reconnect
+  changes nothing, so `Last-Event-ID` recovery cannot double-count.
+- Warm-up samples are never charted; telemetry and the log stay bounded.
+- Events are pooled and applied once per flush window, at once on a terminal
+  event or a full pool — the observer-overhead rule, tested rather than assumed.
+- The bearer token goes on every request, run ids are path-encoded, agent error
+  codes survive to the UI, and the token leaves the URL only once the session
+  exists.
+- A comparison lists the largest regression first, never calls float noise a
+  change, names what it could not line up, and discards the answer for a pair
+  that is no longer selected.
+- Category balance leaves facets out and recognises a total sitting on the
+  weak-link cap.
+
+Each of these was checked by breaking the code it guards and watching a test
+fail.
+
 ## Gaps, stated plainly
 
 | Gap | Plan |
@@ -107,7 +129,7 @@ explicitly rather than reading the clock, so tests do not fail at midnight.
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --release
-(cd apps/web && pnpm build)          # includes tsc --noEmit
+(cd apps/web && pnpm test && pnpm build)   # build includes tsc --noEmit
 ./scripts/e2e.sh
 ```
 

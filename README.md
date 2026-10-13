@@ -300,7 +300,7 @@ measurement or scoring is a test that would fail without it.
 
 ```bash
 cargo fmt --all && cargo clippy --all-targets -- -D warnings && cargo test --workspace --release
-(cd apps/web && pnpm build)
+(cd apps/web && pnpm test && pnpm build)
 ./scripts/e2e.sh
 ```
 
